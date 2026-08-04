@@ -1,0 +1,38 @@
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Model directories (will be populated by install script)
+models/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pyvenv.cfg
+*.so
+.*.swp
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System
+.DS_Store
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*~
+tmp/
+temp/
