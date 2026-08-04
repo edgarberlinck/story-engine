@@ -18,8 +18,7 @@ from models import DIFFUSION_MODELS, SEGMENTATION_MODELS
 def install_models():
     """Install all required models for the project."""
     print("=== Installing Models ===")
-    print("This may take some time depending on your internet connection and the size of the models.")
-    print("This will take a shit load of disk space and, not less importantly, time. Grab a coffee, or two, or three. This is going to take a while.")
+    
     # Use model constants from models.py instead of hardcoded values
     models_to_install = {
         "diffusion": list(DIFFUSION_MODELS.keys()),
@@ -46,8 +45,15 @@ def install_models():
                     repo_id = model_name  # Fallback to direct name
                     
                 print(f"  - {model_name} ({repo_id})")
+                
+                # Check if model already exists
+                model_path = Path(category_dir) / model_name
+                if model_path.exists() and len(os.listdir(model_path)) > 0:
+                    print(f"    ✓ Model already installed, skipping...")
+                    continue
+                    
                 try:
-                    # Download the model
+                    # Download the model directly to project's models directory
                     download_path = snapshot_download(
                         repo_id=repo_id,
                         revision="main",
@@ -70,6 +76,22 @@ def install_models():
         print(f"Installation failed with error: {e}")
         sys.exit(1)
 
+def cleanup_hf_cache():
+    """Clean up Hugging Face cache (optional)."""
+    print("\n=== Cleaning Hugging Face Cache ===")
+    try:
+        from huggingface_hub import scan_cache_dir
+        cache_info = scan_cache_dir()
+        if cache_info.size_str != "0 bytes":
+            print(f"Cleaning up {cache_info.size_str} of cached files...")
+            # This will remove all cached files (be careful!)
+            deleted_bytes = cache_info.delete()
+            print(f"Cleaned up {deleted_bytes} bytes")
+        else:
+            print("No cached files to clean.")
+    except Exception as e:
+        print(f"Warning: Could not clean Hugging Face cache: {e}")
+
 def verify_models():
     """Verify that required models are installed."""
     print("\n=== Verifying Models ===")
@@ -90,3 +112,6 @@ def verify_models():
 if __name__ == "__main__":
     install_models()
     verify_models()
+    
+    # Optional: Clean up HF cache after installation
+    # cleanup_hf_cache()
