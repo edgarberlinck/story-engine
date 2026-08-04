@@ -1,5 +1,7 @@
 # Story Engine Project
 
+![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-blue.svg)
+
 ## Overview
 This project provides an organized system for managing machine learning models, primarily focused on image generation with diffusion models and segmentation models.
 
@@ -8,6 +10,7 @@ This project provides an organized system for managing machine learning models, 
 - Standardized model constants and configurations
 - Automated model installation script
 - Image generation capabilities using Hugging Face models
+- Generic task framework for flexible image generation
 
 ## Prerequisites
 Before running the project, you need to install and authenticate with the Hugging Face CLI:
