@@ -49,6 +49,7 @@ make generate
 ├── scripts/
 │   ├── install.py        # Model installation script
 │   └── image_generator.py # Image generation script
+├── outputs/              # Generated content storage directory
 └── models/               # Model storage directories
     ├── diffusion/        # Diffusion models (text-to-image)
     └── segmentation/     # Segmentation models
@@ -85,3 +86,11 @@ If you encounter authentication issues with Hugging Face models:
 1. Run `hf auth login` to authenticate
 2. Ensure your account has access to the required model repositories
 3. Check your internet connection for large model downloads (4GB+ models may time out)
+
+## Installation Enhancements
+The installation script now features:
+- Concurrent downloads for faster installation
+- Progress tracking with rich status updates  
+- Network speed detection for optimal download concurrency
+- Smart concurrency control based on connection quality
+- User feedback throughout the process
