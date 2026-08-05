@@ -17,7 +17,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import model constants
-from models import DIFFUSION_MODELS, MODEL_PATHS, DEFAULT_MODEL_CONFIGS, TEXT_GENERATION_MODELS
+from models import DIFFUSION_MODELS, MODEL_PATHS, DEFAULT_MODEL_CONFIGS, TEXT_GENERATION_MODELS, get_model_config
 from utils.model_metrics import ModelMetrics
 
 # Define the available diffusion models for image generation
@@ -125,39 +125,35 @@ def generate_images(
     
     # Load the pipeline for image generation
     try:
+        # Resolve device/dtype from DEFAULT_MODEL_CONFIGS (mps > cuda > cpu)
+        device, torch_dtype = get_model_config("diffusion")
+
         # Determine pipeline type based on model name
         if model_name == "sdxl":
             pipe = StableDiffusionXLPipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.float16,
+                torch_dtype=torch_dtype,
                 safety_checker=None
             )
         elif model_name == "flux_dev":
             # FLUX.1 models use FluxPipeline
             pipe = FluxPipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.bfloat16
+                torch_dtype=torch_dtype
             )
         elif "flux" in model_name.lower():
             # FLUX.2 models (e.g. Klein) use Flux2Pipeline
             pipe = Flux2Pipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.bfloat16
+                torch_dtype=torch_dtype
             )
         else:
             pipe = StableDiffusionPipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.float16,
+                torch_dtype=torch_dtype,
                 safety_checker=None
             )
-        
-        # Set up device (use MPS for M5 Pro, CUDA if available, otherwise CPU)
-        if torch.backends.mps.is_available():
-            device = "mps"
-        elif torch.cuda.is_available():
-            device = "cuda"
-        else:
-            device = "cpu"
+
         pipe = pipe.to(device)
         
         # Set up generation parameters 
@@ -283,30 +279,25 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
     
     # Use the appropriate pipeline based on model type
     try:
+        device, torch_dtype = get_model_config("diffusion")
+
         if model_name == "flux_dev":
             pipe = FluxPipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.bfloat16
+                torch_dtype=torch_dtype
             )
         elif "flux" in model_name.lower():
             pipe = Flux2Pipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.bfloat16
+                torch_dtype=torch_dtype
             )
         else:
             # Use StableDiffusionPipeline for other models
             pipe = StableDiffusionPipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.float16
+                torch_dtype=torch_dtype
             )
-            
-        # Set up device (use MPS for M5 Pro, CUDA if available, otherwise CPU)
-        if torch.backends.mps.is_available():
-            device = "mps"
-        elif torch.cuda.is_available():
-            device = "cuda"
-        else:
-            device = "cpu"
+
         pipe = pipe.to(device)
         
     except Exception as e:
@@ -314,11 +305,11 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
         print("Falling back to default pipeline...")
         # Fallback to basic StableDiffusionPipeline
         try:
+            device, torch_dtype = get_model_config("diffusion")
             pipe = StableDiffusionPipeline.from_pretrained(
                 "runwayml/stable-diffusion-v1-5",
-                torch_dtype=torch.float16
+                torch_dtype=torch_dtype
             )
-            device = "cuda" if torch.cuda.is_available() else "cpu"
             pipe = pipe.to(device)
         except Exception as fallback_error:
             print(f"Fallback also failed: {fallback_error}")
