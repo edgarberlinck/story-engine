@@ -10,8 +10,8 @@ to include other types of models as the project expands.
 # Diffusion Models (Primary for Image Generation)
 DIFFUSION_MODELS = {
     "stable_diffusion_v1_5": "runwayml/stable-diffusion-v1-5",
-    "sdxl": "stabilityai/stable-diffusion-xl-base-1.0",
-    "flux_klein_base_9b_fp8": "black-forest-labs/FLUX.2-klein-base-9b-fp8",
+    "sdxl": "stabilityai/stable-diffusion-xl-base-1.0", 
+    "flux_klein": "black-forest-labs/FLUX.2-klein-4B",
     "flux_dev": "black-forest-labs/FLUX.1-dev"
 }
 
@@ -65,18 +65,18 @@ MODEL_METADATA = {
         "description": "Next generation text-to-image generation model with improved detail",
         "repo_id": "stabilityai/stable-diffusion-xl-base-1.0"
     },
-    "flux_klein_base_9b_fp8": {
-        "name": "FLUX.2 Klein Base 9B FP8", 
+    "flux_klein": {
+        "name": "FLUX.2 Klein 4B",
         "type": "diffusion",
-        "size": "4GB",
-        "description": "High quality text-to-image generation model",
-        "repo_id": "black-forest-labs/FLUX.2-klein-base-9b-fp8"
+        "size": "13GB",
+        "description": "High quality text-to-image generation model (diffusers format, open access)",
+        "repo_id": "black-forest-labs/FLUX.2-klein-4B"
     },
     "flux_dev": {
         "name": "FLUX.1 Dev",
         "type": "diffusion",
-        "size": "4GB",
-        "description": "Latest text-to-image generation model with advanced capabilities",
+        "size": "34GB",
+        "description": "Latest text-to-image generation model (gated: requires accepting license on Hugging Face)",
         "repo_id": "black-forest-labs/FLUX.1-dev"
     },
     "detr_resnet_50_panoptic": {

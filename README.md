@@ -61,7 +61,7 @@ The `models.py` file defines the following model categories:
 
 ### Diffusion Models
 - `stable_diffusion_v1_5`: runwayml/stable-diffusion-v1-5
-- `flux_klein_base_9b_fp8`: black-forest-labs/FLUX.2-klein-base-9b-fp8
+- `flux_klein`: black-forest-labs/FLUX.2-klein-4B
 
 ### Segmentation Models  
 - `detr_resnet_50_panoptic`: facebook/detr-resnet-50-panoptic

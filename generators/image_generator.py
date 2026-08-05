@@ -7,9 +7,9 @@ This script demonstrates how to use the organized models directory structure.
 import os
 import sys
 import re
+import time
 from pathlib import Path
-from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
-from diffusers import AutoPipelineForText2Image
+from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, FluxPipeline, Flux2Pipeline
 import torch
 
 # Add project root to Python path
@@ -18,12 +18,13 @@ sys.path.insert(0, str(project_root))
 
 # Import model constants
 from models import DIFFUSION_MODELS, MODEL_PATHS, DEFAULT_MODEL_CONFIGS, TEXT_GENERATION_MODELS
+from utils.model_metrics import ModelMetrics
 
 # Define the available diffusion models for image generation
 AVAILABLE_DIFFUSION_MODELS = {
     "stable_diffusion_v1_5": "runwayml/stable-diffusion-v1-5",
     "sdxl": "stabilityai/stable-diffusion-xl-base-1.0",
-    "flux_klein_base_9b_fp8": "black-forest-labs/FLUX.2-klein-base-9b-fp8",
+    "flux_klein": "black-forest-labs/FLUX.2-klein-4B",
     "flux_dev": "black-forest-labs/FLUX.1-dev"
 }
 
@@ -84,16 +85,30 @@ def generate_filename_from_prompt(prompt):
     
     return filename
 
-def generate_images(prompt, num_images=1, model_name="stable_diffusion_v1_5"):
-    """Generate image(s) from a text prompt using the specified diffusion model.
+def generate_images(
+    prompt, 
+    num_images=1, 
+    model_name="sdxl", 
+    seed=42,
+    steps=30,
+    cfg=7.5,
+    width=1024,
+    height=1024
+):
+    """Generate images using the specified diffusion model.
     
     Args:
         prompt (str): Description of the image to generate
         num_images (int): Number of images to generate (default: 1)
-        model_name (str): Name of the model to use (default: "stable_diffusion_v1_5")
+        model_name (str): Name of the diffusion model to use (default: sdxl)
+        seed (int): Random seed for reproducibility (default: 42)
+        steps (int): Number of inference steps (default: 30)
+        cfg (float): Classifier-free guidance scale (default: 7.5)
+        width (int): Image width (default: 1024)
+        height (int): Image height (default: 1024)
         
     Returns:
-        list: List of generated image file paths
+        list: List of paths to generated image files
     """
     print(f"Generating {num_images} image(s) for prompt: '{prompt}'")
     
@@ -117,6 +132,18 @@ def generate_images(prompt, num_images=1, model_name="stable_diffusion_v1_5"):
                 torch_dtype=torch.float16,
                 safety_checker=None
             )
+        elif model_name == "flux_dev":
+            # FLUX.1 models use FluxPipeline
+            pipe = FluxPipeline.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16
+            )
+        elif "flux" in model_name.lower():
+            # FLUX.2 models (e.g. Klein) use Flux2Pipeline
+            pipe = Flux2Pipeline.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16
+            )
         else:
             pipe = StableDiffusionPipeline.from_pretrained(
                 model_path,
@@ -133,18 +160,65 @@ def generate_images(prompt, num_images=1, model_name="stable_diffusion_v1_5"):
             device = "cpu"
         pipe = pipe.to(device)
         
+        # Set up generation parameters 
+        generator = torch.Generator(device=device).manual_seed(seed)
+        
         # Generate the image(s)
-        images = pipe(prompt, num_images=num_images)
+        metrics_tracker = ModelMetrics()
+        metrics_tracker.start_timer()
+        
+        if model_name == "flux_dev":
+            # FLUX Dev has specific requirements for generation
+            images = pipe(
+                prompt, 
+                generator=generator,
+                num_inference_steps=steps,
+                guidance_scale=cfg,
+                width=width,
+                height=height,
+                max_sequence_length=512  # Standard for FLUX models
+            )
+        elif "flux" in model_name.lower():
+            # For other Flux models like Klein
+            images = pipe(
+                prompt, 
+                generator=generator,
+                num_inference_steps=steps,
+                guidance_scale=cfg,
+                width=width,
+                height=height
+            )
+        else:
+            # Standard SD models
+            images = pipe(
+                prompt, 
+                num_images=num_images,
+                num_inference_steps=steps,
+                guidance_scale=cfg,
+                width=width,
+                height=height,
+                generator=generator
+            )
+            
+        metrics_tracker.end_timer()
+        
         generated_images = []
         
-        # Save each image
+        # Save each image with metadata
         filename_base = generate_filename_from_prompt(prompt)
         for i, image in enumerate(images.images):
             output_path = f"outputs/{filename_base}_{model_name}_benchmark.png"
             image.save(output_path)
             generated_images.append(output_path)
-            print(f"Image {i+1} will be saved to: {output_path}")
+            print(f"Image {i+1} saved to: {output_path}")
             
+        # Record and save metrics
+        metrics_tracker.record_generation(
+            model_name, prompt, seed, steps, cfg, width, height, output_path
+        )
+        metrics_filename = metrics_tracker.save_metrics(filename_base, model_name)
+        print(f"Metrics saved to: {metrics_filename}")
+        
     except Exception as e:
         print(f"Error during image generation: {e}")
         raise
@@ -209,12 +283,15 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
     
     # Use the appropriate pipeline based on model type
     try:
-        if "flux" in model_name.lower():
-            # Use AutoPipelineForText2Image for Flux models
-            pipe = AutoPipelineForText2Image.from_pretrained(
+        if model_name == "flux_dev":
+            pipe = FluxPipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch.float16,
-                variant="fp16"
+                torch_dtype=torch.bfloat16
+            )
+        elif "flux" in model_name.lower():
+            pipe = Flux2Pipeline.from_pretrained(
+                model_path,
+                torch_dtype=torch.bfloat16
             )
         else:
             # Use StableDiffusionPipeline for other models
@@ -293,7 +370,9 @@ def main():
     setup_model_directories()
     
     # Example usage with your requested prompt
-    prompt = "Goku playing volleyball with Rod Stewart on a sunny beach, vibrant colors, dynamic action, cinematic lighting"
+    prompt = ("Sherlock Holmes drinking coffee with Albert Einstein "
+              "while Taylor Swift plays chess against Napoleon "
+              "inside the International Space Station.")
     
     try:
         # Generate images using all models for benchmarking

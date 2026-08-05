@@ -29,7 +29,7 @@ class TestImageGenerationSystem(unittest.TestCase):
         # Test diffusion models
         self.assertIsInstance(DIFFUSION_MODELS, dict)
         self.assertIn("stable_diffusion_v1_5", DIFFUSION_MODELS)
-        self.assertIn("flux_klein_base_9b_fp8", DIFFUSION_MODELS)
+        self.assertIn("flux_klein", DIFFUSION_MODELS)
         
         # Check that model paths are defined
         self.assertIsInstance(MODEL_PATHS, dict)

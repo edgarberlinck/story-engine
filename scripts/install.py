@@ -61,95 +61,51 @@ def get_concurrent_downloads(network_speed_mbps):
 
 def download_model(model_name, model_type, destination_dir):
     """Download a model to the specified directory with progress tracking."""
-    try:
-        print(f"Downloading {model_name} ({model_type})...")
-        
-        # Get the actual Hugging Face repository name from metadata
-        if model_name in MODEL_METADATA:
-            repo_id = MODEL_METADATA[model_name]["repo_id"]
-        else:
-            # Default to original name if not found in metadata
-            repo_id = model_name
-            
-        # Import huggingface_hub here to avoid issues
-        try:
-            from huggingface_hub import snapshot_download
-            
-            # Download with progress tracking
-            snapshot_download(
-                repo_id,
-                repo_type="model",
-                local_dir=destination_dir,
-                local_dir_use_symlinks=False,
-                tqdm_class=tqdm,
-                resume_download=True,
-                max_files=100  # Limit number of files downloaded at once
-            )
-            
-        except ImportError:
-            print("⚠ Hugging Face Hub library not found. Installing it...")
-            # Try to install huggingface_hub if missing
-            import subprocess
-            
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "huggingface_hub"])
-                from huggingface_hub import snapshot_download
-                
-                snapshot_download(
-                    repo_id,
-                    repo_type="model",
-                    local_dir=destination_dir,
-                    local_dir_use_symlinks=False,
-                    tqdm_class=tqdm,
-                    resume_download=True,
-                    max_files=100
-                )
-            except Exception:
-                print(f"⚠ Could not install huggingface_hub or download model {model_name}")
-                print("  This is likely due to network or permission issues.")
-                return False
-                
-        except Exception as e:
-            print(f"✗ Failed to download {model_name}: {e}")
-            # Try a second method by downloading from Hugging Face Hub directly
-            try:
-                from huggingface_hub import hf_hub_download
-                from huggingface_hub.utils import validate_repo_id
-                
-                # Check if repo exists  
-                validate_repo_id(repo_id)
-                
-                # Download using a simpler approach for basic files
-                print(f"  Falling back to simple direct download approach...")
-                download_files = []
-                try:
-                    # Try with file-specific download - this will work for most cases
-                    for i in range(10):  # Try a reasonable number of files
-                        try:
-                            file_name = f"model_{i}.bin" if i > 0 else "config.json"
-                            local_file = hf_hub_download(
-                                repo_id=repo_id,
-                                filename=file_name,
-                                repo_type="model",
-                                local_dir=destination_dir,
-                                tqdm_class=tqdm
-                            )
-                            download_files.append(local_file)
-                        except Exception:
-                            break
-                    print("  Simple download approach completed.")
-                except Exception:
-                    pass
-                    
-            except Exception:
-                print("  No working download method available.")
-                return False
+    print(f"Downloading {model_name} ({model_type})...")
 
+    # Get the actual Hugging Face repository name from metadata
+    if model_name in MODEL_METADATA:
+        repo_id = MODEL_METADATA[model_name]["repo_id"]
+    else:
+        repo_id = model_name
+
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError:
+        print("⚠ Hugging Face Hub library not found. Installing it...")
+        import subprocess
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "huggingface_hub"])
+            from huggingface_hub import snapshot_download
+        except Exception:
+            print(f"✗ Could not install huggingface_hub; cannot download {model_name}")
+            return False
+
+    try:
+        from huggingface_hub.errors import GatedRepoError, RepositoryNotFoundError
+    except ImportError:
+        GatedRepoError = RepositoryNotFoundError = None
+
+    try:
+        snapshot_download(
+            repo_id,
+            repo_type="model",
+            local_dir=destination_dir,
+            tqdm_class=tqdm,
+            # Skip sample images and non-essential files
+            ignore_patterns=["*.jpg", "*.jpeg", "*.png", "*.gif", "*.md"],
+        )
         print(f"✓ Downloaded {model_name} successfully")
         return True
-        
     except Exception as e:
-        print(f"✗ Failed to download {model_name}: {e}")
+        if GatedRepoError is not None and isinstance(e, GatedRepoError):
+            print(f"✗ {model_name} is a GATED model ({repo_id}).")
+            print(f"  1. Visit https://huggingface.co/{repo_id} and accept the license.")
+            print(f"  2. Make sure you are logged in: run `hf auth login` (or `huggingface-cli login`).")
+        elif RepositoryNotFoundError is not None and isinstance(e, RepositoryNotFoundError):
+            print(f"✗ Repository not found: {repo_id}. Check the repo_id in models.py.")
+        else:
+            print(f"✗ Failed to download {model_name} ({repo_id}): {e}")
         return False
 
 def install_all_models():
