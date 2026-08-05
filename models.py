@@ -10,7 +10,9 @@ to include other types of models as the project expands.
 # Diffusion Models (Primary for Image Generation)
 DIFFUSION_MODELS = {
     "stable_diffusion_v1_5": "runwayml/stable-diffusion-v1-5",
-    "flux_klein_base_9b_fp8": "black-forest-labs/FLUX.2-klein-base-9b-fp8"
+    "sdxl": "stabilityai/stable-diffusion-xl-base-1.0",
+    "flux_klein_base_9b_fp8": "black-forest-labs/FLUX.2-klein-base-9b-fp8",
+    "flux_dev": "black-forest-labs/FLUX.1-dev"
 }
 
 # Segmentation Models (Used for image analysis and processing)
@@ -20,7 +22,6 @@ SEGMENTATION_MODELS = {
 
 # Text Generation Models (for naming images based on prompts)
 TEXT_GENERATION_MODELS = {
-    "llama3_8b": "ollama/llama3:8b",
     "phi3_mini": "microsoft/Phi-3-mini-4k-instruct",
     "gemma_2b": "google/gemma-2b"
 }
@@ -54,36 +55,49 @@ MODEL_METADATA = {
         "name": "Stable Diffusion v1.5",
         "type": "diffusion",
         "size": "4GB",
-        "description": "General purpose text-to-image generation model"
+        "description": "General purpose text-to-image generation model",
+        "repo_id": "runwayml/stable-diffusion-v1-5"
+    },
+    "sdxl": {
+        "name": "Stable Diffusion XL",
+        "type": "diffusion",
+        "size": "5GB",
+        "description": "Next generation text-to-image generation model with improved detail",
+        "repo_id": "stabilityai/stable-diffusion-xl-base-1.0"
     },
     "flux_klein_base_9b_fp8": {
         "name": "FLUX.2 Klein Base 9B FP8", 
         "type": "diffusion",
         "size": "4GB",
-        "description": "High quality text-to-image generation model"
+        "description": "High quality text-to-image generation model",
+        "repo_id": "black-forest-labs/FLUX.2-klein-base-9b-fp8"
+    },
+    "flux_dev": {
+        "name": "FLUX.1 Dev",
+        "type": "diffusion",
+        "size": "4GB",
+        "description": "Latest text-to-image generation model with advanced capabilities",
+        "repo_id": "black-forest-labs/FLUX.1-dev"
     },
     "detr_resnet_50_panoptic": {
         "name": "DETR ResNet-50 Panoptic",
         "type": "segmentation", 
         "size": "1.2GB",
-        "description": "Panoptic segmentation model for image analysis"
-    },
-    "llama3_8b": {
-        "name": "Llama 3 8B",
-        "type": "text_generation",
-        "size": "4GB",
-        "description": "Small language model for image naming"
+        "description": "Panoptic segmentation model for image analysis",
+        "repo_id": "facebook/detr-resnet-50-panoptic"
     },
     "phi3_mini": {
         "name": "Phi-3 Mini",
         "type": "text_generation",
         "size": "3GB",
-        "description": "Compact language model for image naming"
+        "description": "Compact language model for image naming",
+        "repo_id": "microsoft/Phi-3-mini-4k-instruct"
     },
     "gemma_2b": {
         "name": "Gemma 2B",
         "type": "text_generation",
         "size": "2GB",
-        "description": "Small efficient language model for image naming"
+        "description": "Small efficient language model for image naming",
+        "repo_id": "google/gemma-2b"
     }
 }

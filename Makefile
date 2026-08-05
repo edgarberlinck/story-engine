@@ -6,7 +6,7 @@ all: help
 # Install dependencies and download models
 install: 
 	@echo "Installing dependencies..."
-	source .venv/bin/activate && pip install huggingface_hub torch diffusers pillow
+	source .venv/bin/activate && pip install huggingface_hub torch diffusers pillow tqdm
 	@echo "Installing models..."
 	source .venv/bin/activate && python scripts/install.py
 
@@ -18,11 +18,11 @@ models:
 # Generate an image
 generate:
 	@echo "Generating image with Goku playing volleyball..."
-	source .venv/bin/activate && python scripts/image_generator.py
+	source .venv/bin/activate && python generators/image_generator.py
 
 # Clean up
 clean:
-	rm -rf models/diffusion/* models/segmentation/*
+	rm -rf models/diffusion/* models/segmentation/* models/text_generation/*
 	@echo "Cleaned model directories"
 
 # Show help
