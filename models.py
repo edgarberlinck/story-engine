@@ -46,7 +46,7 @@ DEFAULT_MODEL_CONFIGS = {
         "device": "cpu"
     },
     "text_generation": {
-        "dtype": "float32",
+        "dtype": "float16",
         "device": "cpu"
     }
 }

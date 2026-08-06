@@ -28,6 +28,24 @@ AVAILABLE_DIFFUSION_MODELS = {
     "flux_dev": "black-forest-labs/FLUX.1-dev"
 }
 
+def resolve_model_path(model_type, model_name, hub_id):
+    """Resolve a model to its locally installed path (from `make install`).
+
+    Args:
+        model_type (str): Key in MODEL_PATHS ('diffusion', 'text_generation', ...)
+        model_name (str): Local directory name of the model
+        hub_id (str): Hugging Face hub repo id used as a fallback
+
+    Returns:
+        str: Local path if the model was installed, otherwise the hub id.
+    """
+    local_path = os.path.join(str(project_root), MODEL_PATHS[model_type], model_name)
+    if os.path.isdir(local_path) and os.listdir(local_path):
+        return local_path
+    print(f"Warning: {model_name} not found locally at {local_path}. "
+          f"Run 'make install' first. Falling back to hub download: {hub_id}")
+    return hub_id
+
 def setup_model_directories():
     """Ensure all required model directories exist."""
     model_dirs = [
@@ -98,16 +116,31 @@ def generate_prompt_with_llm(description, model_name="phi3_mini"):
     """
     try:
         from transformers import pipeline as hf_pipeline
+        from transformers.utils import logging as hf_logging
 
-        model_id = TEXT_GENERATION_MODELS[model_name]
+        # Only surface real errors from transformers (hides benign
+        # generation-config and tokenizer warnings).
+        hf_logging.set_verbosity_error()
+
+        model_id = resolve_model_path(
+            "text_generation", model_name, TEXT_GENERATION_MODELS[model_name]
+        )
         device, torch_dtype = get_model_config("text_generation")
 
         generator = hf_pipeline(
             "text-generation",
             model=model_id,
             dtype=torch_dtype,
-            device_map="auto" if device != "cpu" else None,
+            device=device,
         )
+
+        # Configure generation on the model's generation_config to avoid
+        # deprecated mixing of a generation_config with per-call kwargs.
+        generator.model.generation_config.max_new_tokens = 120
+        generator.model.generation_config.do_sample = False
+        generator.model.generation_config.temperature = None
+        generator.model.generation_config.top_p = None
+        generator.model.generation_config.top_k = None
 
         instruction = (
             "Rewrite the following image description as a single detailed "
@@ -117,8 +150,6 @@ def generate_prompt_with_llm(description, model_name="phi3_mini"):
 
         result = generator(
             instruction,
-            max_new_tokens=120,
-            do_sample=False,
             return_full_text=False,
         )
         enriched = result[0]["generated_text"].strip().split("\n")[0].strip()
@@ -137,7 +168,7 @@ def generate_prompt_with_llm(description, model_name="phi3_mini"):
 def generate_images(
     prompt, 
     num_images=1, 
-    model_name="sdxl", 
+    model_name="flux_dev", 
     seed=42,
     steps=30,
     cfg=7.5,
@@ -150,7 +181,7 @@ def generate_images(
     Args:
         prompt (str): Description of the image to generate
         num_images (int): Number of images to generate (default: 1)
-        model_name (str): Name of the diffusion model to use (default: sdxl)
+        model_name (str): Name of the diffusion model to use (default: flux_dev)
         seed (int): Random seed for reproducibility (default: 42)
         steps (int): Number of inference steps (default: 30)
         cfg (float): Classifier-free guidance scale (default: 7.5)
@@ -170,7 +201,7 @@ def generate_images(
     if model_name not in DIFFUSION_MODELS:
         raise ValueError(f"Unsupported diffusion model: {model_name}")
         
-    model_path = DIFFUSION_MODELS[model_name]
+    model_path = resolve_model_path("diffusion", model_name, DIFFUSION_MODELS[model_name])
     print(f"Using diffusion model: {model_name}")
     print(f"Model path: {model_path}")
     
