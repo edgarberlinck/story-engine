@@ -1,35 +1,46 @@
-.PHONY: install models generate clean help
+# Makefile for Story Engine Project
 
 # Default target
-all: help
-
-# Install dependencies and download models
-install: 
-	@echo "Installing dependencies..."
-	source .venv/bin/activate && pip install huggingface_hub torch diffusers pillow tqdm
-	@echo "Installing models..."
-	source .venv/bin/activate && python scripts/install.py
-
-# Download models only
-models:
-	@echo "Downloading models..."
-	source .venv/bin/activate && python scripts/install.py
-
-# Generate an image
-generate:
-	@echo "Generating image for benchmarking..."
-	source .venv/bin/activate && python generators/image_generator.py
-
-# Clean up
-clean:
-	rm -rf models/diffusion/* models/segmentation/* models/text_generation/*
-	@echo "Cleaned model directories"
-
-# Show help
+.PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  install    - Install dependencies and download models"
-	@echo "  models     - Download models only"
-	@echo "  generate   - Generate an image"
-	@echo "  clean      - Clean model directories"
-	@echo "  help       - Show this help"
+	@echo "  make test     - Run all tests"
+	@echo "  make test:watch  - Run tests in watch mode"
+
+# Test target
+.PHONY: test
+test:
+	@echo "Running tests..."
+	python -m unittest discover -s tests -p "test_*.py" -v
+
+# Watch test target
+.PHONY: test:watch
+test:watch:
+	@echo "Watching for test changes..."
+	watchmedo shell-command --recursive --command='python -m unittest discover -s tests -p "test_*.py" -v' tests/
+
+# Install dependencies
+.PHONY: install
+install:
+	pip install -r requirements.txt
+
+# Clean build artifacts
+.PHONY: clean
+clean:
+	find . -type f -name "*.pyc" -delete
+	find . -type d -name "__pycache__" -delete
+	rm -f story_engine.db
+
+# Format code
+.PHONY: format
+format:
+	black .
+
+# Lint code
+.PHONY: lint
+lint:
+	flake8 .
+
+# All checks
+.PHONY: check
+check: lint test
