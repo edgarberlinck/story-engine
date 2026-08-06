@@ -28,13 +28,12 @@ class TestImageGenerationSystem(unittest.TestCase):
         """Test that model constants are properly defined according to contract."""
         # Test diffusion models
         self.assertIsInstance(DIFFUSION_MODELS, dict)
-        self.assertIn("stable_diffusion_v1_5", DIFFUSION_MODELS)
-        self.assertIn("flux_klein", DIFFUSION_MODELS)
+        self.assertIn("sdxl", DIFFUSION_MODELS)
+        self.assertIn("flux_dev", DIFFUSION_MODELS)
         
         # Check that model paths are defined
-        self.assertIsInstance(MODEL_PATHS, dict)
         self.assertIn("diffusion", MODEL_PATHS)
-        self.assertIn("segmentation", MODEL_PATHS)  
+        self.assertIn("segmentation", MODEL_PATHS)
         self.assertIn("text_generation", MODEL_PATHS)
         
         # Test that paths are strings

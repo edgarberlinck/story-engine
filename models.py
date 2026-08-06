@@ -11,9 +11,7 @@ import torch
 
 # Diffusion Models (Primary for Image Generation)
 DIFFUSION_MODELS = {
-    "stable_diffusion_v1_5": "runwayml/stable-diffusion-v1-5",
     "sdxl": "stabilityai/stable-diffusion-xl-base-1.0", 
-    "flux_klein": "black-forest-labs/FLUX.2-klein-4B",
     "flux_dev": "black-forest-labs/FLUX.1-dev"
 }
 
@@ -53,26 +51,12 @@ DEFAULT_MODEL_CONFIGS = {
 
 # Model metadata
 MODEL_METADATA = {
-    "stable_diffusion_v1_5": {
-        "name": "Stable Diffusion v1.5",
-        "type": "diffusion",
-        "size": "4GB",
-        "description": "General purpose text-to-image generation model",
-        "repo_id": "runwayml/stable-diffusion-v1-5"
-    },
     "sdxl": {
         "name": "Stable Diffusion XL",
         "type": "diffusion",
         "size": "5GB",
         "description": "Next generation text-to-image generation model with improved detail",
         "repo_id": "stabilityai/stable-diffusion-xl-base-1.0"
-    },
-    "flux_klein": {
-        "name": "FLUX.2 Klein 4B",
-        "type": "diffusion",
-        "size": "13GB",
-        "description": "High quality text-to-image generation model (diffusers format, open access)",
-        "repo_id": "black-forest-labs/FLUX.2-klein-4B"
     },
     "flux_dev": {
         "name": "FLUX.1 Dev",

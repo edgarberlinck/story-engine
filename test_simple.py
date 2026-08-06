@@ -52,9 +52,9 @@ class TestImageGenerator(unittest.TestCase):
         self.assertIsNotNone(DIFFUSION_MODELS)
         self.assertIsNotNone(MODEL_PATHS)
         
-        # Check that required models exist
-        self.assertIn("stable_diffusion_v1_5", DIFFUSION_MODELS)
-        self.assertIn("flux_klein", DIFFUSION_MODELS)
+        # Check that required models exist (only SDXL and FLUX Dev now)
+        self.assertIn("sdxl", DIFFUSION_MODELS)
+        self.assertIn("flux_dev", DIFFUSION_MODELS)
         
         # Check that model paths are defined
         self.assertIn("diffusion", MODEL_PATHS)

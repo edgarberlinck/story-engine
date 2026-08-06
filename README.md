@@ -60,8 +60,8 @@ make generate
 The `models.py` file defines the following model categories:
 
 ### Diffusion Models
-- `stable_diffusion_v1_5`: runwayml/stable-diffusion-v1-5
-- `flux_klein`: black-forest-labs/FLUX.2-klein-4B
+- `sdxl`: stabilityai/stable-diffusion-xl-base-1.0
+- `flux_dev`: black-forest-labs/FLUX.1-dev
 
 ### Segmentation Models  
 - `detr_resnet_50_panoptic`: facebook/detr-resnet-50-panoptic

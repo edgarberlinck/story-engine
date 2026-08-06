@@ -22,9 +22,7 @@ from utils.model_metrics import ModelMetrics
 
 # Define the available diffusion models for image generation
 AVAILABLE_DIFFUSION_MODELS = {
-    "stable_diffusion_v1_5": "runwayml/stable-diffusion-v1-5",
     "sdxl": "stabilityai/stable-diffusion-xl-base-1.0",
-    "flux_klein": "black-forest-labs/FLUX.2-klein-4B",
     "flux_dev": "black-forest-labs/FLUX.1-dev"
 }
 
@@ -223,14 +221,9 @@ def generate_images(
                 model_path,
                 torch_dtype=torch_dtype
             )
-        elif "flux" in model_name.lower():
-            # FLUX.2 models (e.g. Klein) use Flux2Pipeline
-            pipe = Flux2Pipeline.from_pretrained(
-                model_path,
-                torch_dtype=torch_dtype
-            )
         else:
-            pipe = StableDiffusionPipeline.from_pretrained(
+            # Default to standard pipeline for any other case (shouldn't happen now)
+            pipe = StableDiffusionXLPipeline.from_pretrained(
                 model_path,
                 torch_dtype=torch_dtype,
                 safety_checker=None
@@ -337,7 +330,7 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
     
     Args:
         prompt (str): Description of the image to generate
-        model_name (str): Name of the diffusion model to use (defaults to stable_diffusion_v1_5)
+        model_name (str): Name of the diffusion model to use (defaults to sdxl)
         amount (int): Number of images to generate with the same prompt (default: 1)
         output_filename (str): Optional base filename (if None, will be auto-generated from prompt)
     
@@ -348,15 +341,15 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
     
     # Get model name with defaults
     if model_name is None:
-        model_name = "stable_diffusion_v1_5"
+        model_name = "sdxl"
     
     # Get model path from constants
     if model_name in DIFFUSION_MODELS:
         model_path = os.path.join(MODEL_PATHS["diffusion"], model_name)
         print(f"Using diffusion model: {DIFFUSION_MODELS[model_name]}")
     else:
-        model_path = "models/diffusion/stable-diffusion-v1-5"
-        print(f"Using default model: stable-diffusion-v1-5")
+        model_path = "models/diffusion/stable-diffusion-xl-base-1.0"
+        print(f"Using default model: stable-diffusion-xl-base-1.0")
         
     print(f"Model path: {model_path}")
     
@@ -372,16 +365,12 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
                 model_path,
                 torch_dtype=torch_dtype
             )
-        elif "flux" in model_name.lower():
-            pipe = Flux2Pipeline.from_pretrained(
-                model_path,
-                torch_dtype=torch_dtype
-            )
         else:
-            # Use StableDiffusionPipeline for other models
-            pipe = StableDiffusionPipeline.from_pretrained(
+            # For sdxl and other models
+            pipe = StableDiffusionXLPipeline.from_pretrained(
                 model_path,
-                torch_dtype=torch_dtype
+                torch_dtype=torch_dtype,
+                safety_checker=None
             )
 
         pipe = pipe.to(device)
@@ -389,12 +378,13 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
     except Exception as e:
         print(f"Error loading pipeline: {e}")
         print("Falling back to default pipeline...")
-        # Fallback to basic StableDiffusionPipeline
+        # Fallback to basic StableDiffusionXLPipeline (SDXL)  
         try:
             device, torch_dtype = get_model_config("diffusion")
-            pipe = StableDiffusionPipeline.from_pretrained(
-                "runwayml/stable-diffusion-v1-5",
-                torch_dtype=torch_dtype
+            pipe = StableDiffusionXLPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-xl-base-1.0",
+                torch_dtype=torch_dtype,
+                safety_checker=None
             )
             pipe = pipe.to(device)
         except Exception as fallback_error:
