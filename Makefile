@@ -5,19 +5,19 @@
 help:
 	@echo "Available commands:"
 	@echo "  make test     - Run all tests"
-	@echo "  make test:watch  - Run tests in watch mode"
+	@echo "  make watch    - Watch for test changes"
 
 # Test target
 .PHONY: test
 test:
 	@echo "Running tests..."
-	python -m unittest discover -s tests -p "test_*.py" -v
+	python -m unittest discover -s . -p "test_*.py" -v
 
 # Watch test target
-.PHONY: test:watch
-test:watch:
+.PHONY: watch
+watch:
 	@echo "Watching for test changes..."
-	watchmedo shell-command --recursive --command='python -m unittest discover -s tests -p "test_*.py" -v' tests/
+	watchmedo shell-command --recursive --command='python -m unittest discover -s . -p "test_*.py" -v' .
 
 # Install dependencies
 .PHONY: install
