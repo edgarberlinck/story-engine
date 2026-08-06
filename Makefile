@@ -17,7 +17,7 @@ models:
 
 # Generate an image
 generate:
-	@echo "Generating image with Goku playing volleyball..."
+	@echo "Generating image for benchmarking..."
 	source .venv/bin/activate && python generators/image_generator.py
 
 # Clean up

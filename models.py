@@ -7,6 +7,8 @@ Note: This file primarily focuses on models used for image generation, but can b
 to include other types of models as the project expands.
 """
 
+import torch
+
 # Diffusion Models (Primary for Image Generation)
 DIFFUSION_MODELS = {
     "stable_diffusion_v1_5": "runwayml/stable-diffusion-v1-5",
@@ -101,3 +103,35 @@ MODEL_METADATA = {
         "repo_id": "google/gemma-2b"
     }
 }
+
+def get_model_config(model_type):
+    """
+    Get the appropriate device and torch_dtype configuration for a given model type.
+    
+    Args:
+        model_type (str): Type of model ('diffusion', 'segmentation', 'text_generation')
+        
+    Returns:
+        tuple: (device, torch_dtype) - device string and torch dtype
+    """
+    # Resolve device (mps > cuda > cpu)
+    if torch.backends.mps.is_available():
+        device = "mps"
+    elif torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+    
+    # Get the default config for this model type
+    config = DEFAULT_MODEL_CONFIGS.get(model_type, {})
+    dtype = config.get("dtype", "float32")
+    
+    # Map string dtype to actual torch dtype
+    if dtype == "float16":
+        torch_dtype = torch.float16
+    elif dtype == "bfloat16":
+        torch_dtype = torch.bfloat16
+    else:
+        torch_dtype = torch.float32
+        
+    return device, torch_dtype
