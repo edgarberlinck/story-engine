@@ -11,6 +11,7 @@ This project follows a modular architecture that organizes code into distinct fu
 - `utils/` - Utility functions and helpers
 - `generators/` - Generation components (image, text, etc.)
 - `scripts/` - Supporting scripts
+- `docs/` - Documentation files for humans and LLMs
 
 ## Testing Approach 
 
@@ -54,3 +55,13 @@ The project service provides complete CRUD functionality:
 - Uses SQLite for persistence (no external dependencies)
 - Data stored in `story_engine.db` file
 - All project data includes id, name, description, and timestamps
+
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+### For Humans:
+- `docs/humans/project-service.md` - Complete user guide with usage examples
+
+### For LLMs:
+- `docs/llm/project-service.md` - Technical specification for API integration

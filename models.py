@@ -26,11 +26,19 @@ TEXT_GENERATION_MODELS = {
     "gemma_2b": "google/gemma-2b"
 }
 
+# Image-to-Video Models (for animating generated images)
+IMAGE_TO_VIDEO_MODELS = {
+    "wan22_i2v": "Wan-AI/Wan2.2-I2V-A14B",
+    "ltx_video": "Lightricks/LTX-Video",
+    "hunyuan_video_i2v": "tencent/HunyuanVideo-I2V"
+}
+
 # Model paths (relative to project root)
 MODEL_PATHS = {
     "diffusion": "models/diffusion",
     "segmentation": "models/segmentation",
-    "text_generation": "models/text_generation"
+    "text_generation": "models/text_generation",
+    "image_to_video": "models/image_to_video"
 }
 
 # Default model configurations
@@ -45,6 +53,10 @@ DEFAULT_MODEL_CONFIGS = {
     },
     "text_generation": {
         "dtype": "float16",
+        "device": "cpu"
+    },
+    "image_to_video": {
+        "dtype": "bfloat16",
         "device": "cpu"
     }
 }
@@ -85,6 +97,27 @@ MODEL_METADATA = {
         "size": "2GB",
         "description": "Small efficient language model for image naming",
         "repo_id": "google/gemma-2b"
+    },
+    "wan22_i2v": {
+        "name": "Wan 2.2 I2V A14B",
+        "type": "image_to_video",
+        "size": "~60GB",
+        "description": "Wan 2.2 image-to-video MoE model (A14B) for high-quality video generation from images",
+        "repo_id": "Wan-AI/Wan2.2-I2V-A14B"
+    },
+    "ltx_video": {
+        "name": "LTX-Video",
+        "type": "image_to_video",
+        "size": "~30GB",
+        "description": "Lightricks LTX-Video real-time image-to-video and text-to-video generation model",
+        "repo_id": "Lightricks/LTX-Video"
+    },
+    "hunyuan_video_i2v": {
+        "name": "HunyuanVideo I2V",
+        "type": "image_to_video",
+        "size": "~40GB",
+        "description": "Tencent HunyuanVideo image-to-video generation model",
+        "repo_id": "tencent/HunyuanVideo-I2V"
     }
 }
 

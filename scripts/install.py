@@ -17,7 +17,13 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import model constants
-from models import DIFFUSION_MODELS, SEGMENTATION_MODELS, TEXT_GENERATION_MODELS, MODEL_METADATA
+from models import (
+    DIFFUSION_MODELS,
+    SEGMENTATION_MODELS,
+    TEXT_GENERATION_MODELS,
+    IMAGE_TO_VIDEO_MODELS,
+    MODEL_METADATA,
+)
 
 def setup_directories():
     """Ensure all required directories exist."""
@@ -25,6 +31,7 @@ def setup_directories():
         "models/diffusion",
         "models/segmentation", 
         "models/text_generation",
+        "models/image_to_video",
         "outputs"
     ]
     
@@ -138,6 +145,10 @@ def install_all_models():
     # Add text generation models
     for model_name in TEXT_GENERATION_MODELS:
         all_models_to_install.append((model_name, "text_generation", f"models/text_generation/{model_name}"))
+    
+    # Add image-to-video models
+    for model_name in IMAGE_TO_VIDEO_MODELS:
+        all_models_to_install.append((model_name, "image_to_video", f"models/image_to_video/{model_name}"))
     
     print(f"\nFound {len(all_models_to_install)} models to install:")
     for model_name, model_type, dest_dir in all_models_to_install:
