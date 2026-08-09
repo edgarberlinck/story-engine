@@ -15,9 +15,10 @@ sys.path.insert(0, str(project_root))
 from generators.image_generator import (
     AVAILABLE_DIFFUSION_MODELS,
     generate_images,
-    generate_prompt_with_llm,
     setup_model_directories,
 )
+
+from generators.text_generator import generate_prompt_with_llm
 
 
 def benchmark_models(prompt, num_images=1, task_name=None, seed=42):
