@@ -8,7 +8,7 @@ help:
 	@echo "  make watch    - Watch for test changes"
 	@echo "  make install  - Install dependencies and download models"
 	@echo "  make models   - Download models only"
-	@echo "  make generate - Generate an image"
+	@echo "  make benchmark-image - Run image generation benchmark suite"
 
 # Test target
 .PHONY: test
@@ -36,11 +36,11 @@ models:
 	@echo "Downloading models..."
 	python scripts/install.py
 
-# Generate an image
-.PHONY: generate
-generate:
-	@echo "Generating image..."
-	python generators/image_generator.py
+# Run the image generation benchmark suite
+.PHONY: benchmark-image
+benchmark-image:
+	@echo "Running image generation benchmark..."
+	python generators/benchmark_image_generator.py
 
 # Clean build artifacts
 .PHONY: clean
