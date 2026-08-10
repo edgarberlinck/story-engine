@@ -8,7 +8,10 @@ help:
 	@echo "  make watch    - Watch for test changes"
 	@echo "  make install  - Install dependencies and download models"
 	@echo "  make models   - Download models only"
+	@echo "  make models-ui - Interactive TUI to manage model downloads"
 	@echo "  make benchmark-image - Run image generation benchmark suite"
+	@echo "  make benchmark-video - Run image-to-video generation benchmark suite"
+	@echo "  make benchmark-face  - Run face recognition benchmark (writes report)"
 
 # Test target
 .PHONY: test
@@ -36,11 +39,29 @@ models:
 	@echo "Downloading models..."
 	python scripts/install.py
 
+# Interactive model download manager (Rust TUI)
+.PHONY: models-ui
+models-ui:
+	@cargo build --release --manifest-path dev/models-ui/Cargo.toml
+	@./dev/models-ui/target/release/models-ui .
+
 # Run the image generation benchmark suite
 .PHONY: benchmark-image
 benchmark-image:
 	@echo "Running image generation benchmark..."
 	python generators/benchmark_image_generator.py
+
+# Run the image-to-video generation benchmark suite
+.PHONY: benchmark-video
+benchmark-video:
+	@echo "Running image-to-video generation benchmark..."
+	python generators/benchmark_video_generator.py
+
+# Run the face recognition benchmark suite
+.PHONY: benchmark-face
+benchmark-face:
+	@echo "Running face recognition benchmark..."
+	python generators/benchmark_face_recognition.py
 
 # Clean build artifacts
 .PHONY: clean
