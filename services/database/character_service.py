@@ -85,6 +85,17 @@ class CharacterService:
         conn.close()
         return [dict(r) for r in rows]
 
+    def delete_character(self, name: str, project: str = "test_project") -> bool:
+        conn = self._connect()
+        cur = conn.execute(
+            "DELETE FROM characters WHERE project = ? AND name = ?",
+            (project, name),
+        )
+        conn.commit()
+        success = cur.rowcount > 0
+        conn.close()
+        return success
+
     def find_characters_in_text(
         self, text: str, project: str = "test_project"
     ) -> List[Dict[str, Any]]:

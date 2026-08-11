@@ -73,6 +73,10 @@ class ProjectService:
         """
         return self.db.search_projects(query)
 
+    def delete_project(self, project_id: str) -> bool:
+        """Delete a project and related data"""
+        return self.db.delete_project(project_id)
+
 
 # Create a singleton instance
 project_service = ProjectService()

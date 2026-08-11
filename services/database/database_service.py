@@ -10,6 +10,8 @@ class DatabaseService:
 
     def init_database(self):
         """Initialize the database with required tables"""
+        from services.database.migrations import migrate_database
+        migrate_database(self.db_path)
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -138,6 +140,19 @@ class DatabaseService:
         conn.close()
 
         return projects
+
+    def delete_project(self, project_id: str) -> bool:
+        """Delete a project and related data"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+        # Cascade delete related data
+        cursor.execute("DELETE FROM character_versions WHERE project = ?", (project_id,))
+        cursor.execute("DELETE FROM scenes WHERE project = ?", (project_id,))
+        conn.commit()
+        deleted = cursor.rowcount > 0
+        conn.close()
+        return deleted
 
 
 # Create a singleton instance

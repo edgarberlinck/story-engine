@@ -15,6 +15,16 @@ help:
 	@echo "  make benchmark-face-sdxl - Run face recognition benchmark with SDXL"
 	@echo "  make benchmark_fullbody_recognition - Run full body face recognition benchmark"
 
+# UI targets
+.PHONY: ui cli
+ui:
+	@echo "Launching Story Engine UI..."
+	.venv/bin/python ui/main.py
+
+cli:
+	@echo "Story Engine CLI"
+	.venv/bin/python cli/main.py --help
+
 # Test target
 .PHONY: test
 test:
