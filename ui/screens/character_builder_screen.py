@@ -121,10 +121,14 @@ class CharacterBuilderScreen(QWidget):
         self.prompt_preview.setMaximumHeight(120)
         form.addRow("Prompt:", self.prompt_preview)
 
-        # Status
+        # Status + ghost previews
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("color: #4CAF50; font-style: italic;")
         outer.addWidget(self.status_label)
+
+        self.ghost_row = QHBoxLayout()
+        self.ghost_row.setSpacing(10)
+        outer.addLayout(self.ghost_row)
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -185,17 +189,33 @@ class CharacterBuilderScreen(QWidget):
 
         self.btn_generate.setEnabled(False)
         self.status_label.setText("Generating\u2026 this may take a while.")
+        self._show_ghosts(self.variant_spin.value())
 
         self._gen_thread = _GenerateThread(self.project_slug, name, prompt, self.variant_spin.value())
         self._gen_thread.finished_ok.connect(self._on_generated)
         self._gen_thread.failed.connect(self._on_generation_failed)
         self._gen_thread.start()
 
+    def _show_ghosts(self, count):
+        from ui.components.ghost_card import GhostCard
+        self._clear_ghosts()
+        for _ in range(count):
+            self.ghost_row.addWidget(GhostCard(110, 130))
+        self.ghost_row.addStretch()
+
+    def _clear_ghosts(self):
+        while self.ghost_row.count():
+            item = self.ghost_row.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
     def _on_generated(self):
         self.status_label.setText("")
+        self._clear_ghosts()
         self.on_created()
 
     def _on_generation_failed(self, error):
         self.btn_generate.setEnabled(True)
         self.status_label.setText("")
+        self._clear_ghosts()
         QMessageBox.critical(self, "Generation failed", error)

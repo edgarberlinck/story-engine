@@ -94,6 +94,7 @@ class CharacterViewScreen(QWidget):
         self.character_name = character_name
         self.on_back = on_back
         self._gen_thread = None
+        self._pending_ghosts = 0
 
         self.project = project_manager.get_project(project_id) or {"name": "Unknown"}
         self.project_slug = self.project["name"].replace(" ", "_")
@@ -194,15 +195,22 @@ class CharacterViewScreen(QWidget):
                 item.widget().deleteLater()
 
         versions = character_manager.list_versions(self.project_slug, self.character_name)
-        if not versions:
+        if not versions and not self._pending_ghosts:
             empty = QLabel("No versions yet.")
             empty.setStyleSheet("color: #999; padding: 20px;")
             self.gallery.addWidget(empty, 0, 0)
-        for idx, version in enumerate(versions):
+
+        cells = []
+        if self._pending_ghosts:
+            from ui.components.ghost_card import GhostCard
+            cells.extend(GhostCard(160, 180) for _ in range(self._pending_ghosts))
+        for version in versions:
             thumb = VersionThumb(version)
             thumb.clicked.connect(self.set_default_version)
             thumb.export_requested.connect(self.export_version)
-            self.gallery.addWidget(thumb, idx // 3, idx % 3)
+            cells.append(thumb)
+        for idx, widget in enumerate(cells):
+            self.gallery.addWidget(widget, idx // 3, idx % 3)
 
     def set_default_version(self, version):
         character_manager.set_default_version(self.project_slug, self.character_name, version["version"])
@@ -226,6 +234,8 @@ class CharacterViewScreen(QWidget):
             return
         self.btn_generate.setEnabled(False)
         self.status_label.setText("Generating\u2026 this may take a while.")
+        self._pending_ghosts = num
+        self.refresh()
         self._gen_thread = _GenerateThread(self.project_slug, self.character_name, self._prompt, num)
         self._gen_thread.finished_ok.connect(self._on_generated)
         self._gen_thread.failed.connect(self._on_generation_failed)
@@ -234,9 +244,12 @@ class CharacterViewScreen(QWidget):
     def _on_generated(self):
         self.btn_generate.setEnabled(True)
         self.status_label.setText("")
+        self._pending_ghosts = 0
         self.refresh()
 
     def _on_generation_failed(self, error):
         self.btn_generate.setEnabled(True)
         self.status_label.setText("")
+        self._pending_ghosts = 0
+        self.refresh()
         QMessageBox.critical(self, "Generation failed", error)

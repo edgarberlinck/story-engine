@@ -43,6 +43,7 @@ class ProjectViewScreen(QWidget):
         self.on_character_selected = on_character_selected
         self.on_new_character = on_new_character
         self._scene_thread = None
+        self._pending_scene_ghost = False
 
         self.project = project_manager.get_project(project_id) or {"name": "Unknown", "description": ""}
         layout = QVBoxLayout(self)
@@ -198,12 +199,18 @@ class ProjectViewScreen(QWidget):
                 item.widget().deleteLater()
 
         scenes = scene_manager.list_scenes(self.project_slug)
-        self.scene_empty_label.setVisible(not scenes)
+        self.scene_empty_label.setVisible(not scenes and not self._pending_scene_ghost)
 
-        for idx, scene in enumerate(scenes):
+        cells = []
+        if self._pending_scene_ghost:
+            from ui.components.ghost_card import GhostCard
+            cells.append(GhostCard(240, 220, "Generating scene\u2026"))
+        for scene in scenes:
             card = SceneCard(scene)
             card.clicked.connect(self.show_scene)
-            self.scene_grid.addWidget(card, idx // 4, idx % 4)
+            cells.append(card)
+        for idx, widget in enumerate(cells):
+            self.scene_grid.addWidget(widget, idx // 4, idx % 4)
 
     def show_scene(self, scene):
         """Show the full scene image and prompt in a simple viewer dialog."""
@@ -263,6 +270,8 @@ class ProjectViewScreen(QWidget):
 
         self.btn_new_scene.setEnabled(False)
         self.scene_status_label.setText("Generating scene\u2026 this may take a while.")
+        self._pending_scene_ghost = True
+        self.load_scenes()
 
         self._scene_thread = _SceneGenerateThread(self.project_slug, prompt)
         self._scene_thread.finished_ok.connect(self._on_scene_generated)
@@ -272,9 +281,12 @@ class ProjectViewScreen(QWidget):
     def _on_scene_generated(self):
         self.btn_new_scene.setEnabled(True)
         self.scene_status_label.setText("")
+        self._pending_scene_ghost = False
         self.load_scenes()
 
     def _on_scene_failed(self, error):
         self.btn_new_scene.setEnabled(True)
         self.scene_status_label.setText("")
+        self._pending_scene_ghost = False
+        self.load_scenes()
         QMessageBox.critical(self, "Scene generation failed", error)
