@@ -160,10 +160,10 @@ class CharacterBuilderScreen(QWidget):
     def build_prompt(self):
         a = {k: v.lower() for k, v in self.get_attributes().items()}
         return (
-            f"Photorealistic portrait of a {a['body_type']} {a['gender']} character, "
+            f"Full body photo of a {a['body_type']} {a['gender']} character, "
             f"age {a['age_range']}, with {a['hair_length']} {a['hair_type']} {a['hair_color']} hair, "
             f"{a['skin_tone']} skin tone and {a['eye_color']} eyes, wearing {a['clothing']} clothing, "
-            f"{a['mood']} expression, high detail, studio lighting, neutral background"
+            f"{a['mood']} expression, photorealistic, detailed face, high detail, good lighting"
         )
 
     def preview_prompt(self):

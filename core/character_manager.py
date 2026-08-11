@@ -11,6 +11,20 @@ from services.database.character_version_service import character_version_servic
 from utils.project_paths import character_dir, slugify
 from generators.image_engine import generate_character
 
+# Always enforced on character generation: characters must be full body.
+FULL_BODY_SUFFIX = (
+    "Standing upright, ENTIRE body visible from head to toe including feet, "
+    "full length wide shot, camera far from subject, feet touching the ground "
+    "visible in frame, not a portrait, not a close-up"
+)
+
+
+def ensure_full_body(prompt: str) -> str:
+    """Guarantee the full-body instruction is present in a character prompt."""
+    if "full length wide shot" in prompt.lower():
+        return prompt
+    return f"{prompt.rstrip().rstrip(',.')}. {FULL_BODY_SUFFIX}"
+
 
 class CharacterManager:
     def __init__(self):
@@ -44,7 +58,9 @@ class CharacterManager:
     def generate_versions(self, project: str, name: str, prompt: str,
                           model: str = "flux_dev", num_versions: int = 3,
                           seed_start: int = 42) -> List[Dict]:
-        """Generate multiple versions of a character."""
+        """Generate multiple versions of a character. Prompts are always
+        forced to full body (see ensure_full_body)."""
+        prompt = ensure_full_body(prompt)
         versions = []
         char_path = character_dir(name, project)
         versions_dir = char_path / "versions"
