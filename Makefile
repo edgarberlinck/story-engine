@@ -12,6 +12,8 @@ help:
 	@echo "  make benchmark-image - Run image generation benchmark suite"
 	@echo "  make benchmark-video - Run image-to-video generation benchmark suite"
 	@echo "  make benchmark-face  - Run face recognition benchmark (writes report)"
+	@echo "  make benchmark-face-sdxl - Run face recognition benchmark with SDXL"
+	@echo "  make benchmark_fullbody_recognition - Run full body face recognition benchmark"
 
 # Test target
 .PHONY: test
@@ -62,6 +64,18 @@ benchmark-video:
 benchmark-face:
 	@echo "Running face recognition benchmark..."
 	python generators/benchmark_face_recognition.py
+
+# Run the face recognition benchmark suite with SDXL
+.PHONY: benchmark-face-sdxl
+benchmark-face-sdxl:
+	@echo "Running face recognition benchmark (SDXL)..."
+	python generators/benchmark_face_recognition_sdxl.py
+
+# Run the full body face recognition benchmark suite
+.PHONY: benchmark_fullbody_recognition
+benchmark_fullbody_recognition:
+	@echo "Running full body face recognition benchmark..."
+	python generators/benchmark_fullbody_recognition.py
 
 # Clean build artifacts
 .PHONY: clean
