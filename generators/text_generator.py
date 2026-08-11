@@ -9,6 +9,10 @@ import sys
 import re
 from pathlib import Path
 
+# Avoid HuggingFace tokenizers spawning fork-based parallelism (leaks
+# semaphores on macOS and triggers resource_tracker warnings at shutdown).
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -89,6 +93,7 @@ def generate_prompt_with_llm(description, model_name="phi3_mini"):
     Returns:
         str: An enriched prompt (falls back to the raw description on failure)
     """
+    generator = None
     try:
         from transformers import pipeline as hf_pipeline
         from transformers.utils import logging as hf_logging
@@ -129,13 +134,16 @@ def generate_prompt_with_llm(description, model_name="phi3_mini"):
         )
         enriched = result[0]["generated_text"].strip().split("\n")[0].strip()
 
-        # Free memory before diffusion models load
-        del generator
-
         if enriched:
             print(f"LLM-enriched prompt: {enriched}")
             return enriched
     except Exception as e:
         print(f"Prompt enrichment failed ({e}); using raw description.")
+    finally:
+        # Free memory (and multiprocessing resources) before diffusion
+        # models load.
+        from generators.image_generator import cleanup_pipeline
+        cleanup_pipeline(generator)
+        generator = None
 
     return description

@@ -40,6 +40,8 @@ struct ModelItem {
     local_bytes: u64,
     checked: bool,
     status: Status,
+    /// (missing_files, total_files) from remote verification
+    files: Option<(usize, usize)>,
 }
 
 fn parse_size(s: &str) -> u64 {
@@ -130,6 +132,7 @@ fn parse_models_py(root: &Path) -> Vec<ModelItem> {
             local_bytes: local,
             checked: false,
             status,
+            files: None,
         });
     }
     items
@@ -150,6 +153,87 @@ fn hf_binary(root: &Path) -> PathBuf {
 enum DlMsg {
     Line(usize, String),
     Done(usize, bool),
+    /// Result of remote verification: (idx, missing_files, total_files, exact_total_bytes)
+    Verified(usize, usize, usize, u64),
+    VerifyFailed(usize, String),
+}
+
+fn hf_token() -> Option<String> {
+    if let Ok(t) = std::env::var("HF_TOKEN") {
+        return Some(t);
+    }
+    let home = std::env::var("HOME").ok()?;
+    for p in [".cache/huggingface/token", ".huggingface/token"] {
+        if let Ok(t) = std::fs::read_to_string(Path::new(&home).join(p)) {
+            let t = t.trim().to_string();
+            if !t.is_empty() {
+                return Some(t);
+            }
+        }
+    }
+    None
+}
+
+/// Files install.py deliberately skips; ignore them when verifying too.
+fn ignored_file(name: &str) -> bool {
+    let n = name.to_lowercase();
+    [".jpg", ".jpeg", ".png", ".gif", ".md"]
+        .iter()
+        .any(|ext| n.ends_with(ext))
+}
+
+/// Fetch the repo file list (name, size) from the HF API.
+fn remote_files(repo_id: &str) -> Result<Vec<(String, u64)>, String> {
+    let url = format!("https://huggingface.co/api/models/{repo_id}?blobs=true");
+    let mut req = ureq::get(&url).timeout(Duration::from_secs(20));
+    if let Some(t) = hf_token() {
+        req = req.set("Authorization", &format!("Bearer {t}"));
+    }
+    let body = req
+        .call()
+        .map_err(|e| format!("{e}"))?
+        .into_string()
+        .map_err(|e| format!("{e}"))?;
+    let v: serde_json::Value = serde_json::from_str(&body).map_err(|e| format!("{e}"))?;
+    let sib = v["siblings"].as_array().ok_or("no siblings in response")?;
+    Ok(sib
+        .iter()
+        .filter_map(|s| {
+            Some((
+                s["rfilename"].as_str()?.to_string(),
+                s["size"].as_u64().unwrap_or(0),
+            ))
+        })
+        .filter(|(name, _)| !ignored_file(name))
+        .collect())
+}
+
+/// Verify all models against the HF API in a background thread.
+fn spawn_verify(targets: Vec<(usize, String, PathBuf)>, tx: Sender<DlMsg>) {
+    thread::spawn(move || {
+        for (idx, repo_id, local) in targets {
+            match remote_files(&repo_id) {
+                Ok(files) => {
+                    let total = files.len();
+                    let exact: u64 = files.iter().map(|(_, s)| s).sum();
+                    let missing = files
+                        .iter()
+                        .filter(|(name, size)| {
+                            let p = local.join(name);
+                            match p.metadata() {
+                                Ok(md) => *size > 0 && md.len() != *size,
+                                Err(_) => true,
+                            }
+                        })
+                        .count();
+                    let _ = tx.send(DlMsg::Verified(idx, missing, total, exact));
+                }
+                Err(e) => {
+                    let _ = tx.send(DlMsg::VerifyFailed(idx, e));
+                }
+            }
+        }
+    });
 }
 
 /// Where the hf CLI stages data while downloading (xet/hub caches).
@@ -187,8 +271,29 @@ fn spawn_download(
     hf: PathBuf,
     tx: Sender<DlMsg>,
     pid_slot: Arc<Mutex<Option<u32>>>,
+    log_path: PathBuf,
 ) {
     thread::spawn(move || {
+        use std::io::Write;
+        if let Some(dir) = log_path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let log = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+            .ok()
+            .map(|f| Arc::new(Mutex::new(f)));
+        let log_line = |s: &str| {
+            if let Some(l) = &log {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let _ = writeln!(l.lock().unwrap(), "[{ts}] {s}");
+            }
+        };
+        log_line(&format!("=== starting: hf download {repo_id} --local-dir {}", dest.display()));
         let child = Command::new(&hf)
             .args(["download", &repo_id, "--local-dir"])
             .arg(&dest)
@@ -201,15 +306,28 @@ fn spawn_download(
         let mut child = match child {
             Ok(c) => c,
             Err(e) => {
+                log_line(&format!("failed to start hf: {e}"));
                 let _ = tx.send(DlMsg::Line(idx, format!("failed to start hf: {e}")));
                 let _ = tx.send(DlMsg::Done(idx, false));
                 return;
             }
         };
         *pid_slot.lock().unwrap() = Some(child.id());
+        // Read stdout in the background so the pipe can't fill up and block hf
+        let stdout = child.stdout.take().unwrap();
+        let log_out = log.clone();
+        let h_out = thread::spawn(move || {
+            use std::io::{BufRead, BufReader};
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                if let Some(l) = &log_out {
+                    let _ = writeln!(l.lock().unwrap(), "[stdout] {line}");
+                }
+            }
+        });
         // Read stderr (progress) byte-by-byte, splitting on \r or \n
         let stderr = child.stderr.take().unwrap();
         let tx2 = tx.clone();
+        let log_err = log.clone();
         let h = thread::spawn(move || {
             use std::io::Read;
             let mut buf = [0u8; 4096];
@@ -224,6 +342,9 @@ fn spawn_download(
                                 if !line.is_empty() {
                                     let s = String::from_utf8_lossy(&line).trim().to_string();
                                     if !s.is_empty() {
+                                        if let Some(l) = &log_err {
+                                            let _ = writeln!(l.lock().unwrap(), "{s}");
+                                        }
                                         let _ = tx2.send(DlMsg::Line(idx, s));
                                     }
                                     line.clear();
@@ -236,9 +357,12 @@ fn spawn_download(
                 }
             }
         });
-        let ok = child.wait().map(|s| s.success()).unwrap_or(false);
+        let status = child.wait();
+        let ok = status.as_ref().map(|s| s.success()).unwrap_or(false);
+        log_line(&format!("=== finished: {:?}", status));
         *pid_slot.lock().unwrap() = None;
         let _ = h.join();
+        let _ = h_out.join();
         let _ = tx.send(DlMsg::Done(idx, ok));
     });
 }
@@ -264,6 +388,7 @@ struct App {
     speed_bps: f64,
     active_pid: Arc<Mutex<Option<u32>>>,
     cancelling: bool,
+    log_dir: PathBuf,
 }
 
 impl App {
@@ -271,8 +396,15 @@ impl App {
         let (tx, rx) = mpsc::channel();
         let mut ls = ListState::default();
         ls.select(Some(0));
+        let items = parse_models_py(root);
+        let targets: Vec<(usize, String, PathBuf)> = items
+            .iter()
+            .enumerate()
+            .map(|(i, it)| (i, it.repo_id.clone(), it.local_path.clone()))
+            .collect();
+        spawn_verify(targets, tx.clone());
         App {
-            items: parse_models_py(root),
+            items,
             list_state: ls,
             downloading: None,
             queue: Vec::new(),
@@ -288,7 +420,22 @@ impl App {
             speed_bps: 0.0,
             active_pid: Arc::new(Mutex::new(None)),
             cancelling: false,
+            log_dir: root.join("logs/models-ui"),
         }
+    }
+
+    fn log_path_for(&self, idx: usize) -> PathBuf {
+        self.log_dir.join(format!("{}.log", self.items[idx].key))
+    }
+
+    /// Detect competing `hf download` processes for the same repo, which
+    /// cause lock-timeout failures.
+    fn competing_download(&self, repo_id: &str) -> Option<String> {
+        let out = Command::new("pgrep").args(["-fl", "hf download"]).output().ok()?;
+        let s = String::from_utf8_lossy(&out.stdout);
+        s.lines()
+            .find(|l| l.contains(repo_id) && !l.contains(&std::process::id().to_string()))
+            .map(|l| l.split_whitespace().next().unwrap_or("?").to_string())
     }
 
     fn start_next(&mut self) {
@@ -297,8 +444,18 @@ impl App {
         }
         if let Some(idx) = self.queue.first().copied() {
             self.queue.remove(0);
+            if let Some(pid) = self.competing_download(&self.items[idx].repo_id) {
+                self.items[idx].status = Status::Failed;
+                self.items[idx].checked = false;
+                self.log_line = format!(
+                    "Another 'hf download' for {} is already running (pid {}) - kill it first",
+                    self.items[idx].repo_id, pid
+                );
+                return;
+            }
             self.items[idx].status = Status::Downloading;
             self.downloading = Some(idx);
+            let log_path = self.log_path_for(idx);
             spawn_download(
                 idx,
                 self.items[idx].repo_id.clone(),
@@ -306,6 +463,7 @@ impl App {
                 self.hf.clone(),
                 self.tx.clone(),
                 self.active_pid.clone(),
+                log_path,
             );
         }
     }
@@ -335,6 +493,7 @@ impl App {
                 DlMsg::Done(idx, ok) => {
                     let cancelled = self.cancelling;
                     self.cancelling = false;
+                    let log_hint = self.log_path_for(idx);
                     let it = &mut self.items[idx];
                     it.local_bytes = dir_size(&it.local_path);
                     it.status = if ok {
@@ -343,6 +502,8 @@ impl App {
                         self.log_line = "Download stopped - check + 'd' to resume".into();
                         if it.local_bytes == 0 { Status::Pending } else { Status::Partial }
                     } else {
+                        self.log_line =
+                            format!("Download failed - see {}", log_hint.display());
                         Status::Failed
                     };
                     it.checked = false;
@@ -355,6 +516,35 @@ impl App {
                     if !cancelled {
                         self.start_next();
                     }
+                    // Re-verify against the HF API after any download ends
+                    spawn_verify(
+                        vec![(
+                            idx,
+                            self.items[idx].repo_id.clone(),
+                            self.items[idx].local_path.clone(),
+                        )],
+                        self.tx.clone(),
+                    );
+                }
+                DlMsg::Verified(idx, missing, total, exact_bytes) => {
+                    let it = &mut self.items[idx];
+                    if exact_bytes > 0 {
+                        it.expected_bytes = exact_bytes;
+                    }
+                    it.files = Some((missing, total));
+                    if !matches!(it.status, Status::Downloading | Status::Queued) {
+                        it.status = if missing == 0 {
+                            Status::Completed
+                        } else if it.local_bytes == 0 {
+                            Status::Pending
+                        } else {
+                            Status::Partial
+                        };
+                    }
+                }
+                DlMsg::VerifyFailed(idx, e) => {
+                    self.log_line =
+                        format!("verify {}: {} (using size heuristic)", self.items[idx].key, e);
                 }
             }
         }
@@ -420,13 +610,37 @@ fn main() -> io::Result<()> {
 
     if list_mode {
         for it in parse_models_py(&root) {
+            let (status, files) = match remote_files(&it.repo_id) {
+                Ok(fs) => {
+                    let missing = fs
+                        .iter()
+                        .filter(|(name, size)| {
+                            let p = it.local_path.join(name);
+                            match p.metadata() {
+                                Ok(md) => *size > 0 && md.len() != *size,
+                                Err(_) => true,
+                            }
+                        })
+                        .count();
+                    let st = if missing == 0 {
+                        Status::Completed
+                    } else if it.local_bytes == 0 {
+                        Status::Pending
+                    } else {
+                        Status::Partial
+                    };
+                    (st, format!("{}/{} files", fs.len() - missing, fs.len()))
+                }
+                Err(_) => (it.status.clone(), "unverified".into()),
+            };
             println!(
-                "{:<12} {:<24} {:<16} {:>8} / {:<8} {}",
-                format!("{:?}", it.status),
+                "{:<12} {:<24} {:<16} {:>8} / {:<8} {:<14} {}",
+                format!("{:?}", status),
                 it.name,
                 it.mtype,
                 human(it.local_bytes),
                 it.size_str,
+                files,
                 it.repo_id
             );
         }
@@ -558,10 +772,19 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
                     Style::default().add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(format!(
-                    " {:<16} {:>8} / {:<8}  {}",
+                    " {:<16} {:>8} / {:<8}  {:<12} {}",
                     it.mtype,
                     human(it.local_bytes),
-                    it.size_str,
+                    if it.files.is_some() {
+                        human(it.expected_bytes)
+                    } else {
+                        it.size_str.clone()
+                    },
+                    match it.files {
+                        Some((0, n)) => format!("{n}/{n} files"),
+                        Some((m, n)) => format!("{}/{} files", n - m, n),
+                        None => "verifying…".to_string(),
+                    },
                     it.repo_id
                 )),
             ]);

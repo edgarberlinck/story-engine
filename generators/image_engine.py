@@ -180,8 +180,30 @@ def generate_character(
 
 
 def get_character(name: str, project: str = DEFAULT_PROJECT) -> Optional[Dict[str, Any]]:
-    """Fetch a stored character reference by name."""
-    return character_service.get_character(name, project)
+    """Fetch a stored character reference by name.
+
+    Returns None if the character is unknown. If the record exists but its
+    reference image is missing on disk (stale record, e.g. after cleaning
+    the outputs folder), the reference is regenerated from the stored
+    prompt/seed/model and the database record is updated.
+    """
+    character = character_service.get_character(name, project)
+    if character is None:
+        return None
+    reference = character.get("reference_image")
+    if not reference or not Path(reference).is_file():
+        print(
+            f"Reference image missing for character '{name}' ({reference}); "
+            "regenerating from stored prompt."
+        )
+        return generate_character(
+            name,
+            character["prompt"],
+            model=character.get("model") or DEFAULT_CHARACTER_MODEL,
+            project=project,
+            seed=character.get("seed", 42),
+        )
+    return character
 
 
 def _enrich_scene_prompt(prompt: str, project: str) -> str:

@@ -4,11 +4,17 @@ Enhanced image generation script with organized model structure and multiple ima
 This script demonstrates how to use the organized models directory structure.
 """
 
+import gc
 import os
 import sys
 import re
 import time
 from pathlib import Path
+
+# Avoid HuggingFace tokenizers spawning fork-based parallelism (leaks
+# semaphores on macOS and triggers resource_tracker warnings at shutdown).
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, FluxPipeline, Flux2Pipeline
 import torch
 
@@ -106,6 +112,22 @@ def setup_model_directories():
 
 
 
+def cleanup_pipeline(pipe):
+    """Release a diffusion pipeline and free accelerator memory.
+
+    Deleting the pipeline and clearing device caches ensures torch/HF
+    resources (including multiprocessing semaphores) are released before
+    interpreter shutdown, avoiding resource_tracker leak warnings.
+    """
+    if pipe is not None:
+        del pipe
+    gc.collect()
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+    elif torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def generate_images(
     prompt, 
     num_images=1, 
@@ -147,6 +169,7 @@ def generate_images(
     print(f"Model path: {model_path}")
     
     # Load the pipeline for image generation
+    pipe = None
     try:
         # Resolve device/dtype from DEFAULT_MODEL_CONFIGS (mps > cuda > cpu)
         device, torch_dtype = get_model_config("diffusion")
@@ -236,7 +259,10 @@ def generate_images(
     except Exception as e:
         print(f"Error during image generation: {e}")
         raise
-        
+    finally:
+        cleanup_pipeline(pipe)
+        pipe = None
+
     return generated_images
 
 def benchmark_models(*args, **kwargs):
@@ -278,6 +304,7 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
     generated_files = []
     
     # Use the appropriate pipeline based on model type
+    pipe = None
     try:
         device, torch_dtype = get_model_config("diffusion")
 
@@ -348,7 +375,10 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
             with open(output_path, "w") as f:
                 f.write("Failed to generate image")
             generated_files.append(output_path)
-    
+
+    cleanup_pipeline(pipe)
+    pipe = None
+
     print(f"Generated {len(generated_files)} image(s)")
     return generated_files
 

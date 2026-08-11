@@ -51,6 +51,14 @@ ETA) and an output line showing what's happening.
 
 ## Troubleshooting
 
+- **A download failed** — full hf output is saved to
+  `logs/models-ui/<model_key>.log` (appended across runs, with timestamps).
+  The failure message in the UI points to the exact file.
+- **"Another 'hf download' is already running"** — two downloads of the same
+  repo fight over lock files and fail with lock timeouts. The app detects
+  this and refuses to start; kill the other process (e.g. one started
+  manually in a terminal) and try again.
+
 - **"failed to start hf"** — the app looks for `.venv/bin/hf` in the project
   root, then `hf` on PATH. Override with the `HF_BIN` env var.
 - **Gated models (e.g. FLUX.1-dev)** — accept the license on Hugging Face and

@@ -16,6 +16,10 @@ import sys
 import time
 from pathlib import Path
 
+# Avoid HuggingFace tokenizers spawning fork-based parallelism (leaks
+# semaphores on macOS and triggers resource_tracker warnings at shutdown).
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import torch
 from PIL import Image
 
@@ -23,6 +27,7 @@ from PIL import Image
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from generators.image_generator import cleanup_pipeline
 from models import IMAGE_TO_VIDEO_MODELS, MODEL_PATHS, get_model_config
 from utils.model_metrics import get_memory_usage
 
@@ -165,26 +170,30 @@ def generate_video(
     print(f"Device: {device}, dtype: {torch_dtype}")
 
     pipe = _load_pipeline(model_name, model_path, device, torch_dtype)
-    image = _prepare_image(image_path, params["width"], params["height"])
-    generator = torch.Generator(device="cpu").manual_seed(seed)
+    try:
+        image = _prepare_image(image_path, params["width"], params["height"])
+        generator = torch.Generator(device="cpu").manual_seed(seed)
 
-    call_kwargs = dict(
-        image=image,
-        prompt=prompt,
-        generator=generator,
-        **params,
-    )
-    if negative_prompt is not None:
-        call_kwargs["negative_prompt"] = negative_prompt
+        call_kwargs = dict(
+            image=image,
+            prompt=prompt,
+            generator=generator,
+            **params,
+        )
+        if negative_prompt is not None:
+            call_kwargs["negative_prompt"] = negative_prompt
 
-    start_time = time.time()
-    start_memory = get_memory_usage()
+        start_time = time.time()
+        start_memory = get_memory_usage()
 
-    result = pipe(**call_kwargs)
-    frames = result.frames[0]
+        result = pipe(**call_kwargs)
+        frames = result.frames[0]
 
-    duration_ms = int((time.time() - start_time) * 1000)
-    peak_memory_mb = int(get_memory_usage() - start_memory)
+        duration_ms = int((time.time() - start_time) * 1000)
+        peak_memory_mb = int(get_memory_usage() - start_memory)
+    finally:
+        cleanup_pipeline(pipe)
+        pipe = None
 
     os.makedirs(output_dir, exist_ok=True)
     if output_basename is None:

@@ -40,6 +40,14 @@ def character_appears_in_image(
         )
         return None
 
+    import os
+
+    for label, path in (("reference", reference_image_path),
+                        ("scene", scene_image_path)):
+        if not os.path.isfile(path):
+            print(f"Warning: {label} image not found: {path}; skipping check.")
+            return None
+
     import face_recognition
 
     reference = face_recognition.load_image_file(reference_image_path)
