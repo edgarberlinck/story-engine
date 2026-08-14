@@ -206,14 +206,35 @@ def get_character(name: str, project: str = DEFAULT_PROJECT) -> Optional[Dict[st
     return character
 
 
-def _enrich_scene_prompt(prompt: str, project: str) -> str:
+def _enrich_scene_prompt(prompt: str, project: str, use_appearance_only: bool = False) -> str:
     """Inject stored character descriptions for any character named in the
-    prompt, so callers never need to resend the character prompt."""
+    prompt, so callers never need to resend the character prompt.
+    
+    Args:
+        prompt: Base scene prompt
+        project: Project name
+        use_appearance_only: If True, use appearance-only attributes without style
+                              to avoid style conflicts in multi-character scenes
+    """
     enriched = prompt
     for character in character_service.find_characters_in_text(prompt, project):
-        enriched += (
-            f"\n{character['name']} appearance: {character['prompt']}"
-        )
+        if use_appearance_only:
+            from core.prompt_decomposer import extract_appearance_from_stored_prompt
+            appearance = extract_appearance_from_stored_prompt(character['prompt'])
+            # Prefer stored attributes if available
+            if 'attributes' in character and character['attributes']:
+                from core.prompt_decomposer import build_appearance_prompt
+                # Determine character type from stored prompt or attributes
+                char_type = "man"  # default, could infer from attributes
+                appearance = build_appearance_prompt(char_type, character['attributes'])
+            
+            enriched += (
+                f"\n{character['name']} appearance: {appearance}"
+            )
+        else:
+            enriched += (
+                f"\n{character['name']} appearance: {character['prompt']}"
+            )
         print(f"Scene references known character: {character['name']}")
     return enriched
 
@@ -239,6 +260,7 @@ def generate_scene(
     scene_number: int = None,
     model: str = DEFAULT_CHARACTER_MODEL,
     seed: int = 42,
+    use_style_mediation: bool = True,
     **kwargs: Any,
 ) -> Dict[str, Any]:
     """Generate a scene image inside the project scene folder structure.
@@ -256,8 +278,18 @@ def generate_scene(
 
     # Phase 1: Detect style conflicts (non-blocking warning)
     style_warnings = detect_scene_style_conflicts(prompt, project)
+    
+    # Phase 2: Style mediation - use appearance-only for conflicting styles
+    use_appearance_only = False
+    if use_style_mediation:
+        from core.prompt_decomposer import should_use_scene_style_override
+        characters = character_service.find_characters_in_text(prompt, project)
+        use_appearance_only = should_use_scene_style_override(characters, project)
+        
+        if use_appearance_only and style_warnings:
+            print(f"INFO: Using appearance-only mode for scene to avoid style conflicts")
 
-    enriched_prompt = _enrich_scene_prompt(prompt, project)
+    enriched_prompt = _enrich_scene_prompt(prompt, project, use_appearance_only)
     files = generate_images(
         prompt=enriched_prompt,
         model_name=model,
@@ -277,6 +309,7 @@ def generate_scene(
         "enriched_prompt": enriched_prompt,
         "seed": seed,
         "model": model,
+        "appearance_only_mode": use_appearance_only,
     }
     
     if style_warnings:

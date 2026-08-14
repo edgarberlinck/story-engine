@@ -3,6 +3,7 @@ reference image path) so scenes can reference characters by name only.
 """
 
 import sqlite3
+import json
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
@@ -43,8 +44,13 @@ class CharacterService:
         model: str,
         reference_image: str,
         project: str = "test_project",
+        attributes: Optional[Dict[str, Any]] = None,
     ) -> int:
-        """Insert or update a character reference. Returns the row id."""
+        """Insert or update a character reference. Returns the row id.
+        
+        If attributes is provided, it will be stored in character_attributes table
+        for use in scene generation with style-aware prompt separation.
+        """
         conn = self._connect()
         cursor = conn.execute(
             """
@@ -59,10 +65,25 @@ class CharacterService:
             """,
             (project, name, prompt, seed, model, reference_image, datetime.now()),
         )
+        
+        # Store attributes if provided
+        if attributes is not None:
+            self._save_character_attributes(conn, project, name, attributes)
+        
         conn.commit()
         row_id = cursor.lastrowid
         conn.close()
         return row_id
+    
+    def _save_character_attributes(self, conn: sqlite3.Connection, project: str, 
+                                    character_name: str, attributes: Dict[str, Any]) -> None:
+        """Save character attributes to character_attributes table."""
+        json_str = json.dumps(attributes)
+        conn.execute("""
+            INSERT OR REPLACE INTO character_attributes
+            (project, character_name, attributes_json, updated_at)
+            VALUES (?, ?, ?, ?)
+        """, (project, character_name, json_str, datetime.now()))
 
     def get_character(
         self, name: str, project: str = "test_project"
@@ -73,8 +94,23 @@ class CharacterService:
             "SELECT * FROM characters WHERE project = ? AND name = ?",
             (project, name),
         ).fetchone()
+        
+        if row:
+            character = dict(row)
+            # Load attributes if available
+            attr_row = conn.execute("""
+                SELECT attributes_json FROM character_attributes
+                WHERE project = ? AND character_name = ?
+            """, (project, name)).fetchone()
+            
+            if attr_row and attr_row["attributes_json"]:
+                try:
+                    character["attributes"] = json.loads(attr_row["attributes_json"])
+                except json.JSONDecodeError:
+                    pass
+        
         conn.close()
-        return dict(row) if row else None
+        return character if row else None
 
     def list_characters(self, project: str = "test_project") -> List[Dict[str, Any]]:
         conn = self._connect()
