@@ -11,7 +11,7 @@ spec for the `video_generator` / `video_engine` work.
 
 ## Models
 
-- Use **all** image-to-video models: `wan22_i2v`, `ltx_video`,
+- Use **all** image-to-video models: `wan22_i2v`,
   `hunyuan_video_i2v`.
 - **Default model: `wan22_i2v` (Wan)**.
 - Each model must be invoked with its correct, model-specific parameters
@@ -54,7 +54,7 @@ outputs/<project>/scenes/scene_*/out/<videos>  # generated videos go in out/
 
 - Only convert a scene to video after character validation passes:
   `image_to_video(scene)`.
-- Because we are benchmarking, generate the **same scene with all three
+- Because we are benchmarking, generate the **same scene with all available
   i2v models** and record benchmark results (timings/metrics JSON), same
   approach as `generators/benchmark_image_generator.py` +
   `utils/model_metrics.py`.

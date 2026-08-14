@@ -4,7 +4,6 @@ Image-to-video generation across all supported i2v models.
 
 Supported models (see models.py IMAGE_TO_VIDEO_MODELS):
   - wan22_i2v (default)  : Wan-AI/Wan2.2-I2V-A14B
-  - ltx_video            : Lightricks/LTX-Video
   - hunyuan_video_i2v    : tencent/HunyuanVideo-I2V
 
 Each model is invoked with its own correct pipeline class and parameters.
@@ -50,17 +49,6 @@ MODEL_GENERATION_PARAMS = {
             "fused fingers, still frame, messy background"
         ),
     },
-    "ltx_video": {
-        "width": 704,
-        "height": 480,
-        "num_frames": 121,
-        "fps": 24,
-        "guidance_scale": 3.0,
-        "num_inference_steps": 40,
-        "negative_prompt": (
-            "worst quality, inconsistent motion, blurry, jittery, distorted"
-        ),
-    },
     "hunyuan_video_i2v": {
         "width": 720,
         "height": 480,
@@ -94,12 +82,6 @@ def _load_pipeline(model_name: str, model_path: str, device: str, torch_dtype):
         from diffusers import WanImageToVideoPipeline
 
         pipe = WanImageToVideoPipeline.from_pretrained(
-            model_path, torch_dtype=torch_dtype
-        )
-    elif model_name == "ltx_video":
-        from diffusers import LTXImageToVideoPipeline
-
-        pipe = LTXImageToVideoPipeline.from_pretrained(
             model_path, torch_dtype=torch_dtype
         )
     elif model_name == "hunyuan_video_i2v":

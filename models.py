@@ -29,7 +29,6 @@ TEXT_GENERATION_MODELS = {
 # Image-to-Video Models (for animating generated images)
 IMAGE_TO_VIDEO_MODELS = {
     "wan22_i2v": "Wan-AI/Wan2.2-I2V-A14B",
-    "ltx_video": "Lightricks/LTX-Video",
     "hunyuan_video_i2v": "tencent/HunyuanVideo-I2V"
 }
 
@@ -104,13 +103,6 @@ MODEL_METADATA = {
         "size": "~60GB",
         "description": "Wan 2.2 image-to-video MoE model (A14B) for high-quality video generation from images",
         "repo_id": "Wan-AI/Wan2.2-I2V-A14B"
-    },
-    "ltx_video": {
-        "name": "LTX-Video",
-        "type": "image_to_video",
-        "size": "~30GB",
-        "description": "Lightricks LTX-Video real-time image-to-video and text-to-video generation model",
-        "repo_id": "Lightricks/LTX-Video"
     },
     "hunyuan_video_i2v": {
         "name": "HunyuanVideo I2V",

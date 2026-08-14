@@ -13,7 +13,7 @@
 - [x] Task framework with typed prompts (scenes, characters, environments)
   - [x] Image engine with typed generation (`GenerationType`: character/environment)
   - [x] Scene-driven generation pipeline (`image_engine.generate_scene`)
-- [x] Video generation (Wan 2.2 I2V, LTX-Video, HunyuanVideo I2V) — see Phase 4
+- [x] Video generation (Wan 2.2 I2V, HunyuanVideo I2V) — see Phase 4
 - [ ] Extend task framework to text/audio tasks
 - [ ] Flexible configuration options
   - [x] Per-model-type dtype/device configuration (`get_model_config`)
@@ -35,7 +35,7 @@
   - [ ] Wire segmentation into any code path (currently unused)
 
 ## Phase 4: Image-to-Video Generation 🟢 Mostly Complete
-- [x] Register I2V models (Wan 2.2 I2V A14B, LTX-Video, HunyuanVideo-I2V)
+- [x] Register I2V models (Wan 2.2 I2V A14B, HunyuanVideo-I2V)
 - [x] Install script downloads I2V models to `models/image_to_video/`
 - [x] Video generator module (`generators/video_generator.py`, `make benchmark-video`)
 - [x] Scene-driven video pipeline (`video_engine.py`: validated scene → character reference → animated clip)

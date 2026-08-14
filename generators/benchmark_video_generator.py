@@ -60,14 +60,11 @@ CHARACTERS = {
 }
 
 # Per-model overrides to guarantee >= 4 seconds and >= 720p.
-# Frame counts respect each model's constraints (Wan/Hunyuan: 4k+1 frames,
-# LTX: 8k+1 frames and dimensions divisible by 32 -> 1280x736).
-#   wan22_i2v:         81 frames @ 16 fps = 5.06 s, 1280x720
-#   ltx_video:        121 frames @ 24 fps = 5.04 s, 1280x736
+# Frame counts respect each model's constraints (Wan/Hunyuan: 4k+1 frames).
+#   wan22_i2v:          81 frames @ 16 fps = 5.06 s, 1280x720
 #   hunyuan_video_i2v: 61 frames @ 15 fps = 4.07 s, 1280x720
 BENCHMARK_VIDEO_PARAMS = {
     "wan22_i2v": {"width": 1280, "height": 720, "num_frames": 81, "fps": 16},
-    "ltx_video": {"width": 1280, "height": 736, "num_frames": 121, "fps": 24},
     "hunyuan_video_i2v": {"width": 1280, "height": 720, "num_frames": 61, "fps": 15},
 }
 

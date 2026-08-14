@@ -12,7 +12,6 @@ default is **Wan 2.2** (`wan22_i2v`):
 | Model | Repo |
 |---|---|
 | Wan 2.2 I2V A14B (default) | `Wan-AI/Wan2.2-I2V-A14B` |
-| LTX-Video | `Lightricks/LTX-Video` |
 | HunyuanVideo I2V | `tencent/HunyuanVideo-I2V` |
 
 ## Project folder structure

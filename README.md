@@ -13,7 +13,7 @@ database — all from a desktop UI or CLI.
 ## Features
 
 - **Image generation** — text-to-image via SDXL and FLUX.1-dev
-- **Image-to-video generation** — Wan 2.2 I2V A14B, LTX-Video, HunyuanVideo I2V
+- **Image-to-video generation** — Wan 2.2 I2V A14B, HunyuanVideo I2V
 - **Face recognition** — benchmarking for consistent character identity
 - **Project management** — create, list, search, and update projects (SQLite-backed)
 - **Scene & character management** — structured story data with versioned
@@ -100,7 +100,7 @@ make cli    # CLI help
 | Category | Models |
 |---|---|
 | **Diffusion** (text-to-image) | SDXL (`sdxl`), FLUX.1-dev (`flux_dev`) |
-| **Image-to-video** | Wan 2.2 I2V A14B (`wan22_i2v`), LTX-Video (`ltx_video`), HunyuanVideo I2V (`hunyuan_video_i2v`) |
+| **Image-to-video** | Wan 2.2 I2V A14B (`wan22_i2v`), HunyuanVideo I2V (`hunyuan_video_i2v`) |
 | **Text generation** | Phi-3 Mini (`phi3_mini`), Gemma 2B (`gemma_2b`) |
 | **Segmentation** | DETR ResNet-50 Panoptic (`detr_resnet_50_panoptic`) |
 
