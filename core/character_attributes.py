@@ -199,6 +199,85 @@ CHARACTER_STYLES: Dict[str, Dict[str, str]] = {
 DEFAULT_STYLE = "ultra_realistic"
 
 # ---------------------------------------------------------------------------
+# Style compatibility families (Phase 1 conflict detection)
+# ---------------------------------------------------------------------------
+# Styles within the same family render coherently together; mixing across
+# families in one scene is the failure mode described in
+# docs/scene-generation-caveats.md.
+
+STYLE_FAMILIES: Dict[str, str] = {
+    # Photographic / realistic
+    "ultra_realistic": "realistic",
+    "cinematic": "realistic",
+    "photorealistic": "realistic",
+    "realistic": "realistic",
+    "semi_realistic": "realistic",  # bridges realistic/stylized, see FAMILY_BRIDGES
+
+    # Japanese-inspired 2D
+    "anime": "anime_manga",
+    "manga": "anime_manga",
+
+    # Western 2D / comic
+    "comic_book": "comic_cartoon",
+    "cartoon": "comic_cartoon",
+    "animation": "comic_cartoon",
+
+    # 3D stylized
+    "3d_animation": "3d_stylized",
+    "3d_render": "3d_stylized",
+    "pixar_like": "3d_stylized",
+    "disney_like": "3d_stylized",
+    "clay_render": "3d_stylized",
+    "low_poly": "3d_stylized",
+    "game_asset": "3d_stylized",
+
+    # Painterly / traditional media
+    "digital_painting": "painterly",
+    "oil_painting": "painterly",
+    "watercolor": "painterly",
+    "concept_art": "painterly",
+    "fantasy_art": "painterly",
+    "dark_fantasy": "painterly",
+
+    # Line art / sketch
+    "pencil_drawing": "sketch",
+    "sketch": "sketch",
+    "ink_drawing": "sketch",
+
+    # Genre-flavored but photographic-leaning (treated as realistic-compatible
+    # unless explicitly combined with a 2D family)
+    "cyberpunk": "realistic",
+    "sci_fi": "realistic",
+    "steampunk": "realistic",
+    "medieval_art": "realistic",
+
+    # Ambiguous / low-signal — excluded from conflict checks
+    "stylized": "ambiguous",
+    "pixel_art": "pixel",
+    "minimalist": "ambiguous",
+    "abstract": "ambiguous",
+}
+
+# Families considered mutually exclusive when they appear together in one
+# scene (asymmetric/explicit pairs beyond simple "different family" checks).
+INCOMPATIBLE_FAMILY_PAIRS = {
+    frozenset({"realistic", "anime_manga"}),
+    frozenset({"realistic", "comic_cartoon"}),
+    frozenset({"realistic", "pixel"}),
+    frozenset({"realistic", "3d_stylized"}),
+    frozenset({"anime_manga", "3d_stylized"}),
+    frozenset({"anime_manga", "painterly"}),
+    frozenset({"comic_cartoon", "painterly"}),
+}
+
+# Families that are considered "close enough" not to warn even though they
+# aren't identical (avoids false positives for near-neighbors).
+FAMILY_BRIDGES = {
+    frozenset({"realistic", "painterly"}),  # cinematic/concept art often coexist fine
+    frozenset({"sketch", "painterly"}),
+}
+
+# ---------------------------------------------------------------------------
 # Attribute helpers
 # ---------------------------------------------------------------------------
 

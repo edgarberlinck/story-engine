@@ -218,6 +218,21 @@ def _enrich_scene_prompt(prompt: str, project: str) -> str:
     return enriched
 
 
+def detect_scene_style_conflicts(prompt: str, project: str = DEFAULT_PROJECT) -> list:
+    """Phase 1 mitigation: detect when characters referenced in a scene
+    prompt use incompatible visual styles.
+    
+    This is non-blocking — just returns warnings for UI display. See
+    docs/scene-generation-caveats.md for details.
+    """
+    from core.style_conflict import detect_scene_style_conflicts as detect_conflicts
+    
+    conflicts = detect_conflicts(prompt, project)
+    for conflict in conflicts:
+        print(f"WARNING: {conflict.message()}")
+    return [c.message() for c in conflicts]
+
+
 def generate_scene(
     prompt: str,
     project: str = DEFAULT_PROJECT,
@@ -232,11 +247,15 @@ def generate_scene(
     database and their stored descriptions are appended to the prompt.
 
     Returns:
-        dict with 'scene_number', 'image_path', 'prompt', 'seed', 'model'.
+        dict with 'scene_number', 'image_path', 'prompt', 'seed', 'model',
+        and optionally 'style_warnings'.
     """
     if scene_number is None:
         scene_number = next_scene_number(project)
     target_dir = scene_dir(scene_number, project)
+
+    # Phase 1: Detect style conflicts (non-blocking warning)
+    style_warnings = detect_scene_style_conflicts(prompt, project)
 
     enriched_prompt = _enrich_scene_prompt(prompt, project)
     files = generate_images(
@@ -251,7 +270,7 @@ def generate_scene(
     shutil.move(files[0], image_path)
     print(f"Scene {scene_number} image saved to: {image_path}")
 
-    return {
+    result = {
         "scene_number": scene_number,
         "image_path": image_path,
         "prompt": prompt,
@@ -259,6 +278,11 @@ def generate_scene(
         "seed": seed,
         "model": model,
     }
+    
+    if style_warnings:
+        result["style_warnings"] = style_warnings
+    
+    return result
 
 
 def verify_character_in_scene(
