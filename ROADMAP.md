@@ -40,7 +40,7 @@
 - [x] Video generator module (`generators/video_generator.py`, `make benchmark-video`)
 - [x] Scene-driven video pipeline (`video_engine.py`: validated scene → character reference → animated clip)
 - [x] Output management for video files (`outputs/<project>/scenes/scene_<n>/out/`, videos + metrics JSON)
-- [ ] Per-model quantization/MLX runtime support (see `docs/video-generation-caveats.md`)
+- [ ] Per-model quantization/MLX runtime support (see `docs/image-to-video.md`)
 
 ## Phase 5: Project & Data Management 🟡 In Progress
 - [x] SQLite persistence layer (`services/database/`)
@@ -69,7 +69,7 @@
 ## Technical Considerations
 - [x] Keep model directories organized and scalable
 - [x] Document all APIs and interfaces clearly (`docs/humans/`, `docs/llm/`)
-- [x] Runtime/performance guidance documented (`docs/video-generation-caveats.md`)
+- [x] Runtime/performance guidance documented (`docs/image-to-video.md`)
 - [ ] Maintain backward compatibility with existing implementations (ongoing)
 - [ ] Ensure smooth integration between different generation approaches
 - [ ] Decide: wire up segmentation model or remove it from install list (~1.2GB unused)

@@ -104,8 +104,8 @@ make cli    # CLI help
 | **Text generation** | Phi-3 Mini (`phi3_mini`), Gemma 2B (`gemma_2b`) |
 | **Segmentation** | DETR ResNet-50 Panoptic (`detr_resnet_50_panoptic`) |
 
-See [docs/video-generation-caveats.md](docs/video-generation-caveats.md) for
-runtime guidance on the image-to-video models on this machine.
+See [docs/image-to-video.md](docs/image-to-video.md) for the authoritative
+specification and runtime guidance on the image-to-video models.
 
 ## Automation Commands
 
