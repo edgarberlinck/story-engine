@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QApplication, QStackedWidget
 from ui.screens.project_list_screen import ProjectListScreen
 
 APP_STYLE = """
-QWidget { font-family: sans-serif; font-size: 13px; }
+QWidget { font-family: .AppleSystemUIFont; font-size: 13px; }
 QPushButton {
     background-color: #4CAF50; color: white; border: none;
     border-radius: 4px; padding: 6px 14px; font-weight: 600;
