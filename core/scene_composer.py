@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 
+from generators.image_engine import DEFAULT_SCENE_MODEL
+
 
 @dataclass
 class SceneLayer:
@@ -138,7 +140,7 @@ class MultiStepSceneGenerator:
         characters: List[Dict],
         project: str,
         scene_number: int,
-        model: str = "flux_dev",
+        model: str = DEFAULT_SCENE_MODEL,
         seed: int = 42
     ) -> Dict:
         """Generate scene in multiple steps."""

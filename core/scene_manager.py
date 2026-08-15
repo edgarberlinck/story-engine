@@ -5,7 +5,7 @@ Scene management core for UI.
 import re
 from typing import List, Dict, Optional
 from services.database.scene_service import scene_service
-from generators.image_engine import generate_scene
+from generators.image_engine import DEFAULT_SCENE_MODEL, generate_scene
 from utils.project_paths import DEFAULT_PROJECT, OUTPUTS_ROOT
 
 
@@ -52,7 +52,7 @@ class SceneManager:
 
     def create_scene(self, project: str, prompt: str,
                      scene_number: Optional[int] = None,
-                     model: str = "flux_dev",
+                     model: str = DEFAULT_SCENE_MODEL,
                      seed: int = 42) -> Dict:
         result = generate_scene(
             prompt=prompt,

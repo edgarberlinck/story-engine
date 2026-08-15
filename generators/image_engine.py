@@ -136,6 +136,11 @@ def generate(
 # ---------------------------------------------------------------------------
 
 DEFAULT_CHARACTER_MODEL = "flux_dev"
+# Default model for scene generation. flux_klein (FLUX.2 Klein 4B) supports
+# holistic reference-conditioned multi-character scenes
+# (see docs/story-engine-reference-conditioned-scene-design.md), which is
+# higher-fidelity than the asset-composition fallback used by flux_dev/sdxl.
+DEFAULT_SCENE_MODEL = "flux_klein"
 
 
 def generate_character(
@@ -287,7 +292,7 @@ def generate_scene(
     prompt: str,
     project: str = DEFAULT_PROJECT,
     scene_number: int = None,
-    model: str = DEFAULT_CHARACTER_MODEL,
+    model: str = DEFAULT_SCENE_MODEL,
     seed: int = 42,
     use_style_mediation: bool = True,
     use_advanced_prompting: bool = True,

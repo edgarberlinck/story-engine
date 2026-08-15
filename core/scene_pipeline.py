@@ -503,7 +503,7 @@ def generate_scene_pipeline(
     project: str = DEFAULT_PROJECT,
     scene_number: Optional[int] = None,
     characters: Optional[List[Dict[str, Any]]] = None,
-    model: str = "flux_dev",
+    model: str = "flux_klein",
     seed: int = 42,
     enable_refinement: bool = True,
     refinement_strength: float = 0.25,

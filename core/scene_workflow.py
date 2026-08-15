@@ -14,7 +14,7 @@ backward-compatible wrapper so existing callers/tests don't need to change.
 
 from typing import List, Dict, Any, Optional
 
-from generators.image_engine import generate_scene
+from generators.image_engine import DEFAULT_SCENE_MODEL, generate_scene
 
 
 def generate_scene_with_llm_orchestration(
@@ -24,7 +24,7 @@ def generate_scene_with_llm_orchestration(
     characters: Optional[List[Dict]] = None,
     use_multi_step: bool = True,
     enforce_token_budget: bool = True,
-    model: str = "flux_dev",
+    model: str = DEFAULT_SCENE_MODEL,
     seed: int = 42
 ) -> Dict[str, Any]:
     """
