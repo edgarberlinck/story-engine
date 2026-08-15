@@ -146,13 +146,15 @@ class DatabaseService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+        deleted_projects = cursor.rowcount
         # Cascade delete related data
         cursor.execute("DELETE FROM character_versions WHERE project = ?", (project_id,))
         cursor.execute("DELETE FROM scenes WHERE project = ?", (project_id,))
         conn.commit()
-        deleted = cursor.rowcount > 0
         conn.close()
-        return deleted
+        # Return whether the project row itself was deleted (not the last
+        # statement's rowcount, which may be 0 even when a project was deleted).
+        return deleted_projects > 0
 
 
 # Create a singleton instance

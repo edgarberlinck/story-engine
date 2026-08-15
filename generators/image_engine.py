@@ -15,6 +15,7 @@ from utils.project_paths import (
     slugify,
 )
 from utils.face_check import character_appears_in_image
+from utils.scene_logger import scene_logging
 
 if TYPE_CHECKING:
     from abc import ABC, abstractmethod
@@ -129,6 +130,7 @@ def generate(
         **image_kwargs
     )
 
+
 # ---------------------------------------------------------------------------
 # Character & scene high-level API
 # ---------------------------------------------------------------------------
@@ -216,8 +218,34 @@ def _enrich_scene_prompt(prompt: str, project: str, use_appearance_only: bool = 
         use_appearance_only: If True, use appearance-only attributes without style
                               to avoid style conflicts in multi-character scenes
     """
+    from utils.token_budget import build_token_aware_scene_prompt, count_tokens
+    
+    characters = character_service.find_characters_in_text(prompt, project)
+    
+    # Use token-aware prompt building for better CLIP compatibility
+    if len(characters) >= 1:
+        token_aware_prompt, stats = build_token_aware_scene_prompt(
+            base_prompt=prompt,
+            characters=[{'name': c['name'], 'prompt': c.get('prompt', ''), 
+                        'attributes': c.get('attributes')} for c in characters]
+        )
+        
+        # Log token usage
+        print(f"Token budget: {stats['total_tokens_estimated']}/{stats['max_tokens']} tokens")
+        if stats['items_dropped'] > 0:
+            print(f"Warning: Dropped {stats['items_dropped']} items due to token budget")
+            for dropped in stats['dropped_details']:
+                print(f"  - Dropped {dropped['category']} (priority {dropped['priority']}): {dropped['text']}")
+        
+        # If token-aware prompt is significantly better, use it
+        original_tokens = count_tokens(prompt)
+        if len(characters) > 1 or original_tokens > 60:
+            print(f"Using token-aware prompt construction")
+            return token_aware_prompt
+    
+    # Fallback to original enrichment logic
     enriched = prompt
-    for character in character_service.find_characters_in_text(prompt, project):
+    for character in characters:
         if use_appearance_only:
             from core.prompt_decomposer import extract_appearance_from_stored_prompt
             appearance = extract_appearance_from_stored_prompt(character['prompt'])
@@ -254,6 +282,7 @@ def detect_scene_style_conflicts(prompt: str, project: str = DEFAULT_PROJECT) ->
     return [c.message() for c in conflicts]
 
 
+@scene_logging(scene_name_arg="scene_number", prompt_arg="prompt")
 def generate_scene(
     prompt: str,
     project: str = DEFAULT_PROJECT,
@@ -261,6 +290,12 @@ def generate_scene(
     model: str = DEFAULT_CHARACTER_MODEL,
     seed: int = 42,
     use_style_mediation: bool = True,
+    use_advanced_prompting: bool = True,
+    enforce_token_budget: bool = True,
+    use_asset_pipeline: bool = True,
+    enable_refinement: bool = True,
+    refinement_strength: float = 0.25,
+    refinement_model: str = "sdxl",
     **kwargs: Any,
 ) -> Dict[str, Any]:
     """Generate a scene image inside the project scene folder structure.
@@ -272,24 +307,123 @@ def generate_scene(
         dict with 'scene_number', 'image_path', 'prompt', 'seed', 'model',
         and optionally 'style_warnings'.
     """
+    from utils.token_budget import count_tokens
+    
     if scene_number is None:
         scene_number = next_scene_number(project)
     target_dir = scene_dir(scene_number, project)
 
+    # Find characters in prompt
+    characters = character_service.find_characters_in_text(prompt, project)
+    
     # Phase 1: Detect style conflicts (non-blocking warning)
     style_warnings = detect_scene_style_conflicts(prompt, project)
-    
+
+    # Multi-character scenes: delegate to the asset-composition pipeline
+    # (background text2img -> per-character assets -> segmentation ->
+    # deterministic composition), per
+    # docs/story-engine-multi-character-scene-design.md §2.1.
+    if use_asset_pipeline and len(characters) >= 2:
+        from core.scene_pipeline import generate_scene_pipeline
+        print(f"INFO: {len(characters)} characters detected, delegating to asset-composition pipeline")
+        result = generate_scene_pipeline(
+            prompt=prompt,
+            project=project,
+            scene_number=scene_number,
+            characters=characters,
+            model=model,
+            seed=seed,
+            enable_refinement=enable_refinement,
+            refinement_strength=refinement_strength,
+            refinement_model=refinement_model,
+        )
+        if style_warnings:
+            result.setdefault("style_warnings", style_warnings)
+        return result
+
     # Phase 2: Style mediation - use appearance-only for conflicting styles
     use_appearance_only = False
-    if use_style_mediation:
+    if use_style_mediation and len(characters) >= 2:
         from core.prompt_decomposer import should_use_scene_style_override
-        characters = character_service.find_characters_in_text(prompt, project)
         use_appearance_only = should_use_scene_style_override(characters, project)
         
         if use_appearance_only and style_warnings:
             print(f"INFO: Using appearance-only mode for scene to avoid style conflicts")
 
-    enriched_prompt = _enrich_scene_prompt(prompt, project, use_appearance_only)
+    # Phase 3: Advanced prompting with per-character style tokens
+    enriched_prompt = prompt
+    negative_prompt = None
+    model_recommendation = None
+    
+    if use_advanced_prompting and len(characters) >= 2:
+        from core.advanced_prompting import (
+            build_advanced_scene_prompt,
+            AdvancedPromptingEngine
+        )
+        
+        # Build advanced prompt with per-character tokens
+        adv_prompt, neg_prompt = build_advanced_scene_prompt(
+            prompt, characters, use_advanced_techniques=True
+        )
+        enriched_prompt = adv_prompt
+        negative_prompt = neg_prompt
+        
+        # Recommend model based on style combination
+        style_ids = []
+        from core.style_conflict import detect_character_style
+        for char in characters:
+            style_id = detect_character_style(char.get("prompt", ""))
+            if style_id:
+                style_ids.append(style_id)
+        
+        if style_ids:
+            recommended_model = AdvancedPromptingEngine.recommend_model(style_ids)
+            model_recommendation = {
+                "recommended": recommended_model,
+                "current": model,
+                "use_recommended": recommended_model != model
+            }
+            
+            if recommended_model != model:
+                print(f"INFO: Recommended model for style combination: {recommended_model} "
+                      f"(currently using {model})")
+        
+        # Use appearance-only mode if severe conflicts detected
+        if use_appearance_only:
+            enriched_prompt = _enrich_scene_prompt(prompt, project, use_appearance_only)
+    else:
+        enriched_prompt = _enrich_scene_prompt(prompt, project, use_appearance_only)
+
+    # Phase 4: Token budget enforcement (CLIP limit protection)
+    if enforce_token_budget and len(characters) >= 1:
+        from utils.token_budget import build_token_aware_scene_prompt
+        
+        base_enriched_prompt = enriched_prompt
+        token_aware_prompt, stats = build_token_aware_scene_prompt(
+            base_prompt=prompt,
+            characters=[{'name': c['name'], 'prompt': c.get('prompt', ''), 
+                        'attributes': c.get('attributes')} for c in characters]
+        )
+        
+        # Only use token-aware prompt if it reduces tokens or is within budget
+        original_token_count = count_tokens(base_enriched_prompt)
+        new_token_count = count_tokens(token_aware_prompt)
+        
+        print(f"Token analysis: Original={original_token_count}, Token-aware={new_token_count}")
+        
+        if new_token_count < original_token_count or stats['total_tokens_estimated'] > 70:
+            print(f"INFO: Using token-aware prompt (saved {original_token_count - new_token_count} tokens)")
+            enriched_prompt = token_aware_prompt
+            
+            # Add token stats to result
+            if 'token_stats' not in locals():
+                pass
+
+    # Phase 5: (removed) The old prompt-only MultiStepSceneGenerator branch
+    # was replaced by the asset-composition pipeline delegation above. The
+    # progressive strategy is now only used as an internal fallback inside
+    # core/scene_pipeline.py.
+
     files = generate_images(
         prompt=enriched_prompt,
         model_name=model,
@@ -302,6 +436,10 @@ def generate_scene(
     shutil.move(files[0], image_path)
     print(f"Scene {scene_number} image saved to: {image_path}")
 
+    # Add token statistics to result for debugging
+    from utils.token_budget import count_tokens
+    final_token_count = count_tokens(enriched_prompt)
+    
     result = {
         "scene_number": scene_number,
         "image_path": image_path,
@@ -310,10 +448,18 @@ def generate_scene(
         "seed": seed,
         "model": model,
         "appearance_only_mode": use_appearance_only,
+        "token_count": final_token_count,
+        "token_limit": 77,
     }
     
     if style_warnings:
         result["style_warnings"] = style_warnings
+    
+    if negative_prompt:
+        result["negative_prompt"] = negative_prompt
+    
+    if model_recommendation:
+        result["model_recommendation"] = model_recommendation
     
     return result
 

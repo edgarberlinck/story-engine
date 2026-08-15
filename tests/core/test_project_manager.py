@@ -18,6 +18,10 @@ class TestProjectManager(unittest.TestCase):
         from services.database import database_service
         self.original_path = database_service.db_service.db_path
         database_service.db_service.db_path = self.db_path
+        # Re-initialize the schema against the patched (temp) database so the
+        # singleton creates its tables on this path (it only did so once at
+        # import time against the real story_engine.db).
+        database_service.db_service.init_database()
 
     def tearDown(self):
         from services.database import database_service

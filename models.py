@@ -12,7 +12,8 @@ import torch
 # Diffusion Models (Primary for Image Generation)
 DIFFUSION_MODELS = {
     "sdxl": "stabilityai/stable-diffusion-xl-base-1.0", 
-    "flux_dev": "black-forest-labs/FLUX.1-dev"
+    "flux_dev": "black-forest-labs/FLUX.1-dev",
+    "flux_klein": "black-forest-labs/FLUX.2-klein-4B"
 }
 
 # Segmentation Models (Used for image analysis and processing)
@@ -75,6 +76,13 @@ MODEL_METADATA = {
         "size": "34GB",
         "description": "Latest text-to-image generation model (gated: requires accepting license on Hugging Face)",
         "repo_id": "black-forest-labs/FLUX.1-dev"
+    },
+    "flux_klein": {
+        "name": "FLUX.2 Klein 4B",
+        "type": "diffusion",
+        "size": "4B params",
+        "description": "FLUX.2 Klein 4B text-to-image model; supports image-reference conditioning via Flux2KleinKVPipeline",
+        "repo_id": "black-forest-labs/FLUX.2-klein-4B"
     },
     "detr_resnet_50_panoptic": {
         "name": "DETR ResNet-50 Panoptic",

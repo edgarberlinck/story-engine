@@ -15,7 +15,14 @@ from pathlib import Path
 # semaphores on macOS and triggers resource_tracker warnings at shutdown).
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, FluxPipeline, Flux2Pipeline
+from diffusers import (
+    StableDiffusionPipeline,
+    StableDiffusionXLPipeline,
+    FluxPipeline,
+    Flux2Pipeline,
+    Flux2KleinPipeline,
+    Flux2KleinKVPipeline,
+)
 import torch
 
 # Add project root to Python path
@@ -187,6 +194,12 @@ def generate_images(
                 model_path,
                 torch_dtype=torch_dtype
             )
+        elif model_name == "flux_klein":
+            # FLUX.2 Klein 4B uses the Flux2KleinPipeline (text-only generation).
+            pipe = Flux2KleinPipeline.from_pretrained(
+                model_path,
+                torch_dtype=torch_dtype
+            )
         else:
             # Default to standard pipeline for any other case (shouldn't happen now)
             pipe = StableDiffusionXLPipeline.from_pretrained(
@@ -214,6 +227,18 @@ def generate_images(
                 width=width,
                 height=height,
                 max_sequence_length=512  # Standard for FLUX models
+            )
+        elif model_name == "flux_klein":
+            # FLUX.2 Klein text-only generation (Flux2KleinPipeline supports guidance_scale).
+            images = pipe(
+                prompt,
+                generator=generator,
+                num_inference_steps=steps,
+                guidance_scale=cfg,
+                width=width,
+                height=height,
+                num_images_per_prompt=num_images,
+                max_sequence_length=512
             )
         elif "flux" in model_name.lower():
             # For other Flux models like Klein
@@ -310,6 +335,11 @@ def generate_image(prompt, model_name=None, amount=1, output_filename=None):
 
         if model_name == "flux_dev":
             pipe = FluxPipeline.from_pretrained(
+                model_path,
+                torch_dtype=torch_dtype
+            )
+        elif model_name == "flux_klein":
+            pipe = Flux2KleinPipeline.from_pretrained(
                 model_path,
                 torch_dtype=torch_dtype
             )

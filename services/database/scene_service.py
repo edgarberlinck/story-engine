@@ -10,9 +10,30 @@ from typing import List, Dict, Optional, Any
 class SceneService:
     def __init__(self, db_path: str = "story_engine.db"):
         self.db_path = db_path
+        self._init_table()
 
     def _connect(self):
         return sqlite3.connect(self.db_path)
+
+    def _init_table(self):
+        conn = self._connect()
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS scenes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project TEXT NOT NULL,
+                scene_number INTEGER NOT NULL,
+                prompt TEXT NOT NULL,
+                image_path TEXT NOT NULL,
+                seed INTEGER,
+                model TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(project, scene_number)
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
 
     def list_scenes(self, project: str) -> List[Dict[str, Any]]:
         conn = self._connect()

@@ -126,7 +126,16 @@ def extract_appearance_from_stored_prompt(prompt: str, char_type: str = "man") -
     Returns:
         Appearance-only description without style modifiers
     """
+    from utils.token_budget import strip_generation_instructions
+    
     _, _, appearance = decompose_character_prompt(prompt)
+    
+    # Strip generation instructions that are irrelevant to scenes
+    if appearance and len(appearance) > 10:
+        appearance = strip_generation_instructions(appearance)
+        # Clean up empty result
+        if not appearance or len(appearance.strip()) < 5:
+            pass
     
     if appearance and len(appearance) > 10:
         return appearance

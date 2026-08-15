@@ -33,6 +33,27 @@ class CharacterService:
             )
             """
         )
+        # The `character_attributes` table is required by save_character/
+        # get_character (stored attributes for style-aware scene generation).
+        # Created here so the CharacterService is self-contained (matches the
+        # schema defined in services/database/migrations.py).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS character_attributes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                attributes_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(project, character_name)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_char_attrs_proj_name "
+            "ON character_attributes(project, character_name)"
+        )
         conn.commit()
         conn.close()
 
@@ -136,9 +157,19 @@ class CharacterService:
         self, text: str, project: str = "test_project"
     ) -> List[Dict[str, Any]]:
         """Return all known characters whose name appears in the given text."""
-        return [
-            c for c in self.list_characters(project) if c["name"].lower() in text.lower()
-        ]
+        import re
+        found = []
+        text_lower = text.lower()
+        
+        for c in self.list_characters(project):
+            name_lower = c["name"].lower()
+            # Use word boundaries to avoid false positives
+            # e.g., "Al" shouldn't match "also", "Roger" shouldn't match "Rogers"
+            pattern = r'\b' + re.escape(name_lower) + r'\b'
+            if re.search(pattern, text_lower):
+                found.append(c)
+        
+        return found
 
 
 # Singleton instance

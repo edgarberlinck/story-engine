@@ -8,6 +8,7 @@ import os
 import sys
 import re
 from pathlib import Path
+from typing import Optional
 
 # Avoid HuggingFace tokenizers spawning fork-based parallelism (leaks
 # semaphores on macOS and triggers resource_tracker warnings at shutdown).
@@ -20,6 +21,20 @@ sys.path.insert(0, str(project_root))
 # Import model constants
 from models import TEXT_GENERATION_MODELS, get_model_config
 from utils.model_metrics import ModelMetrics
+
+# Imported at module scope (rather than lazily inside each function) so it is
+# a stable, patchable module attribute for tests. `transformers` exposes
+# `pipeline` via a lazy __getattr__, which makes `from transformers import
+# pipeline` inside a function immune to `patch("transformers.pipeline")`;
+# binding it here avoids that ambiguity.
+try:
+    from transformers import pipeline as hf_pipeline
+    from transformers.utils import logging as hf_logging
+    _HF_AVAILABLE = True
+except Exception:  # pragma: no cover - transformers is a core dependency
+    hf_pipeline = None
+    hf_logging = None
+    _HF_AVAILABLE = False
 
 def resolve_model_path(model_type, model_name, hub_id):
     """Resolve a model to its locally installed path (from `make install`).
@@ -95,9 +110,6 @@ def generate_prompt_with_llm(description, model_name="phi3_mini"):
     """
     generator = None
     try:
-        from transformers import pipeline as hf_pipeline
-        from transformers.utils import logging as hf_logging
-
         # Only surface real errors from transformers (hides benign
         # generation-config and tokenizer warnings).
         hf_logging.set_verbosity_error()
@@ -147,3 +159,93 @@ def generate_prompt_with_llm(description, model_name="phi3_mini"):
         generator = None
 
     return description
+
+
+def generate_text_with_llm(
+    prompt: str,
+    model_name: str = "phi3_mini",
+    max_new_tokens: int = 150,
+    temperature: Optional[float] = None,
+) -> Optional[str]:
+    """Run a general-purpose completion against a local text-generation model.
+
+    Unlike `generate_prompt_with_llm` (which is hardcoded to rewrite an image
+    description into a single-line diffusion prompt), this returns the model's
+    raw completion for an arbitrary instruction prompt. This is what the scene
+    planner needs for structured planning (Stage A context resolution, Stage B
+    decomposition, Stage C compression, Stage D strategy selection) where the
+    caller expects JSON or specific structured output.
+
+    Args:
+        prompt: The full instruction prompt to send to the model (passed
+            verbatim, NOT wrapped in the image-rewrite template).
+        model_name: Key in TEXT_GENERATION_MODELS.
+        max_new_tokens: Maximum tokens to generate.
+        temperature: Optional sampling temperature (None = greedy).
+
+    Returns:
+        The model's raw completion string, or None on any failure.
+    """
+    generator = None
+    try:
+        hf_logging.set_verbosity_error()
+
+        model_id = resolve_model_path(
+            "text_generation", model_name, TEXT_GENERATION_MODELS[model_name]
+        )
+        device, torch_dtype = get_model_config("text_generation")
+
+        generator = hf_pipeline(
+            "text-generation",
+            model=model_id,
+            dtype=torch_dtype,
+            device=device,
+        )
+
+        generator.model.generation_config.max_new_tokens = max_new_tokens
+        generator.model.generation_config.do_sample = temperature is not None
+        generator.model.generation_config.temperature = temperature
+        generator.model.generation_config.top_p = None
+        generator.model.generation_config.top_k = None
+
+        # Instruct models (e.g. Phi-3-mini-instruct) require their chat
+        # template to interpret a bare prompt as an instruction; without it
+        # they continue with plausible-but-irrelevant text instead of obeying
+        # "return JSON only". Apply the template when one is available, and
+        # only ask for the assistant turn so return_full_text=False yields
+        # just the completion.
+        tokenizer = getattr(generator, "tokenizer", None)
+        send_prompt = prompt
+        if tokenizer is not None and getattr(tokenizer, "chat_template", None):
+            try:
+                messages = [{"role": "user", "content": prompt}]
+                send_prompt = tokenizer.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
+            except Exception:
+                send_prompt = prompt
+
+        # Pass generation knobs directly to the call: the pipeline applies its
+        # own defaults (e.g. a max_new_tokens cap) that are NOT controlled by
+        # mutating `model.generation_config`, so relying on that silently
+        # truncates structured output. Explicit call args are authoritative.
+        result = generator(
+            send_prompt,
+            return_full_text=False,
+            max_new_tokens=max_new_tokens,
+            do_sample=temperature is not None,
+            temperature=temperature,
+            top_p=None,
+            top_k=None,
+        )
+        text = result[0]["generated_text"].strip()
+        if text:
+            return text
+    except Exception as e:
+        print(f"LLM completion failed ({e}); returning None.")
+    finally:
+        from generators.image_generator import cleanup_pipeline
+        cleanup_pipeline(generator)
+        generator = None
+
+    return None
