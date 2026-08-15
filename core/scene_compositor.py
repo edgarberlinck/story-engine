@@ -1,8 +1,10 @@
 """
 Deterministic scene composition: segmentation + placement/blending.
 
-Pure image operations (PIL + numpy), no diffusion calls. Implements §4 of
-`docs/story-engine-multi-character-scene-design.md`:
+Pure image operations (PIL + numpy), no diffusion calls. This is the
+asset-composition **fallback** path (see
+`docs/story-engine-reference-conditioned-scene-design.md` §2), used when a
+model lacks reference-conditioning support:
 
 1. Segment each character asset (DETR panoptic primary, chroma-key fallback).
 2. Composite background + character cutouts using explicit anchor points,

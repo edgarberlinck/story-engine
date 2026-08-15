@@ -1,12 +1,13 @@
 """
-Focused unit tests for the design-doc gaps implemented to make the scene
-generator match `docs/story-engine-multi-character-scene-design.md`:
+Focused unit tests for the scene-planning gaps implemented to make the scene
+generator match the multi-character design docs
+(`docs/story-engine-reference-conditioned-scene-design.md`,
+`docs/token-budget-implementation.md`):
 
 - Stage D strategy selection (§2.1) with deterministic guardrails.
 - ResolvedCharacter scene_pose / scene_action / scene_position_hint (§2.2).
 - ScenePlan.canvas_layout + strategy (§2.3).
 - The character_service character_attributes table fix.
-- The prompt_builder optimize_for_token_budget `specs` bug fix.
 """
 
 import os

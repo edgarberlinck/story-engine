@@ -2,12 +2,15 @@
 Top-level scene generation orchestrator.
 
 Sequences existing infrastructure (LLM scene planner, image engine) with the
-two new modules (`character_asset_generator.py`, `scene_compositor.py`) to
-implement the "character asset generation + deterministic composition"
-strategy described in
-`docs/story-engine-multi-character-scene-design.md`.
+new modules (`reference_scene_generator.py`, `character_asset_generator.py`,
+`scene_compositor.py`) to implement the holistic reference-conditioned scene
+generation strategy described in
+`docs/story-engine-reference-conditioned-scene-design.md`, with the
+character-asset + deterministic composition path retained as a fallback.
 
-Strategy selection (cheap deterministic gate, per design doc §2.1):
+Strategy selection (cheap deterministic gate):
+- model supports reference conditioning (e.g. `flux_klein`) + character
+  references available -> reference_conditioned (this module)
 - 0 characters               -> single_pass (existing `generate_scene`)
 - 1 character                -> single_pass (existing `generate_scene`)
 - >=2 characters             -> asset_composition (this module), falling

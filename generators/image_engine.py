@@ -321,8 +321,8 @@ def generate_scene(
 
     # Multi-character scenes: delegate to the asset-composition pipeline
     # (background text2img -> per-character assets -> segmentation ->
-    # deterministic composition), per
-    # docs/story-engine-multi-character-scene-design.md §2.1.
+    # deterministic composition), retained as fallback for non-reference
+    # models, per docs/story-engine-reference-conditioned-scene-design.md §2.
     if use_asset_pipeline and len(characters) >= 2:
         from core.scene_pipeline import generate_scene_pipeline
         print(f"INFO: {len(characters)} characters detected, delegating to asset-composition pipeline")

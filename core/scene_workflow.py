@@ -4,12 +4,12 @@ High-level scene generation workflow with LLM orchestration.
 This module provides the main entry point for generating scenes using
 LLM-based planning and multi-step composition.
 
-As of the character-asset + deterministic composition design
-(`docs/story-engine-multi-character-scene-design.md`), the heavy lifting is
-delegated to `core/scene_pipeline.py`, which selects between single-pass,
-progressive (prompt-only), and asset-composition strategies. This function
-is kept as a thin, backward-compatible wrapper so existing callers/tests
-don't need to change.
+As of the character-asset + deterministic composition fallback design
+(`docs/story-engine-reference-conditioned-scene-design.md`), the heavy
+lifting is delegated to `core/scene_pipeline.py`, which selects between
+reference-conditioned, single-pass, progressive (prompt-only), and
+asset-composition strategies. This function is kept as a thin,
+backward-compatible wrapper so existing callers/tests don't need to change.
 """
 
 from typing import List, Dict, Any, Optional
