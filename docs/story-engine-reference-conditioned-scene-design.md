@@ -18,7 +18,7 @@ conditioning on each stored character reference image as a FLUX.2 **reference la
 
 The primary benefit: in-context lighting, occlusion, perspective, interaction, and scene
 coherence — with no pasted character cutouts, no background leakage, and no "sticker"
-artifacts. This mirrors how the reference project (`fairytale-generator`) works: one
+artifacts. This mirrors how the reference project works: one
 cinematic scene prompt describing all subjects in context, character reference images fed
 as reference-latent conditioning, and **no segmentation/compositing at all**.
 

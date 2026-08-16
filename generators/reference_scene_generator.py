@@ -5,7 +5,7 @@ Generates a complete scene in a single diffusion invocation while conditioning o
 character reference images as FLUX.2 reference latents. This replaces the
 "per-character asset -> segmentation -> compositing" path for reference-capable
 models (currently ``flux_klein`` via :class:`Flux2KleinKVPipeline`), mirroring how
-the reference project (fairytale-generator) conditions on character references.
+the reference project conditions on character references.
 
 No segmentation or compositing is performed here; the model renders the characters
 in-context.

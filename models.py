@@ -43,6 +43,7 @@ IMAGE_TO_VIDEO_MODELS = {
 TEXT_TO_SPEECH_MODELS = {
     "qwen3_tts": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
     "qwen3_tts_base": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+    "qwen3_tts_voicedesign": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
 }
 
 # Lip Sync Models (animate the speaking character's mouth to match audio)
@@ -162,6 +163,14 @@ MODEL_METADATA = {
         "size": "~4.2GB",
         "description": "Qwen3-TTS 12Hz 1.7B CustomVoice: expressive TTS with voice cloning from reference audio (Apache-2.0)",
         "repo_id": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+        "source": "huggingface"
+    },
+    "qwen3_tts_voicedesign": {
+        "name": "Qwen3-TTS VoiceDesign 1.7B",
+        "type": "text_to_speech",
+        "size": "~4.2GB",
+        "description": "Qwen3-TTS 12Hz 1.7B VoiceDesign: designs a brand-new voice from a natural-language description (Apache-2.0)",
+        "repo_id": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
         "source": "huggingface"
     },
     "qwen3_tts_base": {

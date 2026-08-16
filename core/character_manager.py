@@ -37,6 +37,42 @@ class CharacterManager:
     def get_character(self, project: str, name: str) -> Optional[Dict]:
         return self.char_service.get_character(name, project)
 
+    def get_voice_path(self, project: str, name: str) -> Optional[str]:
+        """Path to the character's generated voice WAV, if any."""
+        char = self.char_service.get_character(name, project)
+        if char and char.get("voice_path"):
+            return char["voice_path"]
+        return None
+
+    def generate_voice(self, project: str, name: str,
+                       char_type: str = "person",
+                       attributes: Optional[Dict] = None,
+                       instruct: Optional[str] = None,
+                       force: bool = False) -> str:
+        """Generate the character's introduction voice (cached).
+
+        Uses the local Qwen3-TTS engine and the character's attributes
+        (type/gender/age/personality) to pick a preset speaker + delivery.
+        ``instruct`` overrides the auto-derived delivery prompt (regenerate
+        with a custom prompt); ``force=True`` regenerates even if the voice
+        already exists. The resulting WAV path (and prompt used) is persisted
+        on the character record.
+        """
+        from core.voice_engine import voice_engine
+
+        wav_path, instruct_used = voice_engine.generate_character_voice(
+            name=name,
+            project=project,
+            char_type=char_type,
+            attributes=attributes or {},
+            instruct=instruct,
+            force=force,
+        )
+        self.char_service.set_voice_path(
+            name, project, str(wav_path), voice_prompt=instruct_used or None,
+        )
+        return str(wav_path)
+
     def delete_character(self, project: str, name: str) -> bool:
         """Delete a character, its versions and its files."""
         success = self.char_service.delete_character(name, project)
@@ -57,7 +93,8 @@ class CharacterManager:
 
     def generate_versions(self, project: str, name: str, prompt: str,
                           model: str = "flux_dev", num_versions: int = 3,
-                          seed_start: int = 42) -> List[Dict]:
+                          seed_start: int = 42,
+                          attributes: Optional[Dict] = None) -> List[Dict]:
         """Generate multiple versions of a character. Prompts are always
         forced to full body (see ensure_full_body)."""
         prompt = ensure_full_body(prompt)
@@ -120,7 +157,8 @@ class CharacterManager:
                 seed=default_version["seed"],
                 model=model,
                 reference_image=default_version["image_path"],
-                project=project
+                project=project,
+                attributes=attributes,
             )
 
         return versions

@@ -32,20 +32,22 @@ class _GenerateThread(QThread):
     finished_ok = Signal()
     failed = Signal(str)
 
-    def __init__(self, project, name, prompt, num_versions, model_id):
+    def __init__(self, project, name, prompt, num_versions, model_id, attributes=None):
         super().__init__()
         self.project = project
         self.name = name
         self.prompt = prompt
         self.num_versions = num_versions
         self.model_id = model_id
+        self.attributes = attributes or {}
 
     def run(self):
         try:
             character_manager.generate_versions(
                 self.project, self.name, self.prompt,
                 num_versions=self.num_versions,
-                model=self.model_id
+                model=self.model_id,
+                attributes=self.attributes,
             )
             self.finished_ok.emit()
         except Exception as e:  # noqa: BLE001
@@ -262,7 +264,10 @@ class CharacterBuilderScreen(QWidget):
                 # This would be passed to our more complete prompt building function...
                 pass
 
-        self._gen_thread = _GenerateThread(self.project_slug, name, prompt, self.variant_spin.value(), model_id)
+        self._gen_thread = _GenerateThread(
+            self.project_slug, name, prompt, self.variant_spin.value(), model_id,
+            attributes=full_attributes,
+        )
         self._gen_thread.finished_ok.connect(self._on_generated)
         self._gen_thread.failed.connect(self._on_generation_failed)
         self._gen_thread.start()

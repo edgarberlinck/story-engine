@@ -6,7 +6,7 @@
 > and `docs/video-generation-caveats.md`.
 >
 > Operating principles are informed by the working reference implementation
-> `fairytale-generator` (production i2v: Wan 2.2 ComfyUI/xfuser, LTX-2,
+> (production i2v: Wan 2.2 ComfyUI/xfuser, LTX-2,
 > cloud backends), adapted to this codebase's diffusers-based runtime.
 
 ---
@@ -118,7 +118,7 @@ are:
   `width × height`.
 - Benchmark/ideal practice: generate the scene at the video target
   resolution (e.g. 1280×720) so the conditioning frame matches the output
-  (reference: fairytale-generator renders the first frame at the exact
+  (reference: the reference implementation renders the first frame at the exact
   video resolution).
 
 ### Prompt
@@ -131,7 +131,7 @@ are:
   `MODEL_GENERATION_PARAMS`. The Wan negative block forbids
   static/still-frame results, blur, text/subtitles, deformities and extra
   limbs. HunyuanVideo I2V uses no CFG negatives.
-- Fairytale operating rule: a good i2v prompt is a short cinematic beat
+- Reference operating rule: a good i2v prompt is a short cinematic beat
   ("Yamu killing a tiger with a long bow arrow, dramatic action, the arrow
   flies and strikes the tiger, cinematic motion") — scene + action +
   motion style, and **never** text/symbols/numbers in frame.
@@ -258,8 +258,8 @@ Practical rules:
 
 1. **Skip torch-MPS for Wan 2.2** when speed matters. Diffusers' Wan2.2
    pipeline on Metal is partially unaccelerated; the 20-core GPU is left
-   mostly idle. `mlx-wan` (or ComfyUI + GGUF, as in fairytale-generator) is
-   dramatically faster.
+   mostly idle. `mlx-wan` (or ComfyUI + GGUF, as in the reference
+   implementation) is dramatically faster.
 2. Thermal note: sustained 14B inference throttles the M5 Pro over long
    runs, but a 40-step @ Q4 generation finishes before that matters.
 3. Memory is not the issue — quantization gives comfortable headroom. The
@@ -299,7 +299,7 @@ validated scene ──► silent i2v video
 - Local defaults: `qwen3_tts` (voice cloning via the CustomVoice model;
   `qwen3_tts_base` 0.6B as a light fallback). Cloud alternatives were
   dropped for now (paid keys; no disk-cost benefit).
-- Timing rule (from fairytale-generator): speech length is measured with
+- Timing rule (from the reference implementation): speech length is measured with
   ffprobe (`get_audio_length`) and speed-fitted to the scene's video
   duration so dialogue and picture stay aligned.
 
@@ -307,7 +307,7 @@ validated scene ──► silent i2v video
 
 Realism requirement: **the speaking character's mouth must move in sync
 with what is said**. Story Engine does this with a dedicated lip-sync model
-applied to the animated clip + the TTS audio (fairytale-generator relies on
+applied to the animated clip + the TTS audio (the reference implementation relies on
 native joint audio+video models like LTX-2; Story Engine's diffusers i2v
 models are silent, so a post-hoc lip-sync stage is required).
 

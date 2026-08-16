@@ -28,11 +28,20 @@ class CharacterService:
                 seed INTEGER,
                 model TEXT NOT NULL,
                 reference_image TEXT,
+                voice_path TEXT,
+                voice_prompt TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project, name)
             )
             """
         )
+        # Add voice_path / voice_prompt to pre-existing databases (columns
+        # were added after the first release of the characters table).
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(characters)")}
+        if "voice_path" not in cols:
+            conn.execute("ALTER TABLE characters ADD COLUMN voice_path TEXT")
+        if "voice_prompt" not in cols:
+            conn.execute("ALTER TABLE characters ADD COLUMN voice_prompt TEXT")
         # The `character_attributes` table is required by save_character/
         # get_character (stored attributes for style-aware scene generation).
         # Created here so the CharacterService is self-contained (matches the
@@ -66,6 +75,8 @@ class CharacterService:
         reference_image: str,
         project: str = "test_project",
         attributes: Optional[Dict[str, Any]] = None,
+        voice_path: Optional[str] = None,
+        voice_prompt: Optional[str] = None,
     ) -> int:
         """Insert or update a character reference. Returns the row id.
         
@@ -76,15 +87,17 @@ class CharacterService:
         cursor = conn.execute(
             """
             INSERT INTO characters
-                (project, name, prompt, seed, model, reference_image, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (project, name, prompt, seed, model, reference_image, voice_path, voice_prompt, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(project, name) DO UPDATE SET
                 prompt = excluded.prompt,
                 seed = excluded.seed,
                 model = excluded.model,
-                reference_image = excluded.reference_image
+                reference_image = excluded.reference_image,
+                voice_path = COALESCE(excluded.voice_path, characters.voice_path),
+                voice_prompt = COALESCE(excluded.voice_prompt, characters.voice_prompt)
             """,
-            (project, name, prompt, seed, model, reference_image, datetime.now()),
+            (project, name, prompt, seed, model, reference_image, voice_path, voice_prompt, datetime.now()),
         )
         
         # Store attributes if provided
@@ -105,6 +118,27 @@ class CharacterService:
             (project, character_name, attributes_json, updated_at)
             VALUES (?, ?, ?, ?)
         """, (project, character_name, json_str, datetime.now()))
+
+    def set_voice_path(self, name: str, project: str, voice_path: str,
+                       voice_prompt: Optional[str] = None) -> bool:
+        """Persist the character's generated voice WAV path (and the prompt
+        that produced it, if any)."""
+        conn = self._connect()
+        if voice_prompt is not None:
+            cur = conn.execute(
+                "UPDATE characters SET voice_path = ?, voice_prompt = ? "
+                "WHERE project = ? AND name = ?",
+                (voice_path, voice_prompt, project, name),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE characters SET voice_path = ? WHERE project = ? AND name = ?",
+                (voice_path, project, name),
+            )
+        conn.commit()
+        success = cur.rowcount > 0
+        conn.close()
+        return success
 
     def get_character(
         self, name: str, project: str = "test_project"
