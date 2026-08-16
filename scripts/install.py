@@ -22,16 +22,33 @@ from models import (
     SEGMENTATION_MODELS,
     TEXT_GENERATION_MODELS,
     IMAGE_TO_VIDEO_MODELS,
+    TEXT_TO_SPEECH_MODELS,
+    LIP_SYNC_MODELS,
+    MUSIC_GENERATION_MODELS,
     MODEL_METADATA,
 )
+
+
+def is_hf_downloadable(model_name: str) -> bool:
+    """Return True only for models whose weights come from Hugging Face.
+
+    Cloud/API models and GitHub-only checkpoints are excluded: they are
+    either keyed by provider model id or fetched via git clone.
+    """
+    meta = MODEL_METADATA.get(model_name, {})
+    return meta.get("source", "huggingface") == "huggingface"
+
 
 def setup_directories():
     """Ensure all required directories exist."""
     dirs = [
         "models/diffusion",
-        "models/segmentation", 
+        "models/segmentation",
         "models/text_generation",
         "models/image_to_video",
+        "models/text_to_speech",
+        "models/lip_sync",
+        "models/music_generation",
         "outputs"
     ]
     
@@ -149,6 +166,20 @@ def install_all_models():
     # Add image-to-video models
     for model_name in IMAGE_TO_VIDEO_MODELS:
         all_models_to_install.append((model_name, "image_to_video", f"models/image_to_video/{model_name}"))
+
+    # Add audio/voice/lip-sync/music models (Hugging Face weights only;
+    # cloud API models and GitHub-only checkpoints are skipped here).
+    audio_categories = [
+        (TEXT_TO_SPEECH_MODELS, "text_to_speech", "models/text_to_speech"),
+        (LIP_SYNC_MODELS, "lip_sync", "models/lip_sync"),
+        (MUSIC_GENERATION_MODELS, "music_generation", "models/music_generation"),
+    ]
+    for registry, model_type, dest_dir in audio_categories:
+        for model_name in registry:
+            if is_hf_downloadable(model_name):
+                all_models_to_install.append((model_name, model_type, f"{dest_dir}/{model_name}"))
+            else:
+                print(f"  - {model_name} ({model_type}): skipped (not Hugging Face weights)")
     
     print(f"\nFound {len(all_models_to_install)} models to install:")
     for model_name, model_type, dest_dir in all_models_to_install:

@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 """
-Benchmark suite for image-to-video generation models.
+Definitive image-to-video benchmark: the café conversation.
 
-Benchmark 1 — "Yamu":
-  1. Character: Yamu, a Brazilian indian (dark hair, tall, strong body,
-     face paint, feathers in his hair).
-  2. Scene: Yamu riding a horse, holding a long bow and arrow, ready to
-     shoot a tiger (face-validated against his reference).
-  3. Video: Yamu killing the tiger with a long bow arrow, generated with
-     EVERY i2v model. >= 4 seconds, >= 720p, named benchmark_<model>.
+Scene:
+  A cinematic two-character conversation. Nikita and Roger sit at a small
+  table in a quiet, stylish café during the morning. Nikita (long curly red
+  hair, friendly) is on the LEFT; Roger (bald, dark-skinned, muscular,
+  calm) is on the RIGHT. Both visible from the waist up, facing each other,
+  faces clear and unobstructed, medium cinematic shot, warm morning light.
 
-Benchmark 2 — "Tribe meeting":
-  1. Character: Richard Morton, a tall 40yo Swedish archeologist, blonde,
-     green eyes, normal body.
-  2. Character: Cristal, an old lady, Shaman of Yamu's tribe.
-  3. Scene: Cristal in the center of a house, Richard in front of her and
-     Yamu right in the back (all three face-validated).
-  4. Video: Cristal talking to Richard — same specs as benchmark 1.
+Dialogue (drives the future TTS + lip-sync + music stage):
+  Nikita: "Good morning, Roger."
+  Roger:  "Good morning to you too, Nikita."
+  Background: quiet, relaxed café ambience.
 
-Face recognition is REQUIRED: scenes are regenerated until every character
-is verified, and the benchmark aborts if verification is impossible.
+Benchmark rules:
+  - Face verification is REQUIRED: both characters must be detected in the
+    scene, otherwise the scene regenerates (bounded attempts) or the
+    benchmark aborts.
+  - The same validated scene is animated with EVERY i2v model.
+  - Every video is >= 4 s and >= 720p, seeded identically, named
+    benchmark_<model>.mp4, with a metrics JSON next to it.
 
 Outputs follow the project structure (mock project 'test_project'):
   outputs/test_project/characters/<name>/reference.png
@@ -39,25 +40,57 @@ from generators.video_engine import create_validated_scene
 from generators.video_generator import AVAILABLE_VIDEO_MODELS, generate_video
 from utils.project_paths import scene_out_dir
 
-# Characters used across benchmarks.
+# Characters used by the benchmark. Portraits drive character generation;
+# the scene prompt only references them by name.
 CHARACTERS = {
-    "Yamu": (
-        "Portrait of Yamu, a Brazilian indian man, dark hair, tall, strong "
-        "muscular body. He wears traditional indian painting on his face and "
-        "has feathers in his hair. Photorealistic, detailed face"
-    ),
-    "Richard Morton": (
-        "Portrait of Richard Morton, a tall 40 year old Swedish archeologist "
-        "man, blonde hair, green eyes, normal average body build (not strong, "
-        "not skinny), wearing practical field clothes. Photorealistic, "
+    "Nikita": (
+        "Portrait of Nikita, a young woman with long curly red hair and fair "
+        "skin, natural friendly expression, warm eyes. Photorealistic, "
         "detailed face"
     ),
-    "Cristal": (
-        "Portrait of Cristal, a very old lady, the Shaman of a Brazilian "
-        "indian tribe, wrinkled face, wise eyes, traditional tribal shaman "
-        "clothing and ornaments. Photorealistic, detailed face"
+    "Roger": (
+        "Portrait of Roger, a bald dark-skinned man with a muscular build "
+        "and a calm friendly expression. Photorealistic, detailed face"
     ),
 }
+
+# The definitive benchmark scene: both characters in one frame, positioned
+# explicitly, medium cinematic shot, warm morning café light.
+SCENE_PROMPT = (
+    "Nikita and Roger sitting together at a small table in a quiet, stylish "
+    "café during the morning. Nikita is sitting on the left side of the "
+    "image, she has long curly red hair and a natural friendly expression, "
+    "she is looking toward Roger. Roger is sitting on the right side of the "
+    "image, he is a bald dark-skinned man with a muscular build and a calm "
+    "friendly expression, he is looking toward Nikita. Both characters are "
+    "clearly visible from the waist up, sitting naturally and facing each "
+    "other, their faces clearly visible and unobstructed. The composition "
+    "leaves enough visual space around both characters for subtle natural "
+    "movements during a conversation. Warm morning light enters through the "
+    "windows, the café environment is realistic but not visually "
+    "distracting, soft background details, natural shadows, coherent "
+    "lighting and realistic perspective. Medium cinematic shot, both "
+    "characters framed together in the same image. Nikita and Roger appear "
+    "naturally integrated into the same environment with coherent body "
+    "proportions, lighting, shadows and perspective. Photorealistic, "
+    "cinematic composition, realistic facial features, natural body "
+    "posture, subtle storytelling atmosphere"
+)
+
+# Video prompt: describes the natural conversation motion for the i2v
+# animation (scene content stays in the conditioning image).
+VIDEO_PROMPT = (
+    "Nikita and Roger having a natural morning conversation, subtle gestures "
+    "and facial expressions, gentle head movements, cinematic motion"
+)
+
+# Dialogue and background sound for the audio stage (TTS, lip sync and
+# music are the next pipeline phase; captured here as the benchmark spec).
+DIALOGUE = [
+    {"character": "Nikita", "line": "Good morning, Roger."},
+    {"character": "Roger", "line": "Good morning to you too, Nikita."},
+]
+BACKGROUND_SOUND = "quiet and relaxed background ambience"
 
 # Per-model overrides to guarantee >= 4 seconds and >= 720p.
 # Frame counts respect each model's constraints (Wan/Hunyuan: 4k+1 frames).
@@ -100,54 +133,26 @@ def generate_benchmark_videos(scene: dict, video_prompt: str) -> dict:
     return results
 
 
-def run_benchmark_1() -> dict:
-    """Yamu hunting a tiger."""
-    print("\n########## Benchmark 1: Yamu ##########")
-    ensure_character("Yamu")
-
-    scene_prompt = (
-        "Yamu riding a horse, holding a long bow and arrow, ready to shoot "
-        "a tiger"
-    )
-    video_prompt = (
-        "Yamu killing a tiger with a long bow arrow, dramatic action, the "
-        "arrow flies and strikes the tiger, cinematic motion"
-    )
-
-    print(f"\n=== Generating scene: {scene_prompt} ===")
-    scene = create_validated_scene(
-        scene_prompt,
-        character_name="Yamu",
-        seed=42,
-        require_verification=True,
-    )
-    return generate_benchmark_videos(scene, video_prompt)
-
-
-def run_benchmark_2() -> dict:
-    """Yamu and Richard Morton meeting Cristal, the tribe shaman."""
-    print("\n########## Benchmark 2: Tribe meeting ##########")
-    for name in ("Yamu", "Richard Morton", "Cristal"):
+def run_cafe_conversation_benchmark() -> dict:
+    """The definitive benchmark: Nikita and Roger talking in a café."""
+    print("\n########## Benchmark: Café conversation (Nikita & Roger) ##########")
+    for name in ("Nikita", "Roger"):
         ensure_character(name)
 
-    scene_prompt = (
-        "Yamu and Richard Morton talking to Cristal. Cristal is in the "
-        "center of a house, Richard Morton is in front of her and Yamu is "
-        "right in the back"
-    )
-    video_prompt = (
-        "Cristal talking to Richard Morton, natural conversation, subtle "
-        "gestures and facial expressions, cinematic motion"
-    )
-
-    print(f"\n=== Generating scene: {scene_prompt} ===")
+    print(f"\n=== Generating scene: {SCENE_PROMPT[:80]}... ===")
     scene = create_validated_scene(
-        scene_prompt,
-        character_names=["Yamu", "Richard Morton", "Cristal"],
+        SCENE_PROMPT,
+        character_names=["Nikita", "Roger"],
         seed=42,
         require_verification=True,
     )
-    return generate_benchmark_videos(scene, video_prompt)
+
+    print("\n=== Dialogue for the audio stage ===")
+    for d in DIALOGUE:
+        print(f"  {d['character']}: \"{d['line']}\"")
+    print(f"  Background: {BACKGROUND_SOUND}")
+
+    return generate_benchmark_videos(scene, VIDEO_PROMPT)
 
 
 def print_summary(all_results: dict):
@@ -166,19 +171,18 @@ def print_summary(all_results: dict):
 
 
 def main():
-    """Run all image-to-video benchmarks across all i2v models."""
+    """Run the image-to-video benchmark across all i2v models."""
     print("=== Image-to-Video Generation Benchmark Suite ===")
     print(f"Models: {', '.join(AVAILABLE_VIDEO_MODELS)} (default: wan22_i2v)")
 
     all_results = {}
     try:
-        all_results["Benchmark 1 (Yamu vs tiger)"] = run_benchmark_1()
-        all_results["Benchmark 2 (Tribe meeting)"] = run_benchmark_2()
+        all_results["Café conversation (Nikita & Roger)"] = run_cafe_conversation_benchmark()
 
         print_summary(all_results)
         print("\nBenchmark suite completed!")
         print("Compare scene_*/out/benchmark_<model>.mp4 and the matching "
-              "*_benchmark_metrics.json files to pick the best model.")
+              "*_benchmark_metrics.json files to pick the winning i2v model.")
     except Exception as e:
         print(f"Error during benchmark: {e}")
         if all_results:

@@ -34,13 +34,19 @@
   - [x] DETR panoptic model downloadable via install script
   - [ ] Wire segmentation into any code path (currently unused)
 
-## Phase 4: Image-to-Video Generation 🟢 Mostly Complete
+## Phase 4: Image-to-Video Generation 🟡 Mostly Complete
 - [x] Register I2V models (Wan 2.2 I2V A14B, HunyuanVideo-I2V)
 - [x] Install script downloads I2V models to `models/image_to_video/`
 - [x] Video generator module (`generators/video_generator.py`, `make benchmark-video`)
 - [x] Scene-driven video pipeline (`video_engine.py`: validated scene → character reference → animated clip)
 - [x] Output management for video files (`outputs/<project>/scenes/scene_<n>/out/`, videos + metrics JSON)
 - [ ] Per-model quantization/MLX runtime support (see `docs/image-to-video.md`)
+- [ ] Audio & lip-sync pipeline — talking scenes (TTS → lip sync → music → mix, see `docs/image-to-video.md` §10)
+  - [x] Audio model registries in `models.py` (TTS, lip sync, music) + install.py wiring — one winner per category, small fallbacks only
+  - [ ] TTS/voice engine implementation (Qwen3-TTS local, 1.7B + 0.6B)
+  - [ ] Lip-sync implementation (LatentSync 1.6; CUDA-oriented, MPS flakiness accepted — retry on failure)
+  - [ ] Music generation + dialogue/music mix assembly (MusicGen medium)
+- [ ] Single-i2v-model decision: after the benchmark comparison is final, keep exactly one i2v model and remove the other from the project
 
 ## Phase 5: Project & Data Management 🟡 In Progress
 - [x] SQLite persistence layer (`services/database/`)

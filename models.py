@@ -28,9 +28,31 @@ TEXT_GENERATION_MODELS = {
 }
 
 # Image-to-Video Models (for animating generated images)
+# Policy: the benchmark suite decides which i2v model survives; the losing
+# model is removed from this registry once the comparison is final.
 IMAGE_TO_VIDEO_MODELS = {
     "wan22_i2v": "Wan-AI/Wan2.2-I2V-A14B",
     "hunyuan_video_i2v": "tencent/HunyuanVideo-I2V"
+}
+
+# Text-to-Speech Models (spoken dialogue for scenes)
+# Voice cloning/design is a capability of the TTS models below (Qwen3-TTS
+# CustomVoice == voice clone), so no separate voice registry is kept.
+# source "huggingface" => downloadable by `make install`; source "cloud" =>
+# API-driven model, identified by its provider model id (needs API key).
+TEXT_TO_SPEECH_MODELS = {
+    "qwen3_tts": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+    "qwen3_tts_base": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+}
+
+# Lip Sync Models (animate the speaking character's mouth to match audio)
+LIP_SYNC_MODELS = {
+    "latentsync_1_6": "ByteDance/LatentSync-1.6",
+}
+
+# Music Generation Models (background music for scenes)
+MUSIC_GENERATION_MODELS = {
+    "musicgen_medium": "facebook/musicgen-medium",
 }
 
 # Model paths (relative to project root)
@@ -38,7 +60,10 @@ MODEL_PATHS = {
     "diffusion": "models/diffusion",
     "segmentation": "models/segmentation",
     "text_generation": "models/text_generation",
-    "image_to_video": "models/image_to_video"
+    "image_to_video": "models/image_to_video",
+    "text_to_speech": "models/text_to_speech",
+    "lip_sync": "models/lip_sync",
+    "music_generation": "models/music_generation"
 }
 
 # Default model configurations
@@ -57,6 +82,18 @@ DEFAULT_MODEL_CONFIGS = {
     },
     "image_to_video": {
         "dtype": "bfloat16",
+        "device": "cpu"
+    },
+    "text_to_speech": {
+        "dtype": "float16",
+        "device": "cpu"
+    },
+    "lip_sync": {
+        "dtype": "float16",
+        "device": "cpu"
+    },
+    "music_generation": {
+        "dtype": "float16",
         "device": "cpu"
     }
 }
@@ -118,6 +155,38 @@ MODEL_METADATA = {
         "size": "~40GB",
         "description": "Tencent HunyuanVideo image-to-video generation model",
         "repo_id": "tencent/HunyuanVideo-I2V"
+    },
+    "qwen3_tts": {
+        "name": "Qwen3-TTS CustomVoice 1.7B",
+        "type": "text_to_speech",
+        "size": "~4.2GB",
+        "description": "Qwen3-TTS 12Hz 1.7B CustomVoice: expressive TTS with voice cloning from reference audio (Apache-2.0)",
+        "repo_id": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+        "source": "huggingface"
+    },
+    "qwen3_tts_base": {
+        "name": "Qwen3-TTS Base 0.6B",
+        "type": "text_to_speech",
+        "size": "~2.3GB",
+        "description": "Qwen3-TTS 12Hz 0.6B Base: lightweight text-to-speech backbone (Apache-2.0)",
+        "repo_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+        "source": "huggingface"
+    },
+    "latentsync_1_6": {
+        "name": "LatentSync 1.6",
+        "type": "lip_sync",
+        "size": "~9GB weights / 18GB VRAM",
+        "description": "ByteDance diffusion lip sync, 512x512, highest visual fidelity (needs strong GPU)",
+        "repo_id": "ByteDance/LatentSync-1.6",
+        "source": "huggingface"
+    },
+    "musicgen_medium": {
+        "name": "MusicGen Medium",
+        "type": "music_generation",
+        "size": "~11.1GB",
+        "description": "Meta MusicGen medium, controllable text-to-music (MIT)",
+        "repo_id": "facebook/musicgen-medium",
+        "source": "huggingface"
     }
 }
 

@@ -18,8 +18,8 @@ text alone. A still image is produced first, validated, and only then
 animated.
 
 ```
-character reference ──► scene image ──► face validation ──► i2v animation
-        (DB)                (image engine)   (gate)          (video engine)
+character reference ──► scene image ──► face validation ──► i2v animation ──► audio + lip sync
+        (DB)                (image engine)   (gate)          (video engine)      (post)
 ```
 
 The pipeline is a hard sequence — each stage depends on the previous one:
@@ -39,15 +39,24 @@ The pipeline is a hard sequence — each stage depends on the previous one:
 4. **Animation** — the validated scene becomes video via
    `animate_scene(scene)` (single model) or `benchmark_scene_video(scene)`
    (all models).
+5. **Audio + lip sync** — most scenes contain a speaking character and
+   background music. The spoken line is synthesized (TTS), the background
+   track is generated (music), and the speaking character's mouth is
+   animated to match the audio (lip sync). See §10.
+
+> **Benchmark policy (i2v model reduction):** the benchmark suite exists to
+> pick the winning image-to-video model. Once the benchmark comparison is
+> final, **exactly one i2v model remains** in `models.py`; the losing model
+> is removed from the project (registry, install script, params, tests).
 
 ## 2. Architecture
 
 | Component | Responsibility |
 |---|---|
-| `models.py` | `IMAGE_TO_VIDEO_MODELS` registry, `MODEL_PATHS["image_to_video"]`, `get_model_config("image_to_video")` → `(device, torch_dtype)` |
+| `models.py` | `IMAGE_TO_VIDEO_MODELS` registry, `MODEL_PATHS["image_to_video"]`, `get_model_config("image_to_video")` → `(device, torch_dtype)`; plus audio registries: `TEXT_TO_SPEECH_MODELS`, `VOICE_GENERATION_MODELS`, `LIP_SYNC_MODELS`, `MUSIC_GENERATION_MODELS` |
 | `generators/video_generator.py` | Low-level i2v: per-model pipelines, generation params, video + metrics output |
 | `generators/video_engine.py` | High-level orchestration: validated scene → animation, benchmarking |
-| `generators/benchmark_video_generator.py` | Benchmark suite (two fixed scenarios, all models) |
+| `generators/benchmark_video_generator.py` | Benchmark suite (café conversation, all models) |
 | `utils/project_paths.py` | Canonical project-scoped output layout |
 | `utils/model_metrics.py` | RSS memory sampling for peak-memory metrics |
 | `Makefile` | `make benchmark-video` runs the full i2v benchmark suite |
@@ -73,6 +82,31 @@ downloading from the Hugging Face hub id at runtime.
   `video_generator.py`) — never a shared generic call.
 - Device/dtype come from `get_model_config("image_to_video")`
   (`bfloat16`; device resolves mps > cuda > cpu).
+
+### Audio & lip-sync model registries
+
+Registered in `models.py` alongside the i2v models (all verified
+identifiers, sizes from Hugging Face). One winner per category; small
+alternatives kept where useful. This project is **CC BY-NC 4.0
+(non-commercial, personal)** — see `LICENSE.md` and `CONTRIBUTING.md` — so
+model license permissiveness is not the deciding factor; size and quality
+are:
+
+| Registry | Models | Size | Why this one |
+|---|---|---|---|
+| `TEXT_TO_SPEECH_MODELS` | `qwen3_tts` (`Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice`), `qwen3_tts_base` (`Qwen/Qwen3-TTS-12Hz-0.6B-Base`) | 4.2 GB / 2.3 GB | Apache-2.0 SOTA; CustomVoice = voice clone, Base = light fallback |
+| `LIP_SYNC_MODELS` | `latentsync_1_6` (`ByteDance/LatentSync-1.6`) | 9.0 GB | Best fidelity; 1.5 dropped (bigger, 9.2 GB), MuseTalk dropped (256×256, lower fidelity), Wav2Lip dropped (research-grade, GitHub-only) |
+| `MUSIC_GENERATION_MODELS` | `musicgen_medium` (`facebook/musicgen-medium`) | 11.1 GB | Smallest viable; large (19 GB) dropped for +8 GB marginal gain, stable-audio (14.6 GB) dropped for size |
+
+- Voice cloning is a capability of the TTS models (Qwen3-TTS CustomVoice
+  *is* the clone model), so no separate voice registry is kept.
+- Cloud/API TTS (ElevenLabs, MiniMax) and music (MiniMax music-01) were
+  dropped: paid keys, no disk-cost benefit.
+- `scripts/install.py` downloads these Hugging Face-sourced entries
+  (`source: huggingface` in `MODEL_METADATA`) into their `MODEL_PATHS`
+  directories; each category has a `DEFAULT_MODEL_CONFIGS` entry
+  (float16, cpu by default) so `get_model_config("lip_sync")` etc.
+  resolve correctly.
 
 ## 4. Inputs
 
@@ -172,7 +206,7 @@ Run with `make benchmark-video` (or
 `python generators/benchmark_video_generator.py`).
 
 **Goal:** produce the same validated scene, animated by **every** i2v model,
-so outputs are directly comparable. Both benchmarks share the rules:
+so outputs are directly comparable. The suite follows the rules:
 
 - Face verification is **required** (`require_verification=True`); scenes
   regenerate until every character is verified, and the benchmark aborts if
@@ -182,22 +216,22 @@ so outputs are directly comparable. Both benchmarks share the rules:
 - A summary prints path, resolution, duration, latency and peak memory for
   each model.
 
-### Benchmark 1 — "Yamu"
+### The benchmark scenario — "Café conversation"
 
-- Character: **Yamu**, a Brazilian indian (dark hair, tall, strong body,
-  face paint, feathers in his hair).
-- Scene: Yamu riding a horse, holding a long bow and arrow, ready to shoot
-  a tiger (face-validated).
-- Video: Yamu killing the tiger with a long bow arrow (dramatic action).
+The definitive test scene is a **two-character conversation** (chosen to
+exercise the talking-scenes requirement of §10):
 
-### Benchmark 2 — "Tribe meeting"
-
-- Characters: **Yamu**, **Richard Morton** (tall 40-year-old Swedish
-  archeologist, blonde, green eyes), **Cristal** (old lady, Shaman of
-  Yamu's tribe) — all three face-validated in one scene.
-- Scene: Cristal in the center of a house, Richard in front of her, Yamu in
-  the back.
-- Video: Cristal talking to Richard Morton (natural conversation).
+- Characters: **Nikita** (left, long curly red hair, natural friendly
+  expression) and **Roger** (right, bald dark-skinned man, muscular build,
+  calm friendly expression) — both face-validated in one frame.
+- Scene: both sitting at a small table in a quiet, stylish café in the
+  morning, waist-up, facing each other, medium cinematic shot, warm morning
+  light, photorealistic.
+- Video: natural conversation, subtle gestures, gentle head movements,
+  cinematic motion.
+- Dialogue (for the audio stage): Nikita *"Good morning, Roger."* / Roger
+  *"Good morning to you too, Nikita."*; background: quiet, relaxed café
+  ambience.
 
 ### Comparing results
 
@@ -241,3 +275,62 @@ Practical rules:
   rejection, and face-verification policy (required vs. inconclusive).
 - Run `make test` before committing; the suite must pass.
 - `make benchmark-video` is the end-to-end smoke check for the i2v stack.
+
+## 10. Talking scenes: dialogue, lip sync & background music
+
+Most scenes contain a **speaking character** and **background music**. The
+audio stage turns a silent animated clip into a complete scene:
+
+```
+validated scene ──► silent i2v video
+                        │
+                        ├──► TTS speech (spoken line) ──┐
+                        ├──► music generation ──────────┤──► mix ──► final scene
+                        └──► lip sync (mouth ↔ audio) ──┘
+```
+
+### 10.1 Spoken dialogue (TTS / voice)
+
+- The scene carries a **spoken line** (per-character dialogue, generated
+  upstream like the scene prompt). The line is synthesized with a TTS
+  engine; the character's voice is either a **voice clone** (from the
+  character reference audio, if available) or a **designed voice**
+  (natural-language description).
+- Local defaults: `qwen3_tts` (voice cloning via the CustomVoice model;
+  `qwen3_tts_base` 0.6B as a light fallback). Cloud alternatives were
+  dropped for now (paid keys; no disk-cost benefit).
+- Timing rule (from fairytale-generator): speech length is measured with
+  ffprobe (`get_audio_length`) and speed-fitted to the scene's video
+  duration so dialogue and picture stay aligned.
+
+### 10.2 Lip sync (mouth matches speech)
+
+Realism requirement: **the speaking character's mouth must move in sync
+with what is said**. Story Engine does this with a dedicated lip-sync model
+applied to the animated clip + the TTS audio (fairytale-generator relies on
+native joint audio+video models like LTX-2; Story Engine's diffusers i2v
+models are silent, so a post-hoc lip-sync stage is required).
+
+- **Default: `latentsync_1_6`** (`ByteDance/LatentSync-1.6`) — diffusion
+  lip sync, highest visual fidelity (~9 GB weights, needs ~18 GB VRAM).
+- **Accepted risk:** LatentSync is CUDA-oriented; on the M5 Pro it may run
+  flakily on MPS. That is acceptable — intermittent failures are tolerated
+  as long as a usable final video is produced (retry on failure).
+- The lip-sync pass must preserve the original frame rate and resolution of
+  the i2v output; the output replaces the silent clip in `scene_*/out/`.
+
+### 10.3 Background music
+
+- Per-scene background track from `MUSIC_GENERATION_MODELS`:
+  `musicgen_medium` (local).
+- The track is mixed under the dialogue (ducked/at lower volume) and cut to
+  the scene length.
+
+### 10.4 Assembly
+
+- Final scene = lip-synced video + dialogue + music, encoded H.264 MP4
+  (AAC audio), same fps/resolution as the i2v output, saved to
+  `scene_*/out/` alongside the silent clips and metrics.
+- Benchmark scope note: the i2v benchmark measures the **silent** video
+  models only; TTS / lip-sync / music models are evaluated separately in a
+  later audio benchmark.
