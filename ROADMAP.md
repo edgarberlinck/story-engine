@@ -79,6 +79,7 @@
 - [ ] Maintain backward compatibility with existing implementations (ongoing)
 - [ ] Ensure smooth integration between different generation approaches
 - [ ] Decide: wire up segmentation model or remove it from install list (~1.2GB unused)
+- [ ] Flake8 cleanup: repo has pre-existing violations in legacy files (`cli/main.py` F401/E231, `core/advanced_prompting.py` W293/F841, `core/character_manager.py` F401/E226, `models.py` W291/E302, `services/database/character_service.py` W293/E127). Also add a `.flake8`/`setup.cfg` config (exclude `.venv`, outputs, node_modules) so `flake8 .` stops crashing on `.venv`'s sympy (RecursionError) — then enforce via `make lint` in CI
 
 ## Future Enhancements
 - [x] Integration with text generation models (prompt enhancement via Phi-3)
