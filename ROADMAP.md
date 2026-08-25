@@ -40,8 +40,8 @@
 - [x] Video generator module (`generators/video_generator.py`, `make benchmark-video`)
 - [x] Scene-driven video pipeline (`video_engine.py`: validated scene → character reference → animated clip)
 - [x] Output management for video files (`outputs/<project>/scenes/scene_<n>/out/`, videos + metrics JSON)
+- [ ] Consolidate benchmarks: remove redundant `scripts/video_benchmark_nikita_roger.py`; use `generators/benchmark_video_generator.py` as the canonical video benchmark
 - [ ] Per-model quantization/MLX runtime support (see `docs/image-to-video.md`)
-- [x] **Join scene clips into sequence video with ffmpeg** — *TODO: Implement after benchmark videos are generated*
 - [ ] Audio & lip-sync pipeline — talking scenes (TTS → lip sync → music → mix, see `docs/image-to-video.md` §10)
   - [x] Audio model registries in `models.py` (TTS, lip sync, music) + install.py wiring — one winner per category, small fallbacks only
   - [ ] TTS/voice engine implementation (Qwen3-TTS local, 1.7B + 0.6B)
