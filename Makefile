@@ -77,7 +77,7 @@ benchmark-video-generation:
 	@echo "Generating scene images and animating with Wan 2.2 I2V..."
 	@echo "Logs will be written to: logs/wan22_nikita_roger_benchmark.log"
 	@echo ""
-	.venv/bin/python scripts/video_benchmark_nikita_roger.py --all 2>&1 | tee logs/wan22_nikita_roger_benchmark.log
+	python scripts/video_benchmark_nikita_roger.py --all 2>&1 | tee logs/wan22_nikita_roger_benchmark.log
 	@echo ""
 	@echo "=== Benchmark Complete ==="
 	@echo "Check logs/wan22_nikita_roger_benchmark.log for detailed output"
