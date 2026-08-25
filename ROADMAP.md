@@ -13,7 +13,7 @@
 - [x] Task framework with typed prompts (scenes, characters, environments)
   - [x] Image engine with typed generation (`GenerationType`: character/environment)
   - [x] Scene-driven generation pipeline (`image_engine.generate_scene`)
-- [x] Video generation (Wan 2.2 I2V, HunyuanVideo I2V) — see Phase 4
+- [x] Video generation (Wan 2.2 I2V) — see Phase 4
 - [ ] Extend task framework to text/audio tasks
 - [ ] Flexible configuration options
   - [x] Per-model-type dtype/device configuration (`get_model_config`)
@@ -35,12 +35,13 @@
   - [ ] Wire segmentation into any code path (currently unused)
 
 ## Phase 4: Image-to-Video Generation 🟡 Mostly Complete
-- [x] Register I2V models (Wan 2.2 I2V A14B, HunyuanVideo-I2V)
+- [x] Register I2V models (Wan 2.2 I2V A14B; HunyuanVideo-I2V dropped 2026-08)
 - [x] Install script downloads I2V models to `models/image_to_video/`
 - [x] Video generator module (`generators/video_generator.py`, `make benchmark-video`)
 - [x] Scene-driven video pipeline (`video_engine.py`: validated scene → character reference → animated clip)
 - [x] Output management for video files (`outputs/<project>/scenes/scene_<n>/out/`, videos + metrics JSON)
 - [ ] Per-model quantization/MLX runtime support (see `docs/image-to-video.md`)
+- [x] **Join scene clips into sequence video with ffmpeg** — *TODO: Implement after benchmark videos are generated*
 - [ ] Audio & lip-sync pipeline — talking scenes (TTS → lip sync → music → mix, see `docs/image-to-video.md` §10)
   - [x] Audio model registries in `models.py` (TTS, lip sync, music) + install.py wiring — one winner per category, small fallbacks only
   - [ ] TTS/voice engine implementation (Qwen3-TTS local, 1.7B + 0.6B)
