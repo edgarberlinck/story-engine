@@ -69,6 +69,19 @@ benchmark-video:
 	@echo "Running image-to-video generation benchmark..."
 	python generators/benchmark_video_generator.py
 
+# Run the Nikita & Roger 3-scene cinematic benchmark for Wan 2.2 I2V
+# Usage: make benchmark-video-generation (scenes + videos + join)
+.PHONY: benchmark-video-generation
+benchmark-video-generation:
+	@echo "=== Nikita & Roger 3-Scene Wan 2.2 I2V Benchmark ==="
+	@echo "Generating scene images and animating with Wan 2.2 I2V..."
+	@echo "Logs will be written to: logs/wan22_nikita_roger_benchmark.log"
+	@echo ""
+	.venv/bin/python scripts/video_benchmark_nikita_roger.py --all 2>&1 | tee logs/wan22_nikita_roger_benchmark.log
+	@echo ""
+	@echo "=== Benchmark Complete ==="
+	@echo "Check logs/wan22_nikita_roger_benchmark.log for detailed output"
+
 # Run the face recognition benchmark suite
 .PHONY: benchmark-face
 benchmark-face:
