@@ -1,0 +1,263 @@
+{
+  "repo": "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
+  "target": "models/image_to_video/wan22_i2v",
+  "checked_at": "2026-08-18T14:13:51.251558",
+  "status": "PAUSED (by user \u2014 resuming later)",
+  "expected_total_bytes": 126204155463,
+  "files": [
+    {
+      "path": ".gitattributes",
+      "expected_bytes": 1860,
+      "local_bytes": 1860,
+      "complete": true
+    },
+    {
+      "path": "model_index.json",
+      "expected_bytes": 600,
+      "local_bytes": 600,
+      "complete": true
+    },
+    {
+      "path": "scheduler/scheduler_config.json",
+      "expected_bytes": 820,
+      "local_bytes": 820,
+      "complete": true
+    },
+    {
+      "path": "text_encoder/config.json",
+      "expected_bytes": 855,
+      "local_bytes": 855,
+      "complete": true
+    },
+    {
+      "path": "text_encoder/model-00001-of-00003.safetensors",
+      "expected_bytes": 4935812536,
+      "local_bytes": 4935812536,
+      "complete": true
+    },
+    {
+      "path": "text_encoder/model-00002-of-00003.safetensors",
+      "expected_bytes": 4983103192,
+      "local_bytes": 4983103192,
+      "complete": true
+    },
+    {
+      "path": "text_encoder/model-00003-of-00003.safetensors",
+      "expected_bytes": 1442935480,
+      "local_bytes": 1442935480,
+      "complete": true
+    },
+    {
+      "path": "text_encoder/model.safetensors.index.json",
+      "expected_bytes": 22476,
+      "local_bytes": 22476,
+      "complete": true
+    },
+    {
+      "path": "tokenizer/special_tokens_map.json",
+      "expected_bytes": 7079,
+      "local_bytes": 7079,
+      "complete": true
+    },
+    {
+      "path": "tokenizer/spiece.model",
+      "expected_bytes": 4548313,
+      "local_bytes": 4548313,
+      "complete": true
+    },
+    {
+      "path": "tokenizer/tokenizer.json",
+      "expected_bytes": 16837459,
+      "local_bytes": 16837459,
+      "complete": true
+    },
+    {
+      "path": "tokenizer/tokenizer_config.json",
+      "expected_bytes": 61758,
+      "local_bytes": 61758,
+      "complete": true
+    },
+    {
+      "path": "transformer/config.json",
+      "expected_bytes": 495,
+      "local_bytes": 495,
+      "complete": true
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00001-of-00012.safetensors",
+      "expected_bytes": 4864810208,
+      "local_bytes": 2240331776,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00002-of-00012.safetensors",
+      "expected_bytes": 4919594456,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00003-of-00012.safetensors",
+      "expected_bytes": 4919465128,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00004-of-00012.safetensors",
+      "expected_bytes": 4919594536,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00005-of-00012.safetensors",
+      "expected_bytes": 4919465224,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00006-of-00012.safetensors",
+      "expected_bytes": 4919594552,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00007-of-00012.safetensors",
+      "expected_bytes": 4919465224,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00008-of-00012.safetensors",
+      "expected_bytes": 4919594552,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00009-of-00012.safetensors",
+      "expected_bytes": 4919465224,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00010-of-00012.safetensors",
+      "expected_bytes": 4919594552,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00011-of-00012.safetensors",
+      "expected_bytes": 4919465224,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model-00012-of-00012.safetensors",
+      "expected_bytes": 3095607280,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer/diffusion_pytorch_model.safetensors.index.json",
+      "expected_bytes": 97307,
+      "local_bytes": 97307,
+      "complete": true
+    },
+    {
+      "path": "transformer_2/config.json",
+      "expected_bytes": 495,
+      "local_bytes": 495,
+      "complete": true
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00001-of-00012.safetensors",
+      "expected_bytes": 4864810208,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00002-of-00012.safetensors",
+      "expected_bytes": 4919594456,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00003-of-00012.safetensors",
+      "expected_bytes": 4919465128,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00004-of-00012.safetensors",
+      "expected_bytes": 4919594536,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00005-of-00012.safetensors",
+      "expected_bytes": 4919465224,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00006-of-00012.safetensors",
+      "expected_bytes": 4919594552,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00007-of-00012.safetensors",
+      "expected_bytes": 4919465224,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00008-of-00012.safetensors",
+      "expected_bytes": 4919594552,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00009-of-00012.safetensors",
+      "expected_bytes": 4919465224,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00010-of-00012.safetensors",
+      "expected_bytes": 4919594552,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00011-of-00012.safetensors",
+      "expected_bytes": 4919465224,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model-00012-of-00012.safetensors",
+      "expected_bytes": 3095607280,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "transformer_2/diffusion_pytorch_model.safetensors.index.json",
+      "expected_bytes": 97307,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "vae/config.json",
+      "expected_bytes": 724,
+      "local_bytes": 0,
+      "complete": false
+    },
+    {
+      "path": "vae/diffusion_pytorch_model.safetensors",
+      "expected_bytes": 507591892,
+      "local_bytes": 0,
+      "complete": false
+    }
+  ],
+  "bytes_on_disk": 13623762501,
+  "pct": 10.8
+}
