@@ -30,9 +30,10 @@ TEXT_GENERATION_MODELS = {
 # Image-to-Video Models (for animating generated images)
 # Policy: the benchmark suite decides which i2v model survives; the losing
 # model is removed from this registry once the comparison is final.
+# Decision (2026-08): Wan 2.2 A14B is the winner; HunyuanVideo-I2V was
+# dropped (older architecture, heavier VRAM, inferior motion quality).
 IMAGE_TO_VIDEO_MODELS = {
-    "wan22_i2v": "Wan-AI/Wan2.2-I2V-A14B",
-    "hunyuan_video_i2v": "tencent/HunyuanVideo-I2V"
+    "wan22_i2v": "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
 }
 
 # Text-to-Speech Models (spoken dialogue for scenes)
@@ -148,14 +149,7 @@ MODEL_METADATA = {
         "type": "image_to_video",
         "size": "~60GB",
         "description": "Wan 2.2 image-to-video MoE model (A14B) for high-quality video generation from images",
-        "repo_id": "Wan-AI/Wan2.2-I2V-A14B"
-    },
-    "hunyuan_video_i2v": {
-        "name": "HunyuanVideo I2V",
-        "type": "image_to_video",
-        "size": "~40GB",
-        "description": "Tencent HunyuanVideo image-to-video generation model",
-        "repo_id": "tencent/HunyuanVideo-I2V"
+        "repo_id": "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
     },
     "qwen3_tts": {
         "name": "Qwen3-TTS CustomVoice 1.7B",

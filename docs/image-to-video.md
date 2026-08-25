@@ -72,8 +72,15 @@ downloading from the Hugging Face hub id at runtime.
 
 | Key | Model | Repo | Default |
 |---|---|---|---|
-| `wan22_i2v` | Wan 2.2 I2V A14B | `Wan-AI/Wan2.2-I2V-A14B` | **yes** |
-| `hunyuan_video_i2v` | HunyuanVideo I2V | `tencent/HunyuanVideo-I2V` | no |
+| `wan22_i2v` | Wan 2.2 I2V A14B | `Wan-AI/Wan2.2-I2V-A14B-Diffusers` | **yes** |
+
+- **Benchmark decision (2026-08):** Wan 2.2 A14B is the surviving i2v
+  model; HunyuanVideo-I2V was dropped (older architecture, heavier VRAM,
+  inferior motion quality) per the registry policy in `models.py`.
+- The registered repo is the **diffusers-format** checkpoint (loadable via
+  `from_pretrained`). The raw checkpoint
+  (`Wan-AI/Wan2.2-I2V-A14B`) is not loadable by diffusers without
+  conversion and is intentionally not used.
 
 - `AVAILABLE_VIDEO_MODELS` = the full registry; `DEFAULT_VIDEO_MODEL` is
   `wan22_i2v`.
@@ -130,7 +137,7 @@ are:
 - Negative prompts: per-model defaults are defined in
   `MODEL_GENERATION_PARAMS`. The Wan negative block forbids
   static/still-frame results, blur, text/subtitles, deformities and extra
-  limbs. HunyuanVideo I2V uses no CFG negatives.
+  limbs.
 - Reference operating rule: a good i2v prompt is a short cinematic beat
   ("Yamu killing a tiger with a long bow arrow, dramatic action, the arrow
   flies and strikes the tiger, cinematic motion") — scene + action +
@@ -148,10 +155,9 @@ Base parameters (`MODEL_GENERATION_PARAMS`):
 | Model | Resolution | Frames | FPS | Guidance | Steps | Negatives |
 |---|---|---|---|---|---|---|
 | `wan22_i2v` | 832×480 | 81 | 16 | 3.5 | 40 | yes |
-| `hunyuan_video_i2v` | 720×480 | 61 | 15 | 6.5 | 30 | no |
 
-**Frame-count rule (4k+1):** Wan and HunyuanVideo require
-`num_frames ≡ 1 (mod 4)`. 81 and 61 both satisfy this.
+**Frame-count rule (4k+1):** Wan requires `num_frames ≡ 1 (mod 4)`.
+81 satisfies this.
 
 Benchmark overrides (`BENCHMARK_VIDEO_PARAMS`) raise the bar to
 **≥ 720p and ≥ 4 s**:
@@ -159,7 +165,6 @@ Benchmark overrides (`BENCHMARK_VIDEO_PARAMS`) raise the bar to
 | Model | Resolution | Frames | FPS | Duration |
 |---|---|---|---|---|
 | `wan22_i2v` | 1280×720 | 81 | 16 | 5.06 s |
-| `hunyuan_video_i2v` | 1280×720 | 61 | 15 | 4.07 s |
 
 Every generation is wrapped in timing (`duration_ms`) and RSS sampling
 (`peak_memory_mb`) and the pipeline is torn down (`cleanup_pipeline`) in a
@@ -237,10 +242,10 @@ exercise the talking-scenes requirement of §10):
 
 - **Quantitative:** the per-model `*_benchmark_metrics.json` files
   (latency, peak memory, resolution, frames, fps).
-- **Qualitative:** inspect `scene_*/out/benchmark_<model>.mp4` side by side
-  for motion quality, character consistency and prompt adherence.
-- Default benchmark expectations: `wan22_i2v` = reference quality;
-  `hunyuan_video_i2v` = faster but lower fidelity.
+- **Qualitative:** inspect `scene_*/out/benchmark_<model>.mp4` for motion
+  quality, character consistency and prompt adherence.
+- Benchmark decision (2026-08): `wan22_i2v` is the reference/surviving
+  model; HunyuanVideo-I2V was dropped from the registry.
 
 ## 8. Operating constraints (this machine)
 
@@ -264,7 +269,6 @@ Practical rules:
    runs, but a 40-step @ Q4 generation finishes before that matters.
 3. Memory is not the issue — quantization gives comfortable headroom. The
    practical ceiling is speed, not capacity.
-4. HunyuanVideo I2V is lighter and acceptable on MPS for quick iterations.
 
 ## 9. Verification & tests
 
