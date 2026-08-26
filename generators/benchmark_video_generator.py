@@ -97,7 +97,9 @@ BACKGROUND_SOUND = "quiet and relaxed background ambience"
 #   wan22_i2v:          81 frames @ 16 fps = 5.06 s, 1280x720
 # (Benchmark decision 2026-08: wan22_i2v is the surviving i2v model.)
 BENCHMARK_VIDEO_PARAMS = {
-    "wan22_i2v": {"width": 1280, "height": 720, "num_frames": 81, "fps": 16},
+    "wan22_i2v": {"width": 1280, "height": 720, "num_frames": 81, "fps": 16},  # landscape
+    "wan22_i2v_vertical": {"width": 512, "height": 1024, "num_frames": 32, "fps": 8},  # vertical phone screen - 4 seconds at 8fps
+}
 }
 
 
