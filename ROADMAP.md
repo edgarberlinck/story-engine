@@ -48,6 +48,13 @@
   - [ ] Lip-sync implementation (LatentSync 1.6; CUDA-oriented, MPS flakiness accepted — retry on failure)
   - [ ] Music generation + dialogue/music mix assembly (MusicGen medium)
 - [ ] Single-i2v-model decision: after the benchmark comparison is final, keep exactly one i2v model and remove the other from the project
+- [x] Fix FLUX `sentencepiece` crash: FLUX.1's T5 `text_encoder_2` tokenizer (`tokenizer_2/spiece.model`) required the `sentencepiece` package, which was absent from `requirements.txt` and the venv — caused `make benchmark-video` to abort with "Cannot instantiate this tokenizer from a slow version". Added `sentencepiece>=0.2` to `requirements.txt` (installed 0.2.2, cp314 arm64 wheel). FLUX now loads; benchmark runs the full pipeline.
+- [x] **Mitigated "No faces detected" hard-abort in `make benchmark-video`** (after the sentencepiece fix, the benchmark ran the full pipeline but aborted at the validated-scene stage — *not* a crash):
+   - Symptom that triggered the investigation: "No faces detected in scene ...; Characters NOT found in scene: Nikita, Roger; regenerating..." → "Could not verify all characters in scene after 3 attempts."
+   - **Real root cause**: the benchmark verified against the default project (`test_project`), but Nikita & Roger live in the **`Test_ui`** project — it was checking the wrong project's data. (Initial misdiagnosis — a *broken* `dlib`/`face_recognition` embedder under Python 3.14 — was ruled out: face detection works fine on proper `Test_ui` scenes, e.g. "Nikita in scene_4/5/6: True".)
+   - "For now" mitigation applied: `utils/face_check.character_appears_in_image` now returns **`None` (inconclusive)** instead of `False` when no faces are detected in the scene — no detection does not prove the character is absent. Note: with `require_verification=True` (as the benchmark uses) a `None` still raises "verification required but inconclusive"; deciding whether an inconclusive check should accept-or-abort is deferred.
+   - Deeper fix deferred → see cross-project character import below.
+   - Note: `Makefile` benchmark targets call bare `python` (not on PATH outside an activated venv); run via `source .venv/bin/activate && make benchmark-video` or fix the targets to use `.venv/bin/python`.
 
 ## Phase 5: Project & Data Management 🟡 In Progress
 - [x] SQLite persistence layer (`services/database/`)
@@ -58,6 +65,7 @@
 - [x] Core managers bridging DB and UI (`core/project_manager.py`, `character_manager.py`, `scene_manager.py`)
 - [ ] Associate generated assets with projects at the DB level (path-based storage exists)
 - [ ] Migrations for evolving schemas (`migrations.py` exists — needs schema history review)
+- [ ] **Cross-project character import / borrowing**: by design, characters must only be accessed via their owning project (today the scene pipeline resolves characters from the single project being processed — the `Test_ui` vs `test_project` mix-up exposed this). Add a deliberate "import a character from another project" feature so a character (e.g. an *older version* of a character in a different project) can be explicitly brought into the current project. Design considerations: DB record + reference-image copy/link across projects, version tracking, and provenance of the source project.
 
 ## Phase 6: Advanced Story Generation Features 🟡 In Progress
 - [x] Multiple character management (DB-backed, CLI + UI character builder/viewer)

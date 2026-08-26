@@ -29,9 +29,11 @@ def character_appears_in_image(
         tolerance: Face distance threshold (lower = stricter).
 
     Returns:
-        True if a matching face is found, False if not,
-        None if face recognition is unavailable or no face found in the
-        reference (i.e. the check is inconclusive).
+        True if a matching face is found, False if faces were detected in the
+        scene but none matched the reference. Returns None (inconclusive) if the
+        check cannot determine anything: face recognition is unavailable, no face
+        is found in the reference, or no face is found in the scene (no detection
+        does not prove the character is absent).
     """
     if not is_face_check_available():
         print(
@@ -59,8 +61,10 @@ def character_appears_in_image(
     scene = face_recognition.load_image_file(scene_image_path)
     scene_encodings = face_recognition.face_encodings(scene)
     if not scene_encodings:
-        print(f"No faces detected in scene {scene_image_path}")
-        return False
+        # No faces detected: this does not prove the character is absent (the
+        # detector may simply fail to find a face), so the check is inconclusive.
+        print(f"No faces detected in scene {scene_image_path}; check inconclusive.")
+        return None
 
     matches = face_recognition.compare_faces(
         scene_encodings, reference_encodings[0], tolerance=tolerance

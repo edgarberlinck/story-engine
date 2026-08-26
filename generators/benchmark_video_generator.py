@@ -100,7 +100,6 @@ BENCHMARK_VIDEO_PARAMS = {
     "wan22_i2v": {"width": 1280, "height": 720, "num_frames": 81, "fps": 16},  # landscape
     "wan22_i2v_vertical": {"width": 512, "height": 1024, "num_frames": 32, "fps": 8},  # vertical phone screen - 4 seconds at 8fps
 }
-}
 
 
 def ensure_character(name: str):

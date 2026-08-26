@@ -26,12 +26,13 @@ pillow==12.3.0
 psutil==7.2.2
 Pygments==2.20.0
 PyYAML==6.0.3
-qwen-tts==0.1.1  # Qwen3-TTS local engine (voice generation)
+qwen-tts==0.1.1    # Qwen3-TTS local engine (voice generation)
 regex==2026.7.19
 requests==2.34.2
 rich==15.0.0
 safetensors==0.8.0
-setuptools<81  # face_recognition_models needs pkg_resources
+sentencepiece>=0.2   # required by FLUX's T5 text_encoder_2 tokenizer (spiece.model)
+setuptools<81    # face_recognition_models needs pkg_resources
 shellingham==1.5.4
 soundfile==0.14.0  # WAV write for voice generation
 sympy==1.14.0
