@@ -6,8 +6,9 @@
 > and `docs/video-generation-caveats.md`.
 >
 > Operating principles are informed by the working reference implementation
-> (production i2v: Wan 2.2 ComfyUI/xfuser, LTX-2,
+> (production i2v in that reference: Wan 2.2 ComfyUI/xfuser, LTX-2,
 > cloud backends), adapted to this codebase's diffusers-based runtime.
+> Story Engine's chosen i2v model is **LTX-Video 0.9.5** (the LTX lineage).
 
 ---
 
@@ -72,23 +73,29 @@ downloading from the Hugging Face hub id at runtime.
 
 | Key | Model | Repo | Default |
 |---|---|---|---|
-| `wan22_i2v` | Wan 2.2 I2V A14B | `Wan-AI/Wan2.2-I2V-A14B-Diffusers` | **yes** |
+| `ltx_video_095_i2v` | LTX-Video 0.9.5 I2V | `Lightricks/LTX-Video-0.9.5` | **yes** |
 
-- **Benchmark decision (2026-08):** Wan 2.2 A14B is the surviving i2v
-  model; HunyuanVideo-I2V was dropped (older architecture, heavier VRAM,
-  inferior motion quality) per the registry policy in `models.py`.
+- **Benchmark decision (2026-08):** LTX-Video 0.9.5 is the surviving i2v
+  model. Wan 2.2 I2V A14B and HunyuanVideo-I2V were **dropped** per the
+  registry policy in `models.py`. Wan 2.2 A14B is a dual 14B-expert MoE
+  stored **F32** on disk (~119 GB across ~53 GB `transformer` + ~53 GB
+  `transformer_2` + a ~11 GB text encoder) and **OOMs during load on the 64 GB
+  Apple-Silicon host** (SIGKILL `Killed: 9` at "Loading pipeline components",
+  before any sampling step) — so it cannot run here regardless of resolution or
+  frame count. LTX-Video 0.9.5 (~3.6 GB transformer, ~24 GB total) fits
+  comfortably and runs on MPS.
 - The registered repo is the **diffusers-format** checkpoint (loadable via
-  `from_pretrained`). The raw checkpoint
-  (`Wan-AI/Wan2.2-I2V-A14B`) is not loadable by diffusers without
-  conversion and is intentionally not used.
-
+   `from_pretrained`, here `LTXImageToVideoPipeline`).
 - `AVAILABLE_VIDEO_MODELS` = the full registry; `DEFAULT_VIDEO_MODEL` is
-  `wan22_i2v`.
+   `ltx_video_095_i2v`.
 - Each model is invoked through its own diffusers pipeline class and
   model-specific parameters (`MODEL_GENERATION_PARAMS` in
-  `video_generator.py`) — never a shared generic call.
+   `video_generator.py`) — never a shared generic call.
 - Device/dtype come from `get_model_config("image_to_video")`
-  (`bfloat16`; device resolves mps > cuda > cpu).
+   (`bfloat16`; device resolves mps > cuda > cpu). To keep the footprint
+   within the machine's free memory, `_load_pipeline` calls
+   `enable_model_cpu_offload()` on accelerator (cuda/mps) backends so the ~17 GB
+   text encoder is streamed off-device one component at a time.
 
 ### Audio & lip-sync model registries
 
@@ -124,9 +131,9 @@ are:
 - Loaded, converted to RGB, and resized with Lanczos to the model's target
   `width × height`.
 - Benchmark/ideal practice: generate the scene at the video target
-  resolution (e.g. 1280×720) so the conditioning frame matches the output
-  (reference: the reference implementation renders the first frame at the exact
-  video resolution).
+   resolution (e.g. 704×512 for LTX-Video 0.9.5) so the conditioning frame
+   matches the output (reference: the reference implementation renders the first
+   frame at the exact video resolution).
 
 ### Prompt
 
@@ -135,9 +142,9 @@ are:
   **scene content** and the **motion** ("cinematic motion", gestures,
   camera behaviour) — the model needs explicit motion language.
 - Negative prompts: per-model defaults are defined in
-  `MODEL_GENERATION_PARAMS`. The Wan negative block forbids
-  static/still-frame results, blur, text/subtitles, deformities and extra
-  limbs.
+   `MODEL_GENERATION_PARAMS`. The LTX-Video 0.9.5 negative block forbids
+  static/still-frame results, blur, text/subtitles, deformities, extra limbs
+  and a messy background.
 - Reference operating rule: a good i2v prompt is a short cinematic beat
   ("Yamu killing a tiger with a long bow arrow, dramatic action, the arrow
   flies and strikes the tiger, cinematic motion") — scene + action +
@@ -154,17 +161,26 @@ Base parameters (`MODEL_GENERATION_PARAMS`):
 
 | Model | Resolution | Frames | FPS | Guidance | Steps | Negatives |
 |---|---|---|---|---|---|---|
-| `wan22_i2v` | 832×480 | 81 | 16 | 3.5 | 40 | yes |
+| `ltx_video_095_i2v` | 704×512 | 161 | 25 | 3.0 | 50 | yes |
 
-**Frame-count rule (4k+1):** Wan requires `num_frames ≡ 1 (mod 4)`.
-81 satisfies this.
+**Frame-count rule (8k+1):** LTX-Video's VAE has a temporal stride of 8, so
+`num_frames ≡ 1 (mod 8)`; 161 (= 1 + 8×20) satisfies this. 161 frames @ 25 fps
+is a **6.44 s** clip — already past the benchmark's ≥ 4 s bar without needing an
+upsample.
 
-Benchmark overrides (`BENCHMARK_VIDEO_PARAMS`) raise the bar to
-**≥ 720p and ≥ 4 s**:
+Benchmark overrides (`BENCHMARK_VIDEO_PARAMS`) pin the model to its LTX-native
+resolution; the ≥ 4 s bar is met by the 161-frame count:
 
 | Model | Resolution | Frames | FPS | Duration |
 |---|---|---|---|---|
-| `wan22_i2v` | 1280×720 | 81 | 16 | 5.06 s |
+| `ltx_video_095_i2v` | 704×512 | 161 | 25 | 6.44 s |
+
+> **Resolution caveat (honest):** the original benchmark bar was also
+ > "≥ 720p". LTX-Video 0.9.5's native output is 704×512, so the ≥ 720p bar is
+ > **not met** by the default params. Hitting 1280×720 would require an
+ > upsampled generation that the 64 GB run avoids (risking OOM / artifacts);
+ > the ≥ 4 s duration bar is the one that's retained. The video-quality
+ > enhancement option (§3 note + ROADMAP) is the path to higher resolution.
 
 Every generation is wrapped in timing (`duration_ms`) and RSS sampling
 (`peak_memory_mb`) and the pipeline is torn down (`cleanup_pipeline`) in a
@@ -189,16 +205,16 @@ outputs/<project>/
 
 ```json
 {
-  "model": "wan22_i2v",
-  "prompt": "<video prompt>",
-  "image": "<scene image path>",
-  "seed": 42,
-  "fps": 16,
-  "duration_ms": 123456,
-  "peak_memory_mb": 8123,
-  "output": "<video path>",
-  "width": 1280, "height": 720,
-  "num_frames": 81, "guidance_scale": 3.5, "num_inference_steps": 40
+   "model": "ltx_video_095_i2v",
+    "prompt": "<video prompt>",
+   "image": "<scene image path>",
+   "seed": 42,
+   "fps": 25,
+   "duration_ms": 123456,
+   "peak_memory_mb": 8123,
+   "output": "<video path>",
+   "width": 704, "height": 512,
+   "num_frames": 161, "guidance_scale": 3.0, "num_inference_steps": 50
 }
 ```
 
@@ -213,11 +229,13 @@ Run with `make benchmark-video` (or
 **Goal:** produce the same validated scene, animated by **every** i2v model,
 so outputs are directly comparable. The suite follows the rules:
 
-- Face verification is **required** (`require_verification=True`); scenes
-  regenerate until every character is verified, and the benchmark aborts if
-  verification is impossible.
-- Videos are ≥ 4 s and ≥ 720p (see §5 overrides), seeded identically,
-  named `benchmark_<model>.mp4`.
+- Face verification is **soft** (`require_verification=False`): both
+  characters are checked for presence in the scene, but a non-match or an
+  inconclusive check does **not** abort the run — the benchmark's purpose is to
+  see whether a video *can* be generated, not to gate it on perfect face
+  detection.
+- Videos are ≥ 4 s (see §5 overrides), seeded identically, named
+  `benchmark_<model>.mp4`. The ≥ 720p bar was dropped with Wan (see §5).
 - A summary prints path, resolution, duration, latency and peak memory for
   each model.
 
@@ -244,31 +262,48 @@ exercise the talking-scenes requirement of §10):
   (latency, peak memory, resolution, frames, fps).
 - **Qualitative:** inspect `scene_*/out/benchmark_<model>.mp4` for motion
   quality, character consistency and prompt adherence.
-- Benchmark decision (2026-08): `wan22_i2v` is the reference/surviving
-  model; HunyuanVideo-I2V was dropped from the registry.
+- Benchmark decision (2026-08): `ltx_video_095_i2v` is the reference/surviving
+   model. Wan 2.2 I2V A14B was dropped because it OOMs on the 64 GB host, and
+   HunyuanVideo-I2V was dropped for architecture/size — see §3.
 
 ## 8. Operating constraints (this machine)
 
 Machine: Apple M5 Pro MacBook Pro (Mac17,9), 18-core CPU / 20-core GPU,
 Metal 4, 64 GB unified memory, torch 2.13 (MPS), diffusers 0.39.0.
 
-**Verdict: the constraint is throughput, not memory.**
+**Verdict: memory is the binding constraint — it is what forced the model
+choice.** The benchmark's original candidate, Wan 2.2 I2V A14B, is a dual
+14B-expert MoE stored F32 on disk (~119 GB: ~53 GB `transformer` + ~53 GB
+`transformer_2` + a ~11 GB text encoder) and is **killed (`Killed: 9` /
+SIGKILL) inside `from_pretrained`, before any sampling step**, on this 64 GB
+host even at the smallest config (480×320 / 33 frames / 20 steps — a trivial
+load that would be comfortable on a desktop GPU). Lowering resolution, frame
+count, or steps does not help — the OOM is at *load time*, so those knobs are
+irrelevant to it. The surviving model is **LTX-Video 0.9.5**
+(`Lightricks/LTX-Video-0.9.5`), whose ~3.6 GB transformer (≈24 GB total) loads
+comfortably.
 
-| Wan 2.2 A14B variant | Weight size | Verdict on 64 GB |
+| i2v candidate | Footprint | Verdict on 64 GB |
 |---|---|---|
-| FP16 via diffusers/MPS | ~28 GB + text encoder + Wan-VAE + activations | Fits, but slow — MPS falls back to CPU for many Wan ops |
-| MLX / GGUF Q4–Q5 | ~9–12 GB | Sweet spot — comfortable headroom, ~2–5 min per 81-frame @ 832×480 clip |
+| Wan 2.2 I2V A14B | ~119 GB on disk (F32), ~54 GB resident in bf16 | **OOM** — `Killed: 9` at load; abandoned |
+| LTX-Video 0.9.5 | ~24 GB total, 3.6 GB transformer | **Survives** — fits with headroom; chosen |
 
 Practical rules:
 
-1. **Skip torch-MPS for Wan 2.2** when speed matters. Diffusers' Wan2.2
-   pipeline on Metal is partially unaccelerated; the 20-core GPU is left
-   mostly idle. `mlx-wan` (or ComfyUI + GGUF, as in the reference
-   implementation) is dramatically faster.
-2. Thermal note: sustained 14B inference throttles the M5 Pro over long
-   runs, but a 40-step @ Q4 generation finishes before that matters.
-3. Memory is not the issue — quantization gives comfortable headroom. The
-   practical ceiling is speed, not capacity.
+1. **Memory, not throughput, decides the model.** The Wan→LTX swap was driven
+   by load-time OOM, not speed. A future move back to Wan (or to a larger
+   model) is only viable with more unified memory, GPU offload to a real
+   accelerator, or MLX/quantized weights small enough for the 64 GB pool.
+2. `_load_pipeline` calls `enable_model_cpu_offload()` on the accelerator
+   (cuda/mps) backend so the ≈17 GB text encoder is streamed off-device one
+   component at a time, keeping the live footprint within the machine's free
+   memory.
+3. **LTX-Video 0.9.5 is not optimized for MPS.** Diffusers' LTX pipeline on
+   Metal may fall back to CPU for some ops; a future move to `mlx` / GGUF
+   weights (as the reference implementation uses for LTX-2) would sharpen speed.
+4. **Thermal note:** sustained video inference throttles the M5 Pro over long
+   runs; a single 50-step 6.44 s generation finishes before that matters, but
+   the benchmark is run once, not in a tight loop.
 
 ## 9. Verification & tests
 

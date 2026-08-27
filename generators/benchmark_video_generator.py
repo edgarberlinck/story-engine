@@ -22,8 +22,11 @@ Benchmark rules:
      (the point of this benchmark is to see whether a video can be
      generated, not to gate it on perfect face detection).
    - The same validated scene is animated with EVERY i2v model.
-   - Every video is >= 4 s and >= 720p, seeded identically, named
-     benchmark_<model>.mp4, with a metrics JSON next to it.
+    - Every video is >= 4 s, seeded identically, named
+     benchmark_<model>.mp4, with a metrics JSON next to it. The surviving
+     model (ltx_video_095_i2v) is run at its LTX-native 704x512 / 161f / 25fps
+     = 6.44s; the original ">= 720p" bar was dropped because the 64 GB run that
+     could hit 720p (Wan 2.2 A14B) OOMs — see docs/image-to-video.md §5.
 
 Outputs follow the project structure (project 'Test_ui'):
   outputs/Test_ui/characters/<name>/reference.png
@@ -40,7 +43,11 @@ sys.path.insert(0, str(project_root))
 
 from generators.image_engine import generate_character, get_character
 from generators.video_engine import create_validated_scene
-from generators.video_generator import AVAILABLE_VIDEO_MODELS, generate_video
+from generators.video_generator import (
+    AVAILABLE_VIDEO_MODELS,
+    DEFAULT_VIDEO_MODEL,
+    generate_video,
+)
 from utils.project_paths import scene_out_dir
 
 # Nikita and Roger live in the 'Test_ui' project (their reference images and
@@ -100,13 +107,16 @@ DIALOGUE = [
 ]
 BACKGROUND_SOUND = "quiet and relaxed background ambience"
 
-# Per-model overrides to guarantee >= 4 seconds and >= 720p.
-# Frame counts respect each model's constraints (Wan: 4k+1 frames).
-#   wan22_i2v:          81 frames @ 16 fps = 5.06 s, 1280x720
-# (Benchmark decision 2026-08: wan22_i2v is the surviving i2v model.)
+# Per-model overrides to guarantee >= 4 seconds at the model's native resolution.
+# Frame counts respect each model's latent constraints.
+#   ltx_video_095_i2v: 161 frames @ 25 fps = 6.44 s, 704x512 (LTX native;
+#   VAE temporal stride 8 -> num_frames == 1 (mod 8)). The original >= 720p bar
+#   was dropped: only Wan 2.2 A14B could output 720p but it OOMs on 64 GB macOS.
+# (Benchmark decision 2026-08: ltx_video_095_i2v is the surviving i2v model;
+#  Wan 2.2 I2V A14B OOMs on 64 GB macOS; HunyuanVideo-I2V dropped.)
+
 BENCHMARK_VIDEO_PARAMS = {
-    "wan22_i2v": {"width": 1280, "height": 720, "num_frames": 81, "fps": 16},  # landscape
-    "wan22_i2v_vertical": {"width": 512, "height": 1024, "num_frames": 32, "fps": 8},  # vertical phone screen - 4 seconds at 8fps
+    "ltx_video_095_i2v": {"width": 704, "height": 512, "num_frames": 161, "fps": 25},   # LTX native
 }
 
 
@@ -134,7 +144,7 @@ project: str = BENCHMARK_PROJECT) -> dict:
                 output_dir=str(out_dir),
                 output_basename=f"benchmark_{model_name}",
                 seed=42,
-                **BENCHMARK_VIDEO_PARAMS[model_name],
+                **BENCHMARK_VIDEO_PARAMS.get(model_name, {}),
             )
         except Exception as e:
             print(f"Failed to generate video with {model_name}: {e}")
@@ -186,7 +196,7 @@ def print_summary(all_results: dict):
 def main():
     """Run the image-to-video benchmark across all i2v models."""
     print("=== Image-to-Video Generation Benchmark Suite ===")
-    print(f"Models: {', '.join(AVAILABLE_VIDEO_MODELS)} (default: wan22_i2v)")
+    print(f"Models: {', '.join(AVAILABLE_VIDEO_MODELS)} (default: {DEFAULT_VIDEO_MODEL})")
 
     all_results = {}
     try:

@@ -3,10 +3,14 @@
 Image-to-video generation across all supported i2v models.
 
 Supported models (see models.py IMAGE_TO_VIDEO_MODELS):
-  - wan22_i2v (default)  : Wan-AI/Wan2.2-I2V-A14B-Diffusers
+   - ltx_video_095_i2v (default): Lightricks/LTX-Video-0.9.5
+     (LTXImageToVideoPipeline, compact ~3.6 GB transformer — runs on MPS).
 
-Benchmark decision (2026-08): Wan 2.2 A14B is the surviving i2v model;
-HunyuanVideo-I2V was dropped from the registry after comparison.
+Benchmark decision (2026-08): LTX-Video 0.9.5 is the surviving i2v model.
+Wan 2.2 I2V A14B was DROPPED: a dual 14B-expert MoE stored F32 on disk
+(106 GB of transformers) that OOMs (~23 GB free) during model load on a
+64 GB Apple-Silicon Mac, independent of resolution/frames. HunyuanVideo-I2V
+is also dropped.
 
 Each model is invoked with its own correct pipeline class and parameters.
 """
@@ -33,18 +37,18 @@ from models import IMAGE_TO_VIDEO_MODELS, MODEL_PATHS, get_model_config
 from utils.model_metrics import get_memory_usage
 
 AVAILABLE_VIDEO_MODELS = dict(IMAGE_TO_VIDEO_MODELS)
-DEFAULT_VIDEO_MODEL = "wan22_i2v"
+DEFAULT_VIDEO_MODEL = "ltx_video_095_i2v"
 
 # Per-model generation parameters. Each model has different native
 # resolutions, frame counts, fps and guidance requirements.
 MODEL_GENERATION_PARAMS = {
-    "wan22_i2v": {
-        "width": 832,
-        "height": 480,
-        "num_frames": 81,
-        "fps": 16,
-        "guidance_scale": 3.5,
-        "num_inference_steps": 40,
+    "ltx_video_095_i2v": {
+        "width": 704,
+        "height": 512,
+        "num_frames": 161,
+        "fps": 25,
+        "guidance_scale": 3.0,
+        "num_inference_steps": 50,
         "negative_prompt": (
             "bright colors, overexposed, static, blurred details, subtitles, "
             "worst quality, low quality, deformed, disfigured, extra limbs, "
@@ -70,19 +74,22 @@ def resolve_video_model_path(model_name: str) -> str:
 
 
 def _load_pipeline(model_name: str, model_path: str, device: str, torch_dtype):
-    """Load the correct diffusers pipeline for the given i2v model."""
-    if model_name == "wan22_i2v":
-        from diffusers import WanImageToVideoPipeline
+    """Load the correct diffusers pipeline for the given i2v model.
+    New models add an entry here plus one in MODEL_GENERATION_PARAMS."""
+    if model_name == "ltx_video_095_i2v":
+        from diffusers import LTXImageToVideoPipeline
 
-        pipe = WanImageToVideoPipeline.from_pretrained(
+        pipe = LTXImageToVideoPipeline.from_pretrained(
             model_path, torch_dtype=torch_dtype
         )
     else:
         raise ValueError(f"Unsupported image-to-video model: {model_name}")
 
-    # These models are large; offload when CUDA is available, otherwise
-    # move to the resolved device (mps/cpu).
-    if device == "cuda":
+    # The LTX-Video text encoder is large (~17 GB); offloading it to CPU one
+    # component at a time keeps the footprint small enough for an accelerator
+    # with limited free memory (e.g. a 64 GB Apple-Silicon Mac on MPS).
+    # Without an accelerator (cpu), load it resident on CPU.
+    if device in ("cuda", "mps"):
         pipe.enable_model_cpu_offload()
     else:
         pipe = pipe.to(device)
@@ -109,7 +116,8 @@ def generate_video(
     Args:
         image_path: Path to the conditioning image (the scene).
         prompt: Motion/scene description guiding the animation.
-        model_name: One of AVAILABLE_VIDEO_MODELS (default: wan22_i2v).
+        model_name: One of AVAILABLE_VIDEO_MODELS
+          (default: ltx_video_095_i2v).
         output_dir: Directory where the video and metrics are written.
         output_basename: Base filename (defaults to <image stem>_<model>).
         seed: Random seed for reproducibility.

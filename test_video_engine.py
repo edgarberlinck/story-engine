@@ -80,8 +80,8 @@ class TestCharacterService(unittest.TestCase):
 
 
 class TestVideoGenerator(unittest.TestCase):
-    def test_default_model_is_wan(self):
-        self.assertEqual(DEFAULT_VIDEO_MODEL, "wan22_i2v")
+    def test_default_model_is_ltx(self):
+        self.assertEqual(DEFAULT_VIDEO_MODEL, "ltx_video_095_i2v")
 
     def test_all_models_have_params(self):
         self.assertEqual(set(AVAILABLE_VIDEO_MODELS), set(MODEL_GENERATION_PARAMS))

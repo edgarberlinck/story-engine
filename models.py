@@ -30,10 +30,14 @@ TEXT_GENERATION_MODELS = {
 # Image-to-Video Models (for animating generated images)
 # Policy: the benchmark suite decides which i2v model survives; the losing
 # model is removed from this registry once the comparison is final.
-# Decision (2026-08): Wan 2.2 A14B is the winner; HunyuanVideo-I2V was
-# dropped (older architecture, heavier VRAM, inferior motion quality).
+# Decision (2026-08): LTX-Video is the surviving i2v model. Wan 2.2 I2V A14B
+# was DROPPED: it is a dual 14B-expert MoE stored on disk as F32
+# (106 GB across two ~53 GB transformers + 11 GB text encoder), which OOMs
+# (~23 GB free) on a 64 GB Apple-Silicon Mac *during model load* — independent
+# of resolution/frames. LTX-Video 0.9.5 (3.6 GB transformer, ~24 GB total)
+# fits comfortably and runs on MPS; HunyuanVideo-I2V is also dropped.
 IMAGE_TO_VIDEO_MODELS = {
-    "wan22_i2v": "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
+    "ltx_video_095_i2v": "Lightricks/LTX-Video-0.9.5",
 }
 
 # Text-to-Speech Models (spoken dialogue for scenes)
@@ -144,12 +148,12 @@ MODEL_METADATA = {
         "description": "Small efficient language model for image naming",
         "repo_id": "google/gemma-2b"
     },
-    "wan22_i2v": {
-        "name": "Wan 2.2 I2V A14B",
+    "ltx_video_095_i2v": {
+        "name": "LTX-Video 0.9.5 I2V",
         "type": "image_to_video",
-        "size": "~60GB",
-        "description": "Wan 2.2 image-to-video MoE model (A14B) for high-quality video generation from images",
-        "repo_id": "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
+        "size": "~24GB",
+        "description": "LTX-Video 0.9.5 image-to-video model (LTXImageToVideoPipeline): fast, compact (~3.6 GB transformer) - runs on Apple-Silicon MPS, where Wan 2.2 I2V A14B OOMs during load",
+        "repo_id": "Lightricks/LTX-Video-0.9.5"
     },
     "qwen3_tts": {
         "name": "Qwen3-TTS CustomVoice 1.7B",

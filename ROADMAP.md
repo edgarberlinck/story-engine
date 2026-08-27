@@ -13,7 +13,7 @@
 - [x] Task framework with typed prompts (scenes, characters, environments)
   - [x] Image engine with typed generation (`GenerationType`: character/environment)
   - [x] Scene-driven generation pipeline (`image_engine.generate_scene`)
-- [x] Video generation (Wan 2.2 I2V) — see Phase 4
+- [x] Video generation (LTX-Video 0.9.5 I2V) — see Phase 4
 - [ ] Extend task framework to text/audio tasks
 - [ ] Flexible configuration options
   - [x] Per-model-type dtype/device configuration (`get_model_config`)
@@ -35,26 +35,26 @@
   - [ ] Wire segmentation into any code path (currently unused)
 
 ## Phase 4: Image-to-Video Generation 🟡 Mostly Complete
-- [x] Register I2V models (Wan 2.2 I2V A14B; HunyuanVideo-I2V dropped 2026-08)
+- [x] Register I2V models (LTX-Video 0.9.5 I2V; Wan 2.2 I2V A14B and HunyuanVideo-I2V dropped 2026-08 — see decision below)
 - [x] Install script downloads I2V models to `models/image_to_video/`
 - [x] Video generator module (`generators/video_generator.py`, `make benchmark-video`)
 - [x] Scene-driven video pipeline (`video_engine.py`: validated scene → character reference → animated clip)
 - [x] Output management for video files (`outputs/<project>/scenes/scene_<n>/out/`, videos + metrics JSON)
 - [x] Consolidate benchmarks: remove redundant `scripts/video_benchmark_nikita_roger.py`; use `generators/benchmark_video_generator.py` as the canonical video benchmark
-- [ ] Per-model quantization/MLX runtime support (see `docs/image-to-video.md`)
+- [ ] Per-model quantization/MLX runtime support (see `docs/image-to-video.md`); plus the post-generation video-quality enhancement option (see *Future Enhancements*)
 - [ ] Audio & lip-sync pipeline — talking scenes (TTS → lip sync → music → mix, see `docs/image-to-video.md` §10)
   - [x] Audio model registries in `models.py` (TTS, lip sync, music) + install.py wiring — one winner per category, small fallbacks only
   - [ ] TTS/voice engine implementation (Qwen3-TTS local, 1.7B + 0.6B)
   - [ ] Lip-sync implementation (LatentSync 1.6; CUDA-oriented, MPS flakiness accepted — retry on failure)
   - [ ] Music generation + dialogue/music mix assembly (MusicGen medium)
-- [ ] Single-i2v-model decision: after the benchmark comparison is final, keep exactly one i2v model and remove the other from the project
+- [x] **Single-i2v-model decision (2026-08): keep exactly one i2v model.** The benchmark's candidate, **Wan 2.2 I2V A14B**, was dropped — it is a dual 14B-expert MoE stored F32 on disk (~119 GB: ~53 GB `transformer` + ~53 GB `transformer_2` + an ~11 GB text encoder) and is **killed (`Killed: 9` / SIGKILL = OOM) inside `from_pretrained`, before any sampling step**, on the 64 GB Apple-Silicon host even at the smallest config (480×320 / 33f / 20 steps). Lowering resolution, frames, or steps does not help — the OOM is at *load time*. **LTX-Video 0.9.5** (`Lightricks/LTX-Video-0.9.5`, ~3.6 GB transformer, ~24 GB total, `LTXImageToVideoPipeline`) survives and is now the registered + default i2v model. Wan was removed from the registry, install, params, tests, and docs; its on-disk weights were deleted. See `docs/image-to-video.md` §3/§5/§8.
 - [x] Fix FLUX `sentencepiece` crash: FLUX.1's T5 `text_encoder_2` tokenizer (`tokenizer_2/spiece.model`) required the `sentencepiece` package, which was absent from `requirements.txt` and the venv — caused `make benchmark-video` to abort with "Cannot instantiate this tokenizer from a slow version". Added `sentencepiece>=0.2` to `requirements.txt` (installed 0.2.2, cp314 arm64 wheel). FLUX now loads; benchmark runs the full pipeline.
 - [x] **Mitigated "No faces detected" hard-abort in `make benchmark-video`** (after the sentencepiece fix, the benchmark ran the full pipeline but aborted at the validated-scene stage — *not* a crash):
    - Symptom that triggered the investigation: "No faces detected in scene ...; Characters NOT found in scene: Nikita, Roger; regenerating..." → "Could not verify all characters in scene after 3 attempts."
    - **Real root cause**: the benchmark verified against the default project (`test_project`), but Nikita & Roger live in the **`Test_ui`** project — it was checking the wrong project's data. (Initial misdiagnosis — a *broken* `dlib`/`face_recognition` embedder under Python 3.14 — was ruled out: face detection works fine on proper `Test_ui` scenes, e.g. "Nikita in scene_4/5/6: True".)
      - "For now" mitigation applied: `utils/face_check.character_appears_in_image` now returns **`None` (inconclusive)** instead of `False` when no faces are detected in the scene — no detection does not prove the character is absent.
       - **Benchmark wired to reach video generation:** `generators/benchmark_video_generator.py` now runs against `BENCHMARK_PROJECT = "Test_ui"` (where Nikita/Roger actually live, threaded through `ensure_character`/`create_validated_scene`/`scene_out_dir`), and verification is **soft** (`require_verification=False`) — an inconclusive/non-matching face check no longer aborts before the video is generated. The benchmark's job is to see *whether a video can be generated*, not to gate on perfect face detection.
-      - **Status (verified):** the benchmark now runs the full pipeline end-to-end — scene generated, accepted after 3 attempts, then it loads the complete Wan22 i2v pipeline and starts video generation. **Blocking:** the process is killed (`Killed: 9` / SIGKILL = out-of-memory) during the Wan22 i2v **14B** diffusion sampling on MPS (Apple Silicon) — no `.mp4` is produced. This is a *resource/memory* limit, not a code bug. To actually get a video: use a smaller/quantized i2v model, fewer frames/lower resolution, more system memory, or CUDA. (Wan params: see `BENCHMARK_VIDEO_PARAMS` — landscape 1280x720/81f and vertical 512x1024/32f.)
+        - **Status (verified + resolved 2026-08):** the benchmark runs the full pipeline end-to-end — scene generated, accepted after 3 attempts, then it loads the i2v pipeline and starts video generation. An earlier run loaded the **Wan 2.2 A14B** pipeline and was killed (`Killed: 9` / SIGKILL = OOM) at *load time* on MPS — a memory limit, not a code bug. **Resolution:** the i2v model was swapped to **LTX-Video 0.9.5** (fits the 64 GB host; ~24 GB total), so the benchmark now calls `generate_video(..., model_name="ltx_video_095_i2v")` at 704×512 / 161f / 25fps. `BENCHMARK_VIDEO_PARAMS` carries the LTX override; the original ≥ 720p bar was dropped (only Wan could hit 720p and it OOMs) — the ≥ 4 s bar is retained.
       - Deeper fix deferred → see cross-project character import below.
      - Note: `Makefile` benchmark targets call bare `python` (not on PATH outside an activated venv); run via `source .venv/bin/activate && make benchmark-video` or fix the targets to use `.venv/bin/python`.
 
@@ -95,6 +95,7 @@
 ## Future Enhancements
 - [x] Integration with text generation models (prompt enhancement via Phi-3)
 - [x] Face recognition benchmarking for character consistency
+- [ ] **Video-quality enhancement (post-generation) — *proposed, not yet implemented; do NOT auto-download*.** To lift LTX-Video 0.9.5's native 704×512 / 6.44 s output toward the original ≥ 720p bar without re-loading a heavy model, add a dedicated enhancement pass over the generated clip — e.g. an LTX latent up-sampler (`LTXVLatentUpsampler`, ~0.5 GB) and/or a light super-resolution model (Real-ESRGAN / Video-SR) applied to the i2v output. This keeps the resident i2v footprint tiny (LTX transformer is only ~3.6 GB) while recovering resolution, and is a separate model that should be opt-in (its own registry entry + install flag), never folded into the base i2v benchmark.
 - [ ] Web interface for easy access
 - [ ] Export/import of projects
 - [ ] Advanced search filters
