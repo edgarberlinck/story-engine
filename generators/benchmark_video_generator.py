@@ -107,17 +107,17 @@ DIALOGUE = [
 ]
 BACKGROUND_SOUND = "quiet and relaxed background ambience"
 
-# Per-model overrides to guarantee >= 4 seconds at the model's native resolution.
-# Frame counts respect each model's latent constraints.
-#   ltx_video_095_i2v: 161 frames @ 25 fps = 6.44 s, 704x512 (LTX native;
-#   VAE temporal stride 8 -> num_frames == 1 (mod 8)). The original >= 720p bar
-#   was dropped: only Wan 2.2 A14B could output 720p but it OOMs on 64 GB macOS.
-# (Benchmark decision 2026-08: ltx_video_095_i2v is the surviving i2v model;
-#  Wan 2.2 I2V A14B OOMs on 64 GB macOS; HunyuanVideo-I2V dropped.)
-
-BENCHMARK_VIDEO_PARAMS = {
-    "ltx_video_095_i2v": {"width": 704, "height": 512, "num_frames": 161, "fps": 25},   # LTX native
-}
+# Video-model generation parameters (resolution, frame count, fps) are owned
+# by video_generator.MODEL_GENERATION_PARAMS, NOT by this benchmark: when we
+# generate videos we must not pass model-specific parameters from here — that
+# is video_generator's responsibility. The benchmark therefore supplies only
+# what it owns: the conditioning image, the motion prompt, the model name, the
+# output location and a fixed seed.
+#
+# ltx_video_095_i2v is configured by video_generator at its LTX-native
+# 704x512 / 161 frames @ 25 fps = 6.44 s (>= 4 s bar). The original >= 720p
+# bar was dropped: only Wan 2.2 A14B could hit 720p and it OOMs on a 64 GB
+# macOS host; ltx_video_095_i2v is the surviving i2v model.
 
 
 def ensure_character(name: str, project: str = BENCHMARK_PROJECT):
@@ -130,26 +130,32 @@ def ensure_character(name: str, project: str = BENCHMARK_PROJECT):
 
 
 def generate_benchmark_videos(scene: dict, video_prompt: str,
-project: str = BENCHMARK_PROJECT) -> dict:
-    """Animate a validated scene with every i2v model (benchmark specs)."""
-    out_dir = scene_out_dir(scene["scene_number"], project)
-    results = {}
-    for model_name in AVAILABLE_VIDEO_MODELS:
-        try:
-            print(f"\n--- Generating video with {model_name} ---")
-            results[model_name] = generate_video(
-                image_path=scene["image_path"],
-                prompt=video_prompt,
-                model_name=model_name,
-                output_dir=str(out_dir),
-                output_basename=f"benchmark_{model_name}",
-                seed=42,
-                **BENCHMARK_VIDEO_PARAMS.get(model_name, {}),
-            )
-        except Exception as e:
-            print(f"Failed to generate video with {model_name}: {e}")
-            results[model_name] = None
-    return results
+ project: str = BENCHMARK_PROJECT) -> dict:
+     """Animate a validated scene with every i2v model.
+
+     Model-specific generation parameters (resolution, frame count, fps,
+     guidance) are owned by video_generator.MODEL_GENERATION_PARAMS; this
+     benchmark passes only the conditioning image, motion prompt, model name,
+     output location and a fixed seed, and lets video_generator apply each
+     model's native parameters.
+     """
+     out_dir = scene_out_dir(scene["scene_number"], project)
+     results = {}
+     for model_name in AVAILABLE_VIDEO_MODELS:
+         try:
+             print(f"\n--- Generating video with {model_name} ---")
+             results[model_name] = generate_video(
+                 image_path=scene["image_path"],
+                 prompt=video_prompt,
+                 model_name=model_name,
+                 output_dir=str(out_dir),
+                 output_basename=f"benchmark_{model_name}",
+                 seed=42,
+             )
+         except Exception as e:
+             print(f"Failed to generate video with {model_name}: {e}")
+             results[model_name] = None
+     return results
 
 
 def run_cafe_conversation_benchmark(project: str = BENCHMARK_PROJECT) -> dict:

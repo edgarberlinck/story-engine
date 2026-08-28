@@ -168,8 +168,14 @@ Base parameters (`MODEL_GENERATION_PARAMS`):
 is a **6.44 s** clip — already past the benchmark's ≥ 4 s bar without needing an
 upsample.
 
-Benchmark overrides (`BENCHMARK_VIDEO_PARAMS`) pin the model to its LTX-native
-resolution; the ≥ 4 s bar is met by the 161-frame count:
+**Where the model parameters live (single source of truth, 2026-08):** every i2v
+model's resolution / frame count / fps / guidance is owned by
+`video_generator.MODEL_GENERATION_PARAMS`, **not** by the benchmark. The café
+benchmark no longer carries its own `BENCHMARK_VIDEO_PARAMS` override — when it
+generates videos it must not pass model-specific parameters, so it supplies only
+the conditioning image, motion prompt, model name, output location and a fixed
+seed and lets `video_generator` apply each model's native parameters. The ≥ 4 s
+bar is met by LTX-Video's native 161-frame count:
 
 | Model | Resolution | Frames | FPS | Duration |
 |---|---|---|---|---|
