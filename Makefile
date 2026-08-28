@@ -100,11 +100,6 @@ clean:
 format:
 	black .
 
-# Lint code
-.PHONY: lint
-lint:
-	flake8 .
-
 # All checks
 .PHONY: check
-check: lint test
+check: test

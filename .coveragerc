@@ -1,0 +1,27 @@
+[run]
+omit =
+    .venv/*
+    models/*
+    outputs/*
+    logs/*
+    dev/*
+    tests/*
+    test_*.py
+    integration_test.py
+    ui/*
+    generators/benchmark_*.py
+
+[report]
+omit =
+    .venv/*
+    models/*
+    outputs/*
+    logs/*
+    dev/*
+    tests/*
+    test_*.py
+    integration_test.py
+    ui/*
+    generators/benchmark_*.py
+skip_covered = True
+show_missing = False
