@@ -149,7 +149,11 @@ def generate_video(
     pipe = _load_pipeline(model_name, model_path, device, torch_dtype)
     try:
         image = _prepare_image(image_path, params["width"], params["height"])
-        generator = torch.Generator(device="cpu").manual_seed(seed)
+        # The generator must be on the same device as the pipeline's inference
+        # device (e.g. "mps" on Apple Silicon via enable_model_cpu_offload); a
+        # cpu generator on an accelerated pipeline fails at sampling with
+        # "Expected a '<device>' device type for generator but found 'cpu'".
+        generator = torch.Generator(device=device).manual_seed(seed)
 
         call_kwargs = dict(
             image=image,

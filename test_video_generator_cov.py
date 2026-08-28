@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from generators import video_generator as vg
 
@@ -84,6 +84,44 @@ class VideoGeneratorCoverageTest(unittest.TestCase):
             load.assert_called_once()
             cleanup.assert_called_once_with(pipe)
             export.assert_called_once_with(["frame1", "frame2"], result["video_path"], fps=8)
+
+    def test_generate_video_uses_model_device_for_generator(self):
+         # Regression: the torch.Generator must be created on the model's
+         # inference device so an accelerated pipeline (e.g. "mps" on Apple
+         # Silicon) does not fail at sampling with
+         # "Expected a 'mps' device type for generator but found 'cpu'".
+        pipe = _FakePipe()
+        captured = {}  # record the device torch.Generator was built with
+
+        class _GenCls:
+             def __init__(self, device="cpu"):
+                 captured["device"] = device
+
+             def manual_seed(self, seed):
+                 captured["seed"] = seed
+                 return self
+
+        with tempfile.TemporaryDirectory() as tmp:
+            img = os.path.join(tmp, "scene.png")
+            open(img, "w").close()
+            out_dir = os.path.join(tmp, "out")
+            with patch.object(vg, "resolve_video_model_path", return_value="local/model"), \
+                 patch.object(vg, "get_model_config", return_value=("mps", "float16")), \
+                 patch.object(vg, "_load_pipeline", return_value=pipe), \
+                 patch.object(vg, "_prepare_image", return_value="imageobj"), \
+                 patch.object(vg, "get_memory_usage", side_effect=[100, 118]), \
+                 patch.object(vg, "cleanup_pipeline"), \
+                 patch("diffusers.utils.export_to_video"), \
+                 patch.object(vg.torch, "Generator", _GenCls):
+                vg.generate_video(
+                    img, "motion", model_name="ltx_video_095_i2v",
+                    output_dir=out_dir, seed=42, num_frames=3, fps=25,
+                    negative_prompt=None,
+                 )
+
+             # The generator is built on the model's device ("mps"), not "cpu".
+            self.assertEqual(captured["device"], "mps")
+            self.assertEqual(captured["seed"], 42)
 
 
 if __name__ == "__main__":
