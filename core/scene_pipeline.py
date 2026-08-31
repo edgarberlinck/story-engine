@@ -195,6 +195,8 @@ def _run_reference_conditioned_scene(
     references: List[Dict[str, str]],
     model: str,
     seed: int,
+    width: int = 1024,
+    height: int = 1024,
 ) -> Dict[str, Any]:
     """Generate a complete scene in one reference-conditioned diffusion call."""
     from generators.reference_scene_generator import generate_reference_conditioned_scene
@@ -211,8 +213,10 @@ def _run_reference_conditioned_scene(
         reference_image_paths=[r["path"] for r in references],
         model_name=model,
         seed=seed,
+        width=width,
+        height=height,
         task_name=f"scene_{scene_number}_reference",
-    )
+     )
 
     final_image_path = str(target_dir / "scene_reference_conditioned.png")
     import shutil
@@ -508,12 +512,19 @@ def generate_scene_pipeline(
     enable_refinement: bool = True,
     refinement_strength: float = 0.25,
     refinement_model: str = "sdxl",
+    width: int = 1024,
+    height: int = 1024,
 ) -> Dict[str, Any]:
     """Main orchestrator entry point.
 
     Selects a generation strategy based on character count, runs the LLM
     planner (Stage A/B/C) for context, and executes the selected strategy
     with layered fallbacks so the pipeline never crashes.
+
+    ``width`` / ``height`` set the scene output resolution (default 1024×1024,
+    the FLUX.2 Klein KV default). Pass 1024×576 so a multi-character scene is
+    produced at the i2v model's native widescreen frame, keeping the
+    conditioning source and the video the same aspect ratio.
     """
     from services.database.character_service import character_service
     from utils.project_paths import next_scene_number
@@ -537,6 +548,8 @@ def generate_scene_pipeline(
             model=model,
             seed=seed,
             use_asset_pipeline=False,
+            width=width,
+            height=height,
         )
         result.setdefault("strategy", "single_pass")
         return result
@@ -570,7 +583,8 @@ def generate_scene_pipeline(
                   f"({len(references)} reference image(s)).")
             try:
                 result = _run_reference_conditioned_scene(
-                    prompt, project, scene_number, plan, references, model, seed
+                    prompt, project, scene_number, plan, references, model, seed,
+                    width=width, height=height,
                 )
                 if not result["qa"]["passed"]:
                     print("[scene_pipeline] WARNING: QA check flagged one or more characters; "
@@ -618,6 +632,8 @@ def generate_scene_pipeline(
             model=model,
             seed=seed,
             use_asset_pipeline=False,
+            width=width,
+            height=height,
         )
         result.setdefault("strategy", "single_pass")
         result["llm_plan_path"] = None

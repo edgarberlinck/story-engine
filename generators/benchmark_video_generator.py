@@ -129,35 +129,51 @@ def ensure_character(name: str, project: str = BENCHMARK_PROJECT):
         print(f"Character '{name}' already exists; reusing reference.")
 
 
-def generate_benchmark_videos(scene: dict, video_prompt: str,
- project: str = BENCHMARK_PROJECT) -> dict:
-     """Animate a validated scene with every i2v model.
+def generate_benchmark_videos(scene: dict, video_prompt: str, project: str = BENCHMARK_PROJECT) -> dict:
+    """Animate a validated scene with every i2v model, then enhance each clip.
 
-     Model-specific generation parameters (resolution, frame count, fps,
-     guidance) are owned by video_generator.MODEL_GENERATION_PARAMS; this
-     benchmark passes only the conditioning image, motion prompt, model name,
-     output location and a fixed seed, and lets video_generator apply each
-     model's native parameters.
-     """
-     out_dir = scene_out_dir(scene["scene_number"], project)
-     results = {}
-     for model_name in AVAILABLE_VIDEO_MODELS:
-         try:
-             print(f"\n--- Generating video with {model_name} ---")
-             results[model_name] = generate_video(
-                 image_path=scene["image_path"],
-                 prompt=video_prompt,
-                 model_name=model_name,
-                 output_dir=str(out_dir),
-                 output_basename=f"benchmark_{model_name}",
-                 seed=42,
-             )
-         except Exception as e:
-             print(f"Failed to generate video with {model_name}: {e}")
-             results[model_name] = None
-     return results
+    Model-specific generation parameters (resolution, frame count, fps,
+    guidance) are owned by video_generator.MODEL_GENERATION_PARAMS; this
+    benchmark passes only the conditioning image, motion prompt, model name,
+    output location and a fixed seed, and lets video_generator apply each
+    model's native parameters.
 
-
+    Each raw clip is post-processed by the dependency-free video enhancer
+    (temporal smoothing + light denoise + a high-quality low-CRF MKV). The
+    enhanced path and its metrics are stored on the result.
+    """
+    out_dir = scene_out_dir(scene["scene_number"], project)
+    results = {}
+    for model_name in AVAILABLE_VIDEO_MODELS:
+        try:
+            print(f"\n--- Generating video with {model_name} ---")
+            results[model_name] = generate_video(
+                image_path=scene["image_path"],
+                prompt=video_prompt,
+                model_name=model_name,
+                output_dir=str(out_dir),
+                output_basename=f"benchmark_{model_name}",
+                seed=42,
+            )
+            # Post-generation enhancement of the raw clip. Dependency-free
+            # (numpy/scipy/imageio); failures degrade to the raw clip.
+            try:
+                from generators.video_enhancer import enhance_video
+                r = results[model_name]
+                enhanced = enhance_video(
+                    r["video_path"],
+                    output_dir=str(out_dir),
+                    output_basename=f"benchmark_{model_name}",
+                    fps=r["metrics"].get("fps", 25.0),
+                )
+                r["enhanced_video_path"] = enhanced["video_path"]
+                r["enhanced_metrics"] = enhanced["metrics"]
+            except Exception as e:
+                print(f"Enhancement skipped for {model_name}: {e}")
+        except Exception as e:
+            print(f"Failed to generate video with {model_name}: {e}")
+            results[model_name] = None
+    return results
 def run_cafe_conversation_benchmark(project: str = BENCHMARK_PROJECT) -> dict:
     """The definitive benchmark: Nikita and Roger talking in a café."""
     print("\n########## Benchmark: Café conversation (Nikita & Roger) ##########")

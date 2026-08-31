@@ -130,10 +130,17 @@ are:
   unverified scene.
 - Loaded, converted to RGB, and resized with Lanczos to the model's target
   `width × height`.
-- Benchmark/ideal practice: generate the scene at the video target
-   resolution (e.g. 704×512 for LTX-Video 0.9.5) so the conditioning frame
-   matches the output (reference: the reference implementation renders the first
-   frame at the exact video resolution).
+- **Aspect preservation:** the conditioning frame is *fit, never stretched*. When
+ the source already matches the model's target aspect ratio it is a clean Lanczos
+resize; when it does not (e.g. a square 1024×1024 scene) the frame is *contain*-fit
+ into the target box and the leftover edges are filled by *edge-replication*
+ (border padding) — so the picture is never distorted. This used to squash a
+ square scene and make the "aspect ratio look off / movements distort the video".
+- Benchmark/ideal practice: generate the scene at the video target resolution
+ (1024×576 for LTX-Video 0.9.5, now the native output) so the conditioning frame
+ matches the output (reference: the reference implementation renders the first
+ frame at the exact video resolution). The scene pipeline threads `width`/`height`
+ through so the *scene* and the *video* share one 16:9 frame.
 
 ### Prompt
 
@@ -161,7 +168,7 @@ Base parameters (`MODEL_GENERATION_PARAMS`):
 
 | Model | Resolution | Frames | FPS | Guidance | Steps | Negatives |
 |---|---|---|---|---|---|---|
-| `ltx_video_095_i2v` | 704×512 | 161 | 25 | 3.0 | 50 | yes |
+| `ltx_video_095_i2v` | 1024×576 | 161 | 25 | 3.0 | 64 | yes |
 
 **Frame-count rule (8k+1):** LTX-Video's VAE has a temporal stride of 8, so
 `num_frames ≡ 1 (mod 8)`; 161 (= 1 + 8×20) satisfies this. 161 frames @ 25 fps
@@ -179,14 +186,18 @@ bar is met by LTX-Video's native 161-frame count:
 
 | Model | Resolution | Frames | FPS | Duration |
 |---|---|---|---|---|
-| `ltx_video_095_i2v` | 704×512 | 161 | 25 | 6.44 s |
+| `ltx_video_095_i2v` | 1024×576 | 161 | 25 | 6.44 s |
 
-> **Resolution caveat (honest):** the original benchmark bar was also
- > "≥ 720p". LTX-Video 0.9.5's native output is 704×512, so the ≥ 720p bar is
- > **not met** by the default params. Hitting 1280×720 would require an
- > upsampled generation that the 64 GB run avoids (risking OOM / artifacts);
- > the ≥ 4 s duration bar is the one that's retained. The video-quality
- > enhancement option (§3 note + ROADMAP) is the path to higher resolution.
+> **Widescreen + resolution caveat (honest):** the native output moved to
+ > **1024×576 (true 16:9)** so the conditioning image and the video share one
+ > aspect ratio (no more squished source — see §4). The original benchmark bar was
+ > "≥ 720p"; 1024×576 is *close* to 720p (576 vs 720 tall) but is not 720p, so
+ > that bar is still **not met** at native resolution. Hitting 1280×720 would
+ > require an upsampled generation that the 64 GB run avoids (risking OOM /
+ > artifacts); the **≥ 4 s duration bar** is the one that's retained. The
+ > post-generation **enhancement pass** (§11) — and its opt-in *super-resolution
+ > seam* (§11) — is the path to 720p and beyond, without re-loading a heavy i2v
+ > model and **without auto-downloading** anything.
 
 Every generation is wrapped in timing (`duration_ms`) and RSS sampling
 (`peak_memory_mb`) and the pipeline is torn down (`cleanup_pipeline`) in a
@@ -200,10 +211,12 @@ outputs/<project>/
 └── scenes/
     ├── scene_<n>/scene.png             # validated scene image
     └── scene_<n>/out/
-        ├── scene_<n>_<model>.mp4       # single-model animation
-        ├── scene_<n>_<model>_benchmark_metrics.json
-        ├── benchmark_<model>.mp4       # benchmark run output
-        └── benchmark_<model>_benchmark_metrics.json
+         ├── scene_<n>_<model>.mp4        # raw single-model animation (H.264 MP4)
+         ├── scene_<n>_<model>_benchmark_metrics.json
+         ├── benchmark_<model>.mp4        # raw benchmark run output
+         ├── benchmark_<model>_benchmark_metrics.json
+         ├── *_*_enhanced_enhanced.mkv    # high-quality enhanced clip (see §11)
+         └── *_*_enhanced_metrics.json    # enhancement metrics next to it
 ```
 
 - Videos: H.264 MP4 (`diffusers.utils.export_to_video`, model fps).
@@ -219,8 +232,8 @@ outputs/<project>/
    "duration_ms": 123456,
    "peak_memory_mb": 8123,
    "output": "<video path>",
-   "width": 704, "height": 512,
-   "num_frames": 161, "guidance_scale": 3.0, "num_inference_steps": 50
+    "width": 1024, "height": 576,
+    "num_frames": 161, "guidance_scale": 3.0, "num_inference_steps": 64
 }
 ```
 
@@ -318,6 +331,12 @@ Practical rules:
   benchmark fan-out across all models (incl. failure tolerance), scene
   retry-until-verified (same folder, seed bump), unknown-character
   rejection, and face-verification policy (required vs. inconclusive).
+- Enhancement coverage: `test_video_enhancer.py` (temporal smoothing, denoise,
+  read/write round-trip, end-to-end `enhance_video`, and the opt-in
+  super-resolution no-download seam), `test_video_generator_aspect.py`
+  (aspect-preserving `_prepare_image`: clean-resize vs. contain+pad), and
+  `test_video_engine_enhance.py` (`animate_scene(enhance=…)` wiring +
+  graceful degradation).
 - Run `make test` before committing; the suite must pass.
 - `make benchmark-video` is the end-to-end smoke check for the i2v stack.
 
@@ -379,3 +398,61 @@ models are silent, so a post-hoc lip-sync stage is required).
 - Benchmark scope note: the i2v benchmark measures the **silent** video
   models only; TTS / lip-sync / music models are evaluated separately in a
   later audio benchmark.
+
+## 11. Post-generation enhancement
+
+LTX-Video 0.9.5 is compact and fast, so its raw output can look a little "off":
+the motion can flicker/warp between frames and diffusers' `export_to_video` writes
+a lossy H.264 MP4. `generators/video_enhancer.py` adds an **opt-in enhancement
+pass** over the generated clip that:
+
+1. **reads** every frame of the clip,
+2. **temporally smooths** jitter between frames (`temporal_smooth` — a moving
+   window blend) to kill flicker/warping,
+3. applies a **light spatial denoise** (`spatial_denoise` — per-frame Gaussian
+   smoothing) to calm per-frame grain, and
+4. **re-encodes** to a high-quality, low-CRF container (default **MKV**, CRF 12).
+
+All of the base path is **dependency-free** (numpy + scipy + imageio's *bundled*
+ffmpeg); **no new model is downloaded**, so the resident i2v footprint stays
+unchanged.
+
+**Entry point:**
+
+```
+enhance_video(video_path, output_dir=None, output_basename=None,
+              fps=25.0, enhancement=None, sr_model=None, sr_dir=None)
+   -> {"video_path", "metrics_path", "metrics"}
+```
+
+`DEFAULT_ENHANCEMENT = {temporal: 0.18, temporal_window: 1, denoise: 0.5,
+container: "mkv", crf: 12, super_resolve: False}`; the `enhancement` dict
+overrides any subset. Output is `<stem>_enhanced.<container>` plus a
+`<stem>_enhanced_metrics.json` next to it (a trailing `_enhanced` in the source
+name is stripped so re-runs don't stack suffixes). The metrics JSON records the
+source/output paths, frame count/shape, fps, container, crf, the temporal/denoise
+settings applied, `super_resolve`, `mean_abs_frame_change` (the mean per-pixel
+change — 0 means no change), and `duration_ms`.
+
+**Wiring:** `video_engine.animate_scene(..., enhance=True)` runs enhancer over the
+raw clip and attaches `enhanced_video_path` / `enhanced_metrics_path` /
+`enhanced_metrics` to the result; failures degrade gracefully to the raw clip. The
+café benchmark (`benchmark_video_generator`) likewise writes an enhanced MKV per
+model.
+
+**Opt-in super-resolution (no auto-download):** `super_resolve_video(frames,
+sr_model=None, sr_dir=None, scale=2)` is the "specialized video-enhancement
+model" seam. It only runs when a local SR model is already installed
+(`_resolve_local_sr_model` searches `models/super_resolution` and the i2v model
+tree for an up-sampler); otherwise it returns the frames **unchanged** and prints a
+warning. Nothing is ever fetched automatically — this honours the ROADMAP "do NOT
+auto-download" constraint. Enable it explicitly with
+`enhancement={"super_resolve": True, ...}` or by placing a local SR model on disk.
+
+**Aspect ratio:** the enhancer preserves whatever resolution the input already has;
+it never stretches. The 1024×576 (16:9) output (§5) and the aspect-preserving
+`_prepare_image` (§4) are what keep the picture from looking squished in the first
+place.
+
+**Tests:** `test_video_enhancer.py`, `test_video_generator_aspect.py`, and
+`test_video_engine_enhance.py` (see §9).

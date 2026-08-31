@@ -341,7 +341,11 @@ def generate_scene(
             enable_refinement=enable_refinement,
             refinement_strength=refinement_strength,
             refinement_model=refinement_model,
-        )
+            width=kwargs.get("width", 1024),
+            height=kwargs.get("height", 1024),
+         )
+        # width/height are forwarded here for the multi-character path; the
+        # single-pass path below receives them via **kwargs -> generate_images.
         if style_warnings:
             result.setdefault("style_warnings", style_warnings)
         return result

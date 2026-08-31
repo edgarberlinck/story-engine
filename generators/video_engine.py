@@ -133,24 +133,54 @@ def animate_scene(
     model_name: str = DEFAULT_VIDEO_MODEL,
     project: str = DEFAULT_PROJECT,
     seed: int = 42,
-    **overrides: Any,
+    enhance: bool = True,
+    enhancement: Optional[Dict[str, Any]] = None,
+      **overrides: Any,
 ) -> Dict[str, Any]:
-    """Generate a video for a scene using a single i2v model (default: wan).
+    """Generate a video for a scene using a single i2v model (default: ltx).
 
-    Videos are written to outputs/<project>/scenes/scene_<n>/out/.
+    Videos are written to outputs/<project>/scenes/scene_<n>/out/. When
+    ``enhance`` is True (default) the raw clip is also post-processed by
+    :func:`generators.video_enhancer.enhance_video` (temporal smoothing +
+    light denoise + high-quality low-CRF MKV). The enhanced file and its
+    metrics are returned as ``enhanced_video_path`` / ``enhanced_metrics``
+    alongside the raw result.
     """
     out_dir = scene_out_dir(scene["scene_number"], project)
-    return generate_video(
+    result = generate_video(
         image_path=scene["image_path"],
         prompt=scene.get("enriched_prompt", scene["prompt"]),
         model_name=model_name,
         output_dir=str(out_dir),
         output_basename=f"scene_{scene['scene_number']}_{model_name}",
         seed=seed,
-        **overrides,
-    )
+          **overrides,
+      )
 
+    # Optional post-generation enhancement. It only depends on
+    # numpy/scipy/imageio so it never downloads anything. Failures degrade
+    # to the raw clip rather than aborting the pipeline.
+    if enhance:
+        try:
+            from generators.video_enhancer import enhance_video
+            raw_stem = f"scene_{scene['scene_number']}_{model_name}"
+            enhanced = enhance_video(
+                result["video_path"],
+                output_dir=str(out_dir),
+                output_basename=raw_stem,
+                fps=result["metrics"].get("fps", 25.0),
+                enhancement=enhancement,
+            )
+            result["enhanced_video_path"] = enhanced["video_path"]
+            result["enhanced_metrics_path"] = enhanced["metrics_path"]
+            result["enhanced_metrics"] = enhanced["metrics"]
+        except Exception as e:
+          # Enhancement is a quality nicety; never let it break generation.
+            print(f"[video_engine] Enhancement skipped/failed ({e}); "
+                "returning the raw clip.")
+            result["enhanced_video_path"] = result["video_path"]
 
+    return result
 def benchmark_scene_video(
     scene: Dict[str, Any],
     project: str = DEFAULT_PROJECT,

@@ -42,19 +42,25 @@ DEFAULT_VIDEO_MODEL = "ltx_video_095_i2v"
 # Per-model generation parameters. Each model has different native
 # resolutions, frame counts, fps and guidance requirements.
 MODEL_GENERATION_PARAMS = {
-    "ltx_video_095_i2v": {
-        "width": 704,
-        "height": 512,
-        "num_frames": 161,
-        "fps": 25,
-        "guidance_scale": 3.0,
-        "num_inference_steps": 50,
-        "negative_prompt": (
-            "bright colors, overexposed, static, blurred details, subtitles, "
-            "worst quality, low quality, deformed, disfigured, extra limbs, "
-            "fused fingers, still frame, messy background"
-        ),
-    },
+     "ltx_video_095_i2v": {
+          # Wide-screen 16:9 (1024x576 == 16:9 exactly; both dims ÷32, which
+          # LTX-Video's VAE requires). Scenes are generated at this same
+          # resolution so the conditioning frame matches the output and is NOT
+          # squished (see _prepare_image). The old 704x512 (13:10) was the
+          # source of the "off" aspect ratio.
+          "width": 1024,
+          "height": 576,
+          "num_frames": 161,
+          "fps": 25,
+          "guidance_scale": 3.0,
+          # Bumped 50 -> 64: more denoising steps = a little higher quality.
+          "num_inference_steps": 64,
+          "negative_prompt": (
+              "bright colors, overexposed, static, blurred details, subtitles, "
+              "worst quality, low quality, deformed, disfigured, extra limbs, "
+              "fused fingers, still frame, messy background"
+          ),
+      },
 }
 
 
@@ -96,10 +102,68 @@ def _load_pipeline(model_name: str, model_path: str, device: str, torch_dtype):
     return pipe
 
 
-def _prepare_image(image_path: str, width: int, height: int) -> Image.Image:
-    """Load and resize the conditioning image to the model's resolution."""
+def _prepare_image(
+    image_path: str, width: int, height: int, aspect_tolerance: float = 0.02
+) -> Image.Image:
+    """Load and prepare the conditioning image for the video model.
+
+    The model samples at its own ``width x height``. Naively calling
+    ``image.resize((width, height))`` when the source aspect ratio differs from
+    the target aspect ratio STRETCHES the frame (e.g. a square 1024x1024 scene
+    squished into a 1024x576 video) -- that is the "aspect ratio looks off" /
+    "movements distort the video" symptom. To avoid it we:
+
+    1. If the source aspect ratio already matches the target within
+     ``aspect_tolerance``, do a straight resize (no distortion).
+    2. Otherwise "contain-fit" the source into the target box and pad the
+     leftover edges by REPLICATING the image border (edge extension), so the
+     frame is never distorted. When a scene is generated at the model's native
+     resolution this branch never triggers and the frame is a clean resize.
+    """
     image = Image.open(image_path).convert("RGB")
-    return image.resize((width, height), Image.LANCZOS)
+
+    src_w, src_h = image.size
+    target_ar = width / float(height)
+    src_ar = src_w / float(src_h)
+
+    # Branch 1: matching aspect ratio -> a clean, undistorted resize.
+    if abs(src_ar - target_ar) <= aspect_tolerance:
+        if (src_w, src_h) != (width, height):
+            image = image.resize((width, height), Image.LANCZOS)
+        return image
+
+    # Branch 2: differing aspect ratio -> fit and pad (never distort).
+    scale = min(width / float(src_w), height / float(src_h))
+    fit_w = max(1, int(round(src_w * scale)))
+    fit_h = max(1, int(round(src_h * scale)))
+    fitted = image.resize((fit_w, fit_h), Image.LANCZOS)
+
+    left = (width - fit_w) // 2
+    top = (height - fit_h) // 2
+
+    # Edge-extend the frame into the target box (replicate the border pixels).
+    # PIL's resize padding is only 1px, so we replicate the 1px edges of the
+    # fitted frame to fill each border strip, then paste the fitted frame in the
+    # centre. No hard dependency on OpenCV.
+    canvas = Image.new("RGB", (width, height))
+
+    # Top / bottom strips mirror the fitted frame's top / bottom row.
+    top_row = fitted.crop((0, 0, fit_w, 1))
+    for y in range(0, top):
+        canvas.paste(top_row, (left, y))
+    for y in range(top + fit_h, height):
+        canvas.paste(fitted.crop((0, fit_h - 1, fit_w, fit_h)), (left, y))
+
+    # Left / right strips mirror the fitted frame's left / right column
+    # (only within the non-overlapping vertical band).
+    left_col = fitted.crop((0, 0, 1, fit_h))
+    for x in range(0, left):
+        canvas.paste(left_col, (x, top))
+    for x in range(left + fit_w, width):
+        canvas.paste(fitted.crop((fit_w - 1, 0, fit_w, fit_h)), (x, top))
+
+    canvas.paste(fitted, (left, top))
+    return canvas
 
 
 def generate_video(

@@ -10,7 +10,7 @@ from generators import video_generator as vg
 
 class _FakeImage:
     LANCZOS = 1
-    def __init__(self): self.resized = None
+    def __init__(self): self.resized = None; self.size = (640, 480)
     def convert(self, mode): self.mode = mode; return self
     def resize(self, size, resample): self.resized = (size, resample); return self
 

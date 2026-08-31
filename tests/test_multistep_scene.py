@@ -257,8 +257,9 @@ class TestGenerateScenePipelineFallbacks(unittest.TestCase):
             result = sp.generate_scene_pipeline("empty landscape", project="P", scene_number=1, characters=[], model="sdxl", seed=5)
         self.assertEqual(result["strategy"], "single_pass")
         mock_generate.assert_called_once_with(
-            prompt="empty landscape", project="P", scene_number=1, model="sdxl", seed=5, use_asset_pipeline=False
-        )
+            prompt="empty landscape", project="P", scene_number=1, model="sdxl", seed=5, use_asset_pipeline=False,
+            width=1024, height=1024,
+         )
 
     def test_reference_generation_failure_falls_back_to_progressive(self):
         plan = _plan(strategy="progressive")
