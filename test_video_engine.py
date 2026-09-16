@@ -80,8 +80,11 @@ class TestCharacterService(unittest.TestCase):
 
 
 class TestVideoGenerator(unittest.TestCase):
-    def test_default_model_is_ltx(self):
-        self.assertEqual(DEFAULT_VIDEO_MODEL, "ltx_video_095_i2v")
+    def test_no_default_model_while_archived(self):
+        # All i2v models are archived due to hardware constraints (models.py);
+        # the default must be None until a model is re-introduced.
+        self.assertIsNone(DEFAULT_VIDEO_MODEL)
+        self.assertEqual(AVAILABLE_VIDEO_MODELS, {})
 
     def test_all_models_have_params(self):
         self.assertEqual(set(AVAILABLE_VIDEO_MODELS), set(MODEL_GENERATION_PARAMS))
@@ -95,8 +98,10 @@ class TestVideoGenerator(unittest.TestCase):
             generate_video("img.png", "prompt", model_name="not_a_model")
 
     def test_missing_image_rejected(self):
-        with self.assertRaises(FileNotFoundError):
-            generate_video("/nope/missing.png", "prompt")
+        import generators.video_generator as vg
+        with patch.object(vg, "AVAILABLE_VIDEO_MODELS", {"fake_i2v": "org/fake"}):
+            with self.assertRaises(FileNotFoundError):
+                generate_video("/nope/missing.png", "prompt", model_name="fake_i2v")
 
 
 class TestVideoEngine(unittest.TestCase):

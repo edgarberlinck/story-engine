@@ -27,17 +27,15 @@ TEXT_GENERATION_MODELS = {
     "gemma_2b": "google/gemma-2b"
 }
 
-# Image-to-Video Models (for animating generated images)
+# Image-to-Video Models
 # Policy: the benchmark suite decides which i2v model survives; the losing
 # model is removed from this registry once the comparison is final.
-# Decision (2026-08): LTX-Video is the surviving i2v model. Wan 2.2 I2V A14B
-# was DROPPED: it is a dual 14B-expert MoE stored on disk as F32
-# (106 GB across two ~53 GB transformers + 11 GB text encoder), which OOMs
-# (~23 GB free) on a 64 GB Apple-Silicon Mac *during model load* — independent
-# of resolution/frames. LTX-Video 0.9.5 (3.6 GB transformer, ~24 GB total)
-# fits comfortably and runs on MPS; HunyuanVideo-I2V is also dropped.
+# Decision (2026-08): ALL i2v models have been archived due to hardware
+# constraints requiring more GPU memory than available on this machine.
+# Future work: re-introduce when a machine with >= 80 GB unified memory is
+# available for LTX-Video or when models are quantized/MLX-ified for local
+# execution.
 IMAGE_TO_VIDEO_MODELS = {
-    "ltx_video_095_i2v": "Lightricks/LTX-Video-0.9.5",
 }
 
 # Text-to-Speech Models (spoken dialogue for scenes)

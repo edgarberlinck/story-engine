@@ -1,5 +1,5 @@
 """
-Project view screen with breadcrumb and tabs for Characters and Scenes.
+Project view screen with breadcrumb and tabs for Characters, Objects, Locations and Scenes.
 """
 
 from pathlib import Path
@@ -14,8 +14,12 @@ from PySide6.QtGui import QPixmap
 from core.project_manager import project_manager
 from core.character_manager import character_manager
 from core.scene_manager import scene_manager
+from core.object_manager import object_manager
+from core.location_manager import location_manager
 from ui.components.character_card import CharacterCard
 from ui.components.scene_card import SceneCard
+from ui.components.object_card import ObjectCard
+from ui.components.location_card import LocationCard
 
 
 class _SceneGenerateThread(QThread):
@@ -75,6 +79,9 @@ class ProjectViewScreen(QWidget):
             title_box.addWidget(desc_label)
         header.addLayout(title_box)
         header.addStretch()
+        btn_narrator = QPushButton("Narrator\u2026")
+        btn_narrator.clicked.connect(self.configure_narrator)
+        header.addWidget(btn_narrator)
         layout.addLayout(header)
 
         # Tabs
@@ -90,11 +97,17 @@ class ProjectViewScreen(QWidget):
             QTabWidget::pane { border: 1px solid #ddd; border-radius: 0 6px 6px 6px; background: white; }
         """)
         self.tabs.addTab(self._build_characters_tab(), "Characters")
+        self.tabs.addTab(self._build_objects_tab(), "Objects")
+        self.tabs.addTab(self._build_locations_tab(), "Locations")
         self.tabs.addTab(self._build_scenes_tab(), "Scenes")
+        self.tabs.addTab(self._build_timeline_tab(), "Timeline")
         layout.addWidget(self.tabs)
 
         self.load_characters()
+        self.load_objects()
+        self.load_locations()
         self.load_scenes()
+        self.load_timeline()
 
     @property
     def project_slug(self):
@@ -102,7 +115,16 @@ class ProjectViewScreen(QWidget):
 
     def refresh(self):
         self.load_characters()
+        self.load_objects()
+        self.load_locations()
         self.load_scenes()
+        self.load_timeline()
+
+    def configure_narrator(self):
+        from ui.dialogs.narrator_config_dialog import NarratorConfigDialog
+        chars = character_manager.list_characters(self.project_slug)
+        dialog = NarratorConfigDialog(self, project=self.project_slug, characters=chars)
+        dialog.exec()
 
     # -- Characters tab -------------------------------------------------------
 
@@ -118,7 +140,7 @@ class ProjectViewScreen(QWidget):
         toolbar.addWidget(btn_new_char)
         layout.addLayout(toolbar)
 
-        self.char_empty_label = QLabel("No characters yet. Click \u201c+ New Character\u201d to create one.")
+        self.char_empty_label = QLabel("No characters yet. Click \"+ New Character\" to create one.")
         self.char_empty_label.setStyleSheet("color: #999; padding: 20px;")
         self.char_empty_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.char_empty_label)
@@ -152,7 +174,7 @@ class ProjectViewScreen(QWidget):
         reply = QMessageBox.question(
             self,
             "Delete Character",
-            f"Delete character \u201c{character['name']}\u201d?",
+            f"Delete character \"{character['name']}\"?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -160,7 +182,282 @@ class ProjectViewScreen(QWidget):
             character_manager.delete_character(self.project_slug, character["name"])
             self.load_characters()
 
-    # -- Scenes tab -------------------------------------------------------------
+    # -- Objects tab --------------------------------------------------------
+
+    def _build_objects_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        toolbar = QHBoxLayout()
+        toolbar.addStretch()
+        btn_new_obj = QPushButton("+ New Object")
+        btn_new_obj.clicked.connect(self.create_object)
+        toolbar.addWidget(btn_new_obj)
+        layout.addLayout(toolbar)
+
+        self.obj_empty_label = QLabel("No objects yet. Click \"+ New Object\" to create one.")
+        self.obj_empty_label.setStyleSheet("color: #999; padding: 20px;")
+        self.obj_empty_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.obj_empty_label)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        grid_host = QWidget()
+        self.obj_grid = QGridLayout(grid_host)
+        self.obj_grid.setSpacing(15)
+        self.obj_grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        scroll.setWidget(grid_host)
+        layout.addWidget(scroll)
+        return tab
+
+    def load_objects(self):
+        while self.obj_grid.count():
+            item = self.obj_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        objs = object_manager.list_objects(self.project_slug)
+        self.obj_empty_label.setVisible(not objs)
+
+        for idx, obj in enumerate(objs):
+            card = ObjectCard(obj)
+            card.clicked.connect(lambda checked, o=obj: self.on_object_selected(o))
+            card.delete_requested.connect(self.delete_object)
+            self.obj_grid.addWidget(card, idx // 5, idx % 5)
+
+    def on_object_selected(self, obj):
+        QMessageBox.information(self, "Object Selected", f"Selected: {obj['name']}")
+
+    def create_object(self):
+        from PySide6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, "New Object", "Object name:")
+        if not ok or not name.strip():
+            return
+        obj_type, ok = QInputDialog.getText(self, "New Object", "Object type (e.g. weapon, artifact):", text="artifact")
+        if not ok:
+            return
+        description, ok = QInputDialog.getMultiLineText(self, "New Object", "Description:")
+        if not ok:
+            return
+        object_manager.create_object(
+            self.project_slug, name.strip(),
+            obj_type.strip() or "artifact", description.strip(),
+        )
+        self.load_objects()
+
+    def delete_object(self, obj):
+        reply = QMessageBox.question(
+            self,
+            "Delete Object",
+            f"Delete object \"{obj['name']}\"?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            object_manager.delete_object(self.project_slug, obj["name"])
+            self.load_objects()
+
+    # -- Locations tab ------------------------------------------------------
+
+    def _build_locations_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        toolbar = QHBoxLayout()
+        toolbar.addStretch()
+        btn_new_loc = QPushButton("+ New Location")
+        btn_new_loc.clicked.connect(self.create_location)
+        toolbar.addWidget(btn_new_loc)
+        layout.addLayout(toolbar)
+
+        self.loc_empty_label = QLabel("No locations yet. Click \"+ New Location\" to create one.")
+        self.loc_empty_label.setStyleSheet("color: #999; padding: 20px;")
+        self.loc_empty_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.loc_empty_label)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        grid_host = QWidget()
+        self.loc_grid = QGridLayout(grid_host)
+        self.loc_grid.setSpacing(15)
+        self.loc_grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        scroll.setWidget(grid_host)
+        layout.addWidget(scroll)
+        return tab
+
+    def load_locations(self):
+        while self.loc_grid.count():
+            item = self.loc_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        locs = location_manager.list_locations(self.project_slug)
+        self.loc_empty_label.setVisible(not locs)
+
+        for idx, loc in enumerate(locs):
+            card = LocationCard(loc)
+            card.clicked.connect(lambda checked, l=loc: self.on_location_selected(l))
+            card.delete_requested.connect(self.delete_location)
+            self.loc_grid.addWidget(card, idx // 5, idx % 5)
+
+    def on_location_selected(self, loc):
+        QMessageBox.information(self, "Location Selected", f"Selected: {loc['name']}")
+
+    def create_location(self):
+        from PySide6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, "New Location", "Location name:")
+        if not ok or not name.strip():
+            return
+        loc_type, ok = QInputDialog.getText(self, "New Location", "Location type (e.g. city, room):", text="place")
+        if not ok:
+            return
+        description, ok = QInputDialog.getMultiLineText(self, "New Location", "Description:")
+        if not ok:
+            return
+        existing = [l["name"] for l in location_manager.list_locations(self.project_slug)]
+        parent = None
+        if existing:
+            from PySide6.QtWidgets import QInputDialog as _QID
+            parent_choice, ok = _QID.getItem(
+                self, "New Location", "Parent location (optional):",
+                ["<none>"] + existing, 0, False,
+            )
+            if ok and parent_choice != "<none>":
+                parent = parent_choice
+        location_manager.create_location(
+            self.project_slug, name.strip(),
+            loc_type.strip() or "place", description.strip(),
+            parent_location=parent,
+        )
+        self.load_locations()
+
+    def delete_location(self, loc):
+        reply = QMessageBox.question(
+            self,
+            "Delete Location",
+            f"Delete location \"{loc['name']}\"?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            location_manager.delete_location(self.project_slug, loc["name"])
+            self.load_locations()
+
+    # -- Timeline tab ---------------------------------------------------------
+
+    def _build_timeline_tab(self):
+        from PySide6.QtWidgets import QTableWidget
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        hint = QLabel(
+            "You direct the timeline: chapter/scene order, day and time are "
+            "yours to define. The engine only warns about inconsistencies."
+        )
+        hint.setStyleSheet("color: #666;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        toolbar = QHBoxLayout()
+        self.timeline_warn_label = QLabel("")
+        self.timeline_warn_label.setStyleSheet("color: #E65100; font-style: italic;")
+        self.timeline_warn_label.setWordWrap(True)
+        toolbar.addWidget(self.timeline_warn_label, 1)
+        btn_add_entry = QPushButton("+ Add Entry")
+        btn_add_entry.clicked.connect(self.add_timeline_entry)
+        btn_del_entry = QPushButton("Delete Entry")
+        btn_del_entry.clicked.connect(self.delete_timeline_entry)
+        btn_save_tl = QPushButton("Save Timeline")
+        btn_save_tl.clicked.connect(self.save_timeline)
+        toolbar.addWidget(btn_add_entry)
+        toolbar.addWidget(btn_del_entry)
+        toolbar.addWidget(btn_save_tl)
+        layout.addLayout(toolbar)
+
+        self.timeline_table = QTableWidget(0, 5)
+        self.timeline_table.setHorizontalHeaderLabels(
+            ["Chapter", "Scene", "Day", "Time", "Duration (min)"]
+        )
+        self.timeline_table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.timeline_table)
+        return tab
+
+    def load_timeline(self):
+        from PySide6.QtWidgets import QTableWidgetItem
+        from services.database.timeline_service import timeline_service
+
+        entries = timeline_service.list_entries(self.project_slug)
+        self.timeline_table.setRowCount(len(entries))
+        for row, e in enumerate(entries):
+            values = [
+                str(e["chapter_number"]), str(e["scene_number"]),
+                str(e["day"]), e["time_of_day"] or "",
+                "" if e["duration_minutes"] is None else str(e["duration_minutes"]),
+            ]
+            for col, v in enumerate(values):
+                self.timeline_table.setItem(row, col, QTableWidgetItem(v))
+
+        warnings = timeline_service.detect_inconsistencies(self.project_slug)
+        self.timeline_warn_label.setText(" \u26a0 ".join(warnings) if warnings else "")
+
+    def add_timeline_entry(self):
+        from PySide6.QtWidgets import QTableWidgetItem
+        row = self.timeline_table.rowCount()
+        self.timeline_table.insertRow(row)
+        prev_chapter = self.timeline_table.item(row - 1, 0).text() if row else "1"
+        prev_scene = self.timeline_table.item(row - 1, 1).text() if row else "0"
+        try:
+            next_scene = str(int(prev_scene) + 1)
+        except ValueError:
+            next_scene = "1"
+        defaults = [prev_chapter, next_scene, "1", "08:00", ""]
+        for col, v in enumerate(defaults):
+            self.timeline_table.setItem(row, col, QTableWidgetItem(v))
+
+    def delete_timeline_entry(self):
+        from services.database.timeline_service import timeline_service
+        row = self.timeline_table.currentRow()
+        if row < 0:
+            return
+        chapter = self.timeline_table.item(row, 0)
+        scene = self.timeline_table.item(row, 1)
+        if chapter and scene:
+            try:
+                timeline_service.delete_entry(
+                    self.project_slug, int(chapter.text()), int(scene.text())
+                )
+            except ValueError:
+                pass
+        self.timeline_table.removeRow(row)
+        self.load_timeline()
+
+    def save_timeline(self):
+        from services.database.timeline_service import timeline_service
+        errors = []
+        for row in range(self.timeline_table.rowCount()):
+            def cell(col):
+                item = self.timeline_table.item(row, col)
+                return item.text().strip() if item else ""
+            try:
+                chapter = int(cell(0))
+                scene = int(cell(1))
+                day = int(cell(2))
+                time_of_day = cell(3) or "08:00"
+                duration = int(cell(4)) if cell(4) else None
+            except ValueError:
+                errors.append(f"Row {row + 1}: chapter/scene/day/duration must be numbers.")
+                continue
+            timeline_service.save_entry(
+                self.project_slug, chapter, scene, day, time_of_day, duration,
+            )
+        if errors:
+            QMessageBox.warning(self, "Timeline", "\n".join(errors))
+        self.load_timeline()
+
+    # -- Scenes tab ---------------------------------------------------------
 
     def _build_scenes_tab(self):
         tab = QWidget()
@@ -177,7 +474,7 @@ class ProjectViewScreen(QWidget):
         toolbar.addWidget(self.btn_new_scene)
         layout.addLayout(toolbar)
 
-        self.scene_empty_label = QLabel("No scenes yet. Click \u201c+ New Scene\u201d to generate one.")
+        self.scene_empty_label = QLabel("No scenes yet. Click \"+ New Scene\" to generate one.")
         self.scene_empty_label.setStyleSheet("color: #999; padding: 20px;")
         self.scene_empty_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.scene_empty_label)
@@ -239,6 +536,10 @@ class ProjectViewScreen(QWidget):
         layout.addWidget(meta)
 
         btn_row = QHBoxLayout()
+        btn_audio = QPushButton("Edit Audio Scene\u2026")
+        btn_audio.clicked.connect(
+            lambda: self._edit_audio_scene(scene)
+        )
         btn_export = QPushButton("Export Image\u2026")
         btn_export.clicked.connect(
             lambda: self._export_scene(dialog, scene)
@@ -247,10 +548,22 @@ class ProjectViewScreen(QWidget):
         btn_close.setProperty("flat", True)
         btn_close.clicked.connect(dialog.accept)
         btn_row.addStretch()
+        btn_row.addWidget(btn_audio)
         btn_row.addWidget(btn_export)
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row)
 
+        dialog.exec()
+
+    def _edit_audio_scene(self, scene):
+        """Open the audio-scene representation editor for this scene."""
+        from ui.dialogs.scene_editor_dialog import SceneEditorDialog
+        dialog = SceneEditorDialog(
+            self,
+            project=self.project_slug,
+            scene_id=str(scene.get("id", "")),
+            scene_number=scene.get("scene_number"),
+        )
         dialog.exec()
 
     def _export_scene(self, parent, scene):

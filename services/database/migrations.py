@@ -1,6 +1,6 @@
 """
-Database migrations for Story Engine UI enhancements.
-Handles project deletion, character versioning and scene metadata.
+Database migrations for Story Engine — Audiobook & AI Story Engine.
+Handles project deletion, character/object/location/versioning and scene metadata.
 """
 
 import sqlite3
@@ -58,10 +58,93 @@ def migrate_database(db_path: str = "story_engine.db"):
         )
     """)
 
+    # NEW: Objects/Artifacts table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS objects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            description TEXT,
+            owner TEXT,
+            visual_identity TEXT,
+            properties_json TEXT NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(project, name)
+        )
+    """)
+
+    # NEW: Locations table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS locations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            description TEXT,
+            parent_location TEXT,
+            visual_identity TEXT,
+            properties_json TEXT NOT NULL DEFAULT '{}',
+            state TEXT NOT NULL DEFAULT 'initial',
+            state_history_json TEXT NOT NULL DEFAULT '[]',
+            objects_present_json TEXT NOT NULL DEFAULT '[]',
+            characters_associated_json TEXT NOT NULL DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(project, name)
+        )
+    """)
+
+    # NEW: Timeline table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS timeline (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            chapter_id TEXT NOT NULL,
+            chapter_number INTEGER NOT NULL,
+            scene_id INTEGER,
+            scene_number INTEGER NOT NULL,
+            day INTEGER NOT NULL,
+            time_of_day TEXT NOT NULL,
+            duration_minutes INTEGER,
+            events_json TEXT NOT NULL DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(project, chapter_id, scene_number)
+        )
+    """)
+
+    # NEW: Audio scene representations table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS audio_scene_representations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            scene_id INTEGER NOT NULL,
+            scene_number INTEGER NOT NULL,
+            representation_json TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(project, scene_number)
+        )
+    """)
+
+    # NEW: Project settings table (narrator configuration, etc.)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS project_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            key TEXT NOT NULL,
+            value_json TEXT NOT NULL,
+            UNIQUE(project, key)
+        )
+    """)
+
     # Create index for faster lookups
     cur.execute("CREATE INDEX IF NOT EXISTS idx_char_versions_proj_name ON character_versions(project, character_name)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_scenes_proj ON scenes(project)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_char_attrs_proj_name ON character_attributes(project, character_name)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_objects_proj_name ON objects(project, name)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_locations_proj ON locations(project)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_timeline_proj ON timeline(project)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_scene_proj ON audio_scene_representations(project)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_scene_scene ON audio_scene_representations(scene_id)")
 
     conn.commit()
     conn.close()

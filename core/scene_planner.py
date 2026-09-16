@@ -6,8 +6,9 @@ context resolution, and token budget fitting.
 """
 
 import json
+import dataclasses
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from pathlib import Path
 
 # Import with fallback if torch not available
@@ -46,6 +47,36 @@ class ResolvedCharacter:
 
 
 @dataclass
+class ResolvedObject:
+    """LLM-resolved object/artifact with context-aware attributes."""
+    name: str
+    identity: List[str]       # MUST survive verbatim (material, key features)
+    default_presentation: List[str]  # gear/style from generation-time
+    presentation_decision: str  # KEEP | REPLACE | ADAPT
+    scene_presentation: List[str]  # what it should look like in this scene
+    dropped: List[str]
+    dropped_reason: str
+    # Scene-specific fields
+    scene_pose: Optional[str] = None          # e.g. "on the table"
+    scene_position_hint: Optional[str] = None  # e.g. "center stage"
+
+
+@dataclass
+class ResolvedLocation:
+    """LLM-resolved location with context-aware attributes."""
+    name: str
+    identity: List[str]       # MUST survive verbatim (key defining features)
+    default_presentation: List[str]  # visual style from generation-time
+    presentation_decision: str  # KEEP | REPLACE | ADAPT
+    scene_presentation: List[str]  # how it should appear in this scene
+    dropped: List[str]
+    dropped_reason: str
+    # State-specific fields
+    current_state: Optional[str] = None  # e.g. "damaged", "nighttime"
+    scene_state_hint: Optional[str] = None  # e.g. "raining indoors"
+
+
+@dataclass
 class SceneLayerPlan:
     """One layer in LLM-decomposed scene."""
     name: str
@@ -64,6 +95,8 @@ class ScenePlan:
     single_pass_feasible: bool
     rationale: str
     resolved_characters: List[ResolvedCharacter] = field(default_factory=list)
+    resolved_objects: List[ResolvedObject] = field(default_factory=list)
+    resolved_locations: List[ResolvedLocation] = field(default_factory=list)
     strategy: str = "single_pass"  # "single_pass" | "progressive" | "asset_composition"
     canvas_layout: Optional[Dict[str, Any]] = None  # explicit placement hints (§2.3)
 
@@ -134,8 +167,10 @@ def _extract_character_snippets(
 
 def stage_a_context_resolution(
     scene_description: str,
-    characters: List[Dict[str, Any]]
-) -> List[ResolvedCharacter]:
+    characters: List[Dict[str, Any]],
+    objects: Optional[List[Dict[str, Any]]] = None,
+    locations: Optional[List[Dict[str, Any]]] = None,
+) -> List[Union[ResolvedCharacter, ResolvedObject, ResolvedLocation]]:
     """
     Stage A: Resolve character descriptions against scene context.
     
@@ -153,24 +188,49 @@ def stage_a_context_resolution(
         for c in characters
     ], indent=2)
     
-    llm_prompt = f"""You resolve character descriptions against a scene context.
+    objs_json = json.dumps([
+        {
+            'name': o['name'],
+            'stored_prompt': o.get('prompt', ''),
+            'attributes': o.get('attributes', {})
+        }
+        for o in (objects or [])
+    ], indent=2)
+    
+    locs_json = json.dumps([
+        {
+            'name': l['name'],
+            'stored_prompt': l.get('prompt', ''),
+            'attributes': l.get('attributes', {})
+        }
+        for l in (locations or [])
+    ], indent=2)
+    
+    llm_prompt = f"""You resolve character/object/location descriptions against a scene context.
 
 SCENE: {scene_description}
 
 CHARACTERS:
 {chars_json}
 
-For each character, classify its stored description into:
-- identity: MUST survive verbatim (face, hair, build, age, species, scars). Copy verbatim.
-- default_presentation: clothing/gear from generation-time style
+OBJECTS:
+{objs_json}
+
+LOCATIONS:
+{locs_json}
+
+For each entity, classify its stored description into:
+- identity: MUST survive verbatim (face/hair/build/age for characters; material/key features for objects; defining features for locations). Copy verbatim.
+- default_presentation: clothing/gear from generation-time style (characters/objects) or visual style (locations)
 - presentation_decision: KEEP | REPLACE | ADAPT (based on scene context)
-- scene_presentation: what they should wear/appear as in THIS scene
+- scene_presentation: what they should appear as in THIS scene
 - dropped: specific phrases removed with reason
 
 Optionally, for the asset-composition path, also extract from the SCENE text:
-- scene_pose: the character's pose/positioning in this scene (e.g. "sitting on a chair") or null
-- scene_action: what the character is doing (e.g. "playing a black Gibson Explorer guitar") or null
+- scene_pose: the entity's pose/positioning in this scene (e.g. "sitting on a chair") or null
+- scene_action: what the entity is doing (e.g. "playing a black Gibson Explorer guitar") or null
 - scene_position_hint: where in the frame they appear (e.g. "left side of the stage") or null
+- current_state: for locations, the current state (e.g. "damaged", "nighttime") or null
 
 Rules:
 - NEVER drop identity traits; copy them verbatim
@@ -178,21 +238,7 @@ Rules:
 - Everything removed must appear in "dropped" with a reason
 - Return valid JSON only
 
-Return JSON array:""" + """
-[
-  {
-    "name": "CharacterName",
-    "identity": ["trait1", "trait2"],
-    "default_presentation": ["original clothing"],
-    "presentation_decision": "REPLACE",
-    "scene_presentation": ["appropriate clothes for scene"],
-    "scene_pose": "sitting on a chair" or null,
-    "scene_action": "playing guitar" or null,
-    "scene_position_hint": "left side of the stage" or null,
-    "dropped": ["phrase to drop"],
-    "dropped_reason": "why dropped"
-  }
-]"""
+Return JSON array with items type-discriminated by "__type__" field ("character", "object", "location"). Each item should have a "name" field and the relevant attributes above."""
     
     # Try LLM
     if not LLM_AVAILABLE:
@@ -204,11 +250,22 @@ Return JSON array:""" + """
             if result:
                 chars_data = json.loads(_extract_json_blocks(result))
                 resolved = []
-                for c in chars_data:
+                for item in chars_data:
+                    # Items are type-discriminated by "__type__" field
+                    item_type = item.pop("__type__", "character")
                     # Allow the LLM to omit the new optional fields.
-                    for optional in ("scene_pose", "scene_action", "scene_position_hint"):
-                        c.setdefault(optional, None)
-                    resolved.append(ResolvedCharacter(**c))
+                    for optional in ("scene_pose", "scene_action", "scene_position_hint", "current_state", "scene_state_hint"):
+                        item.setdefault(optional, None)
+                    if item_type == "object":
+                        cls = ResolvedObject
+                    elif item_type == "location":
+                        cls = ResolvedLocation
+                    else:
+                        cls = ResolvedCharacter
+                    # Only pass fields the target dataclass actually accepts.
+                    allowed = {f.name for f in dataclasses.fields(cls)}
+                    kwargs = {k: v for k, v in item.items() if k in allowed}
+                    resolved.append(cls(**kwargs))
                 return resolved
         except Exception as e:
             print(f"LLM context resolution failed: {e}")
@@ -235,15 +292,47 @@ Return JSON array:""" + """
                 if snippets else ""
             ),
         ))
+    # Add fallback objects if available
+    if objects:
+        for o in objects:
+            obj_name = o.get('name', '')
+            fallback.append(ResolvedObject(
+                name=obj_name,
+                identity=[obj_name],  # simple fallback: just the name
+                default_presentation=[],
+                presentation_decision="ADAPT",
+                scene_presentation=[],
+                dropped=[],
+                dropped_reason="Fallback: no scene text describing object",
+            ))
+    # Add fallback locations if available
+    if locations:
+        for l in locations:
+            loc_name = l.get('name', '')
+            fallback.append(ResolvedLocation(
+                name=loc_name,
+                identity=[loc_name],  # simple fallback: just the name
+                default_presentation=[],
+                presentation_decision="ADAPT",
+                scene_presentation=[],
+                dropped=[],
+                dropped_reason="Fallback: no scene text describing location",
+                current_state="initial",
+            ))
     return fallback
 
 
 def stage_b_decompose_scene(
     scene_description: str,
-    resolved_characters: List[ResolvedCharacter],
+    resolved_entities: List[Union[ResolvedCharacter, ResolvedObject, ResolvedLocation]],
     project_style: Optional[str] = None
 ) -> ScenePlan:
     """Stage B: Decompose scene into layers via LLM."""
+    
+    # Categorize entities
+    characters = [e for e in resolved_entities if isinstance(e, ResolvedCharacter)]
+    objects = [e for e in resolved_entities if isinstance(e, ResolvedObject)]
+    locations = [e for e in resolved_entities if isinstance(e, ResolvedLocation)]
     
     chars_desc = json.dumps([
         {
@@ -251,7 +340,25 @@ def stage_b_decompose_scene(
             'identity': c.identity,
             'scene_presentation': c.scene_presentation
         }
-        for c in resolved_characters
+        for c in characters
+    ], indent=2)
+    
+    objs_desc = json.dumps([
+        {
+            'name': o.name,
+            'identity': o.identity,
+            'scene_presentation': o.scene_presentation
+        }
+        for o in objects
+    ], indent=2)
+    
+    locs_desc = json.dumps([
+        {
+            'name': l.name,
+            'identity': l.identity,
+            'scene_presentation': l.scene_presentation
+        }
+        for l in locations
     ], indent=2)
     
     llm_prompt = f"""You are a scene director planning multi-step image generation.
@@ -259,6 +366,8 @@ The image model handles ~1-2 subjects well per step.
 
 SCENE: {scene_description}
 CHARACTERS: {chars_desc}
+OBJECTS: {objs_desc}
+LOCATIONS: {locs_desc}
 PROJECT STYLE: {project_style or 'photorealistic'}
 
 Produce JSON with layers for incremental generation:
@@ -267,7 +376,7 @@ Produce JSON with layers for incremental generation:
   "layers": [
     {{
       "name": "base_environment",
-      "prompt": "environment description without characters",
+      "prompt": "environment description without characters/objects",
       "must_include": ["element1", "element2"],
       "region_hint": "full frame"
     }},
@@ -276,6 +385,12 @@ Produce JSON with layers for incremental generation:
       "prompt": "character with identity traits, action, and scene-appropriate appearance",
       "must_include": ["trait1"],
       "region_hint": "left/right/center area"
+    }},
+    {{
+      "name": "object_Name",
+      "prompt": "object with identity traits and scene-appropriate appearance",
+      "must_include": ["trait1"],
+      "region_hint": "full frame or specific region"
     }}
   ],
   "single_pass_feasible": true/false,
@@ -319,6 +434,9 @@ Rules:
             layers=layers,
             single_pass_feasible=data.get('single_pass_feasible', False),
             rationale=data.get('rationale', ''),
+            resolved_characters=characters,
+            resolved_objects=objects,
+            resolved_locations=locations,
             canvas_layout=data.get('canvas_layout'),
         )
     except Exception as e:
@@ -335,7 +453,10 @@ Rules:
                 )
             ],
             single_pass_feasible=True,
-            rationale="LLM unavailable, using fallback"
+            rationale="LLM unavailable, using fallback",
+            resolved_characters=[],
+            resolved_objects=[],
+            resolved_locations=[],
         )
 
 
@@ -530,6 +651,8 @@ class LLMScenePlanner:
         scene_description: str,
         characters: List[Dict[str, Any]],
         project_style: Optional[str] = None,
+        objects: Optional[List[Dict[str, Any]]] = None,
+        locations: Optional[List[Dict[str, Any]]] = None,
     ) -> ScenePlan:
         """Create complete scene plan via LLM delegation."""
         
@@ -543,13 +666,17 @@ class LLMScenePlanner:
             )
         
         # Stage A: Context resolution
-        print("Stage A: Resolving character context...")
-        resolved = stage_a_context_resolution(scene_description, characters)
+        print("Stage A: Resolving character/context...")
+        resolved = stage_a_context_resolution(
+            scene_description, characters, objects, locations
+        )
         
         # Stage B: Decomposition  
         print("Stage B: Decomposing scene...")
         plan = stage_b_decompose_scene(scene_description, resolved, project_style)
-        plan.resolved_characters = resolved
+        plan.resolved_characters = [e for e in resolved if isinstance(e, ResolvedCharacter)]
+        plan.resolved_objects = [e for e in resolved if isinstance(e, ResolvedObject)]
+        plan.resolved_locations = [e for e in resolved if isinstance(e, ResolvedLocation)]
         
         # Stage C: Token fitting
         print("Stage C: Fitting token budgets...")
@@ -602,6 +729,28 @@ class LLMScenePlanner:
                     'dropped': c.dropped
                 }
                 for c in plan.resolved_characters
+            ],
+            'resolved_objects': [
+                {
+                    'name': o.name,
+                    'identity': o.identity,
+                    'presentation_decision': o.presentation_decision,
+                    'scene_presentation': o.scene_presentation,
+                    'scene_pose': o.scene_pose,
+                    'dropped': o.dropped
+                }
+                for o in plan.resolved_objects
+            ],
+            'resolved_locations': [
+                {
+                    'name': l.name,
+                    'identity': l.identity,
+                    'presentation_decision': l.presentation_decision,
+                    'scene_presentation': l.scene_presentation,
+                    'current_state': l.current_state,
+                    'dropped': l.dropped
+                }
+                for l in plan.resolved_locations
             ]
         }
         
@@ -611,6 +760,8 @@ class LLMScenePlanner:
 def create_llm_scene_plan(
     scene_description: str,
     characters: List[Dict[str, Any]],
+    objects: Optional[List[Dict[str, Any]]] = None,
+    locations: Optional[List[Dict[str, Any]]] = None,
     project_name: str = "default"
 ) -> ScenePlan:
     """Convenience function to create LLM-based scene plan."""
@@ -626,7 +777,7 @@ def create_llm_scene_plan(
         project_style = 'photorealistic'
     
     planner = LLMScenePlanner(use_llm=True)
-    plan = planner.plan_scene(scene_description, characters, project_style)
+    plan = planner.plan_scene(scene_description, characters, project_style, objects=objects, locations=locations)
     
     # Save plan for audit
     try:

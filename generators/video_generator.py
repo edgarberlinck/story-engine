@@ -37,31 +37,18 @@ from models import IMAGE_TO_VIDEO_MODELS, MODEL_PATHS, get_model_config
 from utils.model_metrics import get_memory_usage
 
 AVAILABLE_VIDEO_MODELS = dict(IMAGE_TO_VIDEO_MODELS)
-DEFAULT_VIDEO_MODEL = "ltx_video_095_i2v"
+
+# No i2v models available; video generation archived due to hardware
+# constraints. Set to None to indicate no model is available until a machine
+# with sufficient GPU memory (>= 32 GB VRAM for LTX-Video or >= 80 GB unified
+# memory for larger models) is available.
+DEFAULT_VIDEO_MODEL = None
 
 # Per-model generation parameters. Each model has different native
 # resolutions, frame counts, fps and guidance requirements.
-MODEL_GENERATION_PARAMS = {
-     "ltx_video_095_i2v": {
-          # Wide-screen 16:9 (1024x576 == 16:9 exactly; both dims ÷32, which
-          # LTX-Video's VAE requires). Scenes are generated at this same
-          # resolution so the conditioning frame matches the output and is NOT
-          # squished (see _prepare_image). The old 704x512 (13:10) was the
-          # source of the "off" aspect ratio.
-          "width": 1024,
-          "height": 576,
-          "num_frames": 161,
-          "fps": 25,
-          "guidance_scale": 3.0,
-          # Bumped 50 -> 64: more denoising steps = a little higher quality.
-          "num_inference_steps": 64,
-          "negative_prompt": (
-              "bright colors, overexposed, static, blurred details, subtitles, "
-              "worst quality, low quality, deformed, disfigured, extra limbs, "
-              "fused fingers, still frame, messy background"
-          ),
-      },
-}
+# No models are currently available (archived see models.py).
+# Parameters will be populated when a video model is re-introduced.
+MODEL_GENERATION_PARAMS = {}
 
 
 def resolve_video_model_path(model_name: str) -> str:
@@ -110,7 +97,7 @@ def _prepare_image(
     The model samples at its own ``width x height``. Naively calling
     ``image.resize((width, height))`` when the source aspect ratio differs from
     the target aspect ratio STRETCHES the frame (e.g. a square 1024x1024 scene
-    squished into a 1024x576 video) -- that is the "aspect ratio looks off" /
+    squished into a 576x1024 video) -- that is the "aspect ratio looks off" /
     "movements distort the video" symptom. To avoid it we:
 
     1. If the source aspect ratio already matches the target within

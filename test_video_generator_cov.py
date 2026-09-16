@@ -24,10 +24,23 @@ class _FakePipe:
         return SimpleNamespace(frames=[["frame1", "frame2"]])
 
 
+# All real i2v models are archived (models.py); tests exercise the pipeline
+# machinery with a fake registry entry.
+_FAKE_MODELS = {"ltx_video_095_i2v": "Lightricks/LTX-Video-0.9.5"}
+_FAKE_PARAMS = {
+    "ltx_video_095_i2v": {
+        "width": 704, "height": 480, "num_frames": 9, "fps": 25,
+        "guidance_scale": 3.0, "num_inference_steps": 2,
+        "negative_prompt": "worst quality",
+    }
+}
+
+
 class VideoGeneratorCoverageTest(unittest.TestCase):
     def test_resolve_video_model_path_local_and_hub(self):
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(vg, "project_root", tmp), \
+             patch.object(vg, "AVAILABLE_VIDEO_MODELS", _FAKE_MODELS), \
              patch.object(vg, "MODEL_PATHS", {"image_to_video": "models/i2v"}):
             local = os.path.join(tmp, "models/i2v/ltx_video_095_i2v")
             os.makedirs(local)
@@ -63,14 +76,16 @@ class VideoGeneratorCoverageTest(unittest.TestCase):
             img = os.path.join(tmp, "scene.png")
             open(img, "w").close()
             out_dir = os.path.join(tmp, "out")
-            with patch.object(vg, "resolve_video_model_path", return_value="local/model"), \
+            with patch.object(vg, "AVAILABLE_VIDEO_MODELS", _FAKE_MODELS), \
+                 patch.object(vg, "MODEL_GENERATION_PARAMS", _FAKE_PARAMS), \
+                 patch.object(vg, "resolve_video_model_path", return_value="local/model"), \
                  patch.object(vg, "get_model_config", return_value=("cpu", "float16")), \
                  patch.object(vg, "_load_pipeline", return_value=pipe) as load, \
                  patch.object(vg, "_prepare_image", return_value="imageobj") as prep, \
                  patch.object(vg, "get_memory_usage", side_effect=[100, 118]), \
                  patch.object(vg, "cleanup_pipeline") as cleanup, \
                  patch("diffusers.utils.export_to_video") as export:
-                result = vg.generate_video(img, "motion", output_dir=out_dir, output_basename="movie", seed=12, num_frames=3, fps=8, negative_prompt=None)
+                result = vg.generate_video(img, "motion", model_name="ltx_video_095_i2v", output_dir=out_dir, output_basename="movie", seed=12, num_frames=3, fps=8, negative_prompt=None)
 
             self.assertTrue(result["video_path"].endswith("movie.mp4"))
             self.assertTrue(os.path.isfile(result["metrics_path"]))
@@ -105,7 +120,9 @@ class VideoGeneratorCoverageTest(unittest.TestCase):
             img = os.path.join(tmp, "scene.png")
             open(img, "w").close()
             out_dir = os.path.join(tmp, "out")
-            with patch.object(vg, "resolve_video_model_path", return_value="local/model"), \
+            with patch.object(vg, "AVAILABLE_VIDEO_MODELS", _FAKE_MODELS), \
+                 patch.object(vg, "MODEL_GENERATION_PARAMS", _FAKE_PARAMS), \
+                 patch.object(vg, "resolve_video_model_path", return_value="local/model"), \
                  patch.object(vg, "get_model_config", return_value=("mps", "float16")), \
                  patch.object(vg, "_load_pipeline", return_value=pipe), \
                  patch.object(vg, "_prepare_image", return_value="imageobj"), \

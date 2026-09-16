@@ -69,37 +69,30 @@ CHARACTERS = {
     ),
 }
 
-# The definitive benchmark scene: both characters in one frame, positioned
-# explicitly, medium cinematic shot, warm morning café light.
+# The definitive benchmark scene for the vertical 9:16 LTX Video benchmark.
+# Focuses on subtle motion and character consistency for ~3 seconds.
 SCENE_PROMPT = (
-    "Nikita and Roger sitting together at a small table in a quiet, stylish "
-    "café during the morning. Nikita is sitting on the left side of the "
-    "image, she has long curly red hair and a natural friendly expression, "
-    "she is looking toward Roger. Roger is sitting on the right side of the "
-    "image, he is a bald dark-skinned man with a muscular build and a calm "
-    "friendly expression, he is looking toward Nikita. Both characters are "
-    "clearly visible from the waist up, sitting naturally and facing each "
-    "other, their faces clearly visible and unobstructed. The composition "
-    "leaves enough visual space around both characters for subtle natural "
-    "movements during a conversation. Warm morning light enters through the "
-    "windows, the café environment is realistic but not visually "
-    "distracting, soft background details, natural shadows, coherent "
-    "lighting and realistic perspective. Medium cinematic shot, both "
-    "characters framed together in the same image. Nikita and Roger appear "
-    "naturally integrated into the same environment with coherent body "
-    "proportions, lighting, shadows and perspective. Photorealistic, "
-    "cinematic composition, realistic facial features, natural body "
-    "posture, subtle storytelling atmosphere"
+    "Nikita and Roger are sitting together at a small table in a quiet, "
+    "realistic café during the morning. Nikita looks at Roger and makes a "
+    "subtle natural movement, gently turning her head toward him and smiling. "
+    "Roger remains mostly still and looks at Nikita. Both characters remain "
+    "visually consistent throughout the shot. Natural breathing and subtle "
+    "facial movement. Stable camera, realistic lighting, realistic anatomy, "
+    "cinematic composition. Minimal movement, calm and natural acting."
 )
 
-# Video prompt: describes the natural conversation motion for the i2v
-# animation (scene content stays in the conditioning image).
+# Video prompt: describes the subtle natural motion for the i2v animation
+# (scene content stays in the conditioning image). Vertical 9:16 configuration.
 VIDEO_PROMPT = (
-    "Nikita and Roger having a natural morning conversation, subtle gestures "
-    "and facial expressions, gentle head movements, cinematic motion"
+    "Nikita and Roger having a natural morning conversation, subtle head "
+    "movement, gentle smiling, natural breathing, cinematic motion"
 )
 
-# Dialogue and background sound for the audio stage (TTS, lip sync and
+# Vertical 9:16 configuration for LTX Video benchmark
+BENCHMARK_VIDEO_PARAMS = {
+    "width": 576,
+    "height": 1024,
+}
 # music are the next pipeline phase; captured here as the benchmark spec).
 DIALOGUE = [
     {"character": "Nikita", "line": "Good morning, Roger."},
@@ -115,9 +108,17 @@ BACKGROUND_SOUND = "quiet and relaxed background ambience"
 # output location and a fixed seed.
 #
 # ltx_video_095_i2v is configured by video_generator at its LTX-native
-# 704x512 / 161 frames @ 25 fps = 6.44 s (>= 4 s bar). The original >= 720p
-# bar was dropped: only Wan 2.2 A14B could hit 720p and it OOMs on a 64 GB
-# macOS host; ltx_video_095_i2v is the surviving i2v model.
+# vertical 9:16 576x1024 / 81 frames @ 25 fps = ~3.24 s (new benchmark
+# duration). The previous 1024x576 landscape configuration is no longer the
+# default for this benchmark. Model-specific generation parameters
+# (resolution, frame count, fps, guidance) are owned by
+# video_generator.MODEL_GENERATION_PARAMS; this benchmark passes only the
+# conditioning image, motion prompt, model name, output location and a fixed
+# seed, and lets video_generator apply each model's native parameters.
+
+# ltx_video_095_i2v native: 576x1024 (9:16), 81 frames @ 25 fps = ~3.24 s.
+# The benchmark scenario uses subtle motion to test character identity and
+# temporal stability over ~3 seconds, not complex animation.
 
 
 def ensure_character(name: str, project: str = BENCHMARK_PROJECT):
@@ -184,13 +185,17 @@ def run_cafe_conversation_benchmark(project: str = BENCHMARK_PROJECT) -> dict:
     # Face verification is checked but NON-FATAL (require_verification=False):
     # an inconclusive/non-matching check must not abort the benchmark — the
     # point is to see whether a video can be generated.
+    # Generate the scene at the LTX Video benchmark resolution (576x1024, 9:16)
+    # so the conditioning frame matches the output exactly.
     scene = create_validated_scene(
         SCENE_PROMPT,
         character_names=["Nikita", "Roger"],
         seed=42,
         project=project,
         require_verification=False,
-     )
+        width=BENCHMARK_VIDEO_PARAMS["width"],
+        height=BENCHMARK_VIDEO_PARAMS["height"],
+    )
 
     print("\n=== Dialogue for the audio stage ===")
     for d in DIALOGUE:

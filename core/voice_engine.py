@@ -79,10 +79,96 @@ INSTRUCT_BY_EXPRESSION = {
     "Confident": "sounding confident",
     "Mysterious": "sounding mysterious",
     "Sad": "sounding gentle and a little sad",
+    "Angry": "sounding angry and forceful",
+    "Fearful": "sounding shaky and breathless",
+    "Stressed": "sounding breathless and urgent",
+}
+
+# Tone hints for the common delivery styles.
+INSTRUCT_BY_TONE = {
+    "confrontational": "confrontational and direct",
+    "descriptive": "descriptive and clear",
+    "friendly": "warm and approachable",
+    "narrative": "storytelling and engaging",
+    "cinematic": "cinematic and dramatic",
+    "natural": "natural and conversational",
+}
+
+# Intensity levels mapped to instruct nudges.
+INTENSITY_MAP = {
+    0.1: "mild and gentle",
+    0.3: "moderate and controlled",
+    0.5: "balanced and natural",
+    0.7: "strong and expressive",
+    0.9: "intense and forceful",
 }
 
 # Ages that map to a "young" delivery.
 _YOUNG_AGES = {"Child", "Teenager", "Young Adult"}
+
+
+def _map_intensity(intensity: Optional[float]) -> str:
+    """Map a numeric intensity (0.0-1.0) to an instruct nudge.
+
+    Qwen3-TTS supports intensity control via the instruct parameter but does
+    not expose speed/drive in the instruct; pacing is driven via generation
+    kwargs instead. We therefore translate intensity into a descriptive
+    adjective that the instruct can carry.
+
+    ``None`` means "no explicit intensity requested" and yields no nudge.
+    """
+    if intensity is None:
+        return ""
+    t = max(0.0, min(1.0, float(intensity)))
+    best = min(INTENSITY_MAP.keys(), key=lambda k: abs(k - t))
+    return INTENSITY_MAP[best]
+
+
+def _build_instruct_from_emo_tone_delivery(
+    emotion: str,
+    tone: str,
+    intensity: float,
+    delivery: str,
+    personality: str = "",
+    expression: str = "",
+) -> str:
+    """Build an instruct string from emotion, tone, intensity, and delivery.
+
+    The Qwen3-TTS CustomVoice model accepts an `instruct` parameter that
+    steers timbre, emotion, and delivery. We combine the available components
+    into a natural-language prompt fragment.
+    """
+    parts = []
+
+    # Emotion
+    if emotion and emotion in INSTRUCT_BY_EXPRESSION:
+        parts.append(INSTRUCT_BY_EXPRESSION[emotion])
+    elif emotion:
+        parts.append(f"sounding {emotion.lower()}")
+
+    # Tone
+    if tone and tone in INSTRUCT_BY_TONE:
+        parts.append(INSTRUCT_BY_TONE[tone])
+
+    # Intensity
+    intensity_nudge = _map_intensity(intensity)
+    if intensity_nudge:
+        parts.append(intensity_nudge)
+
+    # Delivery
+    if delivery:
+        parts.append(delivery)
+
+    # Personality (from attributes, if provided)
+    if personality and personality in INSTRUCT_BY_PERSONALITY:
+        parts.append(INSTRUCT_BY_PERSONALITY[personality])
+
+    # Default
+    if not parts:
+        parts.append(_DEFAULT_INSTRUCT)
+
+    return ", ".join(parts)
+
 
 # Keywords used to infer the desired timbre gender from a regeneration prompt.
 # When the user writes "a warm female voice... she sounds...", the speaker
@@ -210,12 +296,18 @@ def build_voice_line(
 
 
 def pick_speaker(
-    char_type: str, attributes: Optional[Dict[str, str]] = None
+    char_type: str,
+    attributes: Optional[Dict[str, str]] = None,
+    emotion: Optional[str] = None,
+    tone: Optional[str] = None,
+    intensity: Optional[float] = None,
+    delivery: Optional[str] = None,
 ) -> Tuple[str, str]:
     """Choose (speaker, instruct) from the character attributes.
 
-    Gender/age pick the preset timbre; personality/expression refine the
-    delivery via ``instruct``.
+    Gender/age pick the preset timbre; personality/expression/refine the
+    delivery via ``instruct``.  Additional emotion/tone/intensity/delivery
+    parameters can be passed to shape the voice performance.
     """
     attributes = attributes or {}
 
@@ -245,6 +337,21 @@ def pick_speaker(
     expression = _attr(attributes, "expression", "mood")
     if expression in INSTRUCT_BY_EXPRESSION and not instruct_parts:
         instruct_parts.append(INSTRUCT_BY_EXPRESSION[expression])
+
+    # Build from explicit emotion/tone/intensity/delivery parameters
+    instruct = _build_instruct_from_emo_tone_delivery(
+        emotion=emotion,
+        tone=tone,
+        intensity=intensity,
+        delivery=delivery,
+        personality=personality if personality else None,
+        expression=expression if expression else None,
+    )
+
+    # If the _build_instruct function produced a result using the explicit
+    # parameters, use it; otherwise fall back to the old instruct_parts logic.
+    if instruct not in (None, _DEFAULT_INSTRUCT):
+        return speaker, instruct
 
     instruct = ", ".join(instruct_parts) if instruct_parts else _DEFAULT_INSTRUCT
     return speaker, instruct
@@ -362,6 +469,10 @@ class VoiceEngine:
         attributes: Optional[Dict[str, str]] = None,
         output_dir: Optional[Path] = None,
         language: str = "English",
+        emotion: Optional[str] = None,
+        tone: Optional[str] = None,
+        intensity: Optional[float] = None,
+        delivery: Optional[str] = None,
         instruct: Optional[str] = None,
         force: bool = False,
     ) -> Tuple[Path, str]:
@@ -374,6 +485,9 @@ class VoiceEngine:
         - Without ``instruct``: the CustomVoice model speaks with a preset
           timbre picked from the character's attributes.
         - ``force=True`` regenerates even if the WAV already exists.
+        - ``emotion``, ``tone``, ``intensity``, ``delivery``: performance
+          controls that shape the voice via the instruct string (within the
+          capabilities of the selected TTS backend).
         """
         out_dir = Path(output_dir) if output_dir else character_dir(name, project)
         # Voice files live in a dedicated subfolder so the character folder
@@ -388,9 +502,22 @@ class VoiceEngine:
             return wav_path, ""
 
         line = build_voice_line(name, char_type, attributes)
-        effective_instruct = (instruct or "").strip()
 
-        if effective_instruct and self.design_model_available():
+        # Select speaker using attributes + explicit performance parameters.
+        speaker, derived_instruct = pick_speaker(
+            char_type,
+            attributes,
+            emotion=emotion,
+            tone=tone,
+            intensity=intensity,
+            delivery=delivery,
+        )
+        # An explicit instruct (e.g. a user regeneration prompt) always wins
+        # over the auto-derived performance instruct.
+        explicit_instruct = (instruct or "").strip()
+        effective_instruct = explicit_instruct or derived_instruct
+
+        if explicit_instruct and self.design_model_available():
             # Prompt-driven voice design: the prompt creates the timbre.
             logger.info("Designing voice for %s from prompt", name)
             wav, sr = self.generate_designed_voice(
@@ -399,14 +526,6 @@ class VoiceEngine:
             instruct_used = effective_instruct
         else:
             # Fallback: preset speaker + delivery nudge.
-            speaker, derived = pick_speaker(char_type, attributes)
-            if not effective_instruct:
-                effective_instruct = derived
-            elif self.design_model_available() is False:
-                logger.warning(
-                    "VoiceDesign model not found at %s; using preset speaker with prompt as instruct",
-                    self.design_model_dir,
-                )
             logger.info("Generating voice for %s: %s (speaker=%s)", name, line, speaker)
             wav, sr = self.generate_voice_line(
                 line,

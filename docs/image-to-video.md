@@ -1,9 +1,9 @@
 # Image-to-Video (i2v) — Definitive Specification
 
-> **Status:** authoritative. This document is the single source of truth for
-> how image-to-video generation operates inside Story Engine. It replaces the
-> former `docs/humans/video-generation.md`, `docs/llm/video-generation.md`,
-> and `docs/video-generation-caveats.md`.
+> **Status:** archived. Image-to-video generation has been archived due to
+> hardware constraints (see §8). This document is preserved for reference; i2v
+> model re-introduction requires a machine with >= 80 GB unified memory or
+> quantized/MLX-ified models.
 >
 > Operating principles are informed by the working reference implementation
 > (production i2v in that reference: Wan 2.2 ComfyUI/xfuser, LTX-2,
@@ -45,10 +45,11 @@ The pipeline is a hard sequence — each stage depends on the previous one:
    track is generated (music), and the speaking character's mouth is
    animated to match the audio (lip sync). See §10.
 
-> **Benchmark policy (i2v model reduction):** the benchmark suite exists to
-> pick the winning image-to-video model. Once the benchmark comparison is
-> final, **exactly one i2v model remains** in `models.py`; the losing model
-> is removed from the project (registry, install script, params, tests).
+> **Benchmark policy (i2v model reduction):** i2v generation has been
+> archived. The benchmark suite (`make benchmark-video`) is disabled until a
+> suitable model and machine are available. Future work: re-introduce when a
+> machine with >= 80 GB unified memory is available for LTX-Video or when models
+> are quantized/MLX-ified for local execution.
 
 ## 2. Architecture
 
@@ -73,29 +74,17 @@ downloading from the Hugging Face hub id at runtime.
 
 | Key | Model | Repo | Default |
 |---|---|---|---|
-| `ltx_video_095_i2v` | LTX-Video 0.9.5 I2V | `Lightricks/LTX-Video-0.9.5` | **yes** |
+| — | — | — | — |
 
-- **Benchmark decision (2026-08):** LTX-Video 0.9.5 is the surviving i2v
-  model. Wan 2.2 I2V A14B and HunyuanVideo-I2V were **dropped** per the
-  registry policy in `models.py`. Wan 2.2 A14B is a dual 14B-expert MoE
-  stored **F32** on disk (~119 GB across ~53 GB `transformer` + ~53 GB
-  `transformer_2` + a ~11 GB text encoder) and **OOMs during load on the 64 GB
-  Apple-Silicon host** (SIGKILL `Killed: 9` at "Loading pipeline components",
-  before any sampling step) — so it cannot run here regardless of resolution or
-  frame count. LTX-Video 0.9.5 (~3.6 GB transformer, ~24 GB total) fits
-  comfortably and runs on MPS.
-- The registered repo is the **diffusers-format** checkpoint (loadable via
-   `from_pretrained`, here `LTXImageToVideoPipeline`).
-- `AVAILABLE_VIDEO_MODELS` = the full registry; `DEFAULT_VIDEO_MODEL` is
-   `ltx_video_095_i2v`.
-- Each model is invoked through its own diffusers pipeline class and
-  model-specific parameters (`MODEL_GENERATION_PARAMS` in
-   `video_generator.py`) — never a shared generic call.
-- Device/dtype come from `get_model_config("image_to_video")`
-   (`bfloat16`; device resolves mps > cuda > cpu). To keep the footprint
-   within the machine's free memory, `_load_pipeline` calls
-   `enable_model_cpu_offload()` on accelerator (cuda/mps) backends so the ~17 GB
-   text encoder is streamed off-device one component at a time.
+- **Status (2026-08):** ALL i2v models have been archived due to hardware
+  constraints. The `IMAGE_TO_VIDEO_MODELS` registry in `models.py` is empty
+  (`ltx_video_095_i2v` and prior models such as Wan 2.2 I2V A14B and
+  HunyuanVideo-I2V have been removed). Re-introduction requires a machine with
+  >= 80 GB unified memory or quantized/MLX-ified model weights.
+- The registered repo and diffusers-format checkpoint information is preserved
+  in `MODEL_METADATA` for reference, but no models are loaded or invoked.
+- Device/dtype configuration via `get_model_config("image_to_video")` is
+  preserved but will default to CPU with float32 when no model is selected.
 
 ### Audio & lip-sync model registries
 
@@ -168,12 +157,12 @@ Base parameters (`MODEL_GENERATION_PARAMS`):
 
 | Model | Resolution | Frames | FPS | Guidance | Steps | Negatives |
 |---|---|---|---|---|---|---|
-| `ltx_video_095_i2v` | 1024×576 | 161 | 25 | 3.0 | 64 | yes |
+| `ltx_video_095_i2v` | 576×1024 | 81 | 25 | 3.0 | 64 | yes |
 
 **Frame-count rule (8k+1):** LTX-Video's VAE has a temporal stride of 8, so
-`num_frames ≡ 1 (mod 8)`; 161 (= 1 + 8×20) satisfies this. 161 frames @ 25 fps
-is a **6.44 s** clip — already past the benchmark's ≥ 4 s bar without needing an
-upsample.
+`num_frames ≡ 1 (mod 8)`; 81 (= 1 + 8*10) satisfies this. 81 frames @ 25 fps
+is a **~3.24 s** clip — appropriate for the new vertical benchmark target of
+~3 seconds.
 
 **Where the model parameters live (single source of truth, 2026-08):** every i2v
 model's resolution / frame count / fps / guidance is owned by
@@ -181,23 +170,22 @@ model's resolution / frame count / fps / guidance is owned by
 benchmark no longer carries its own `BENCHMARK_VIDEO_PARAMS` override — when it
 generates videos it must not pass model-specific parameters, so it supplies only
 the conditioning image, motion prompt, model name, output location and a fixed
-seed and lets `video_generator` apply each model's native parameters. The ≥ 4 s
-bar is met by LTX-Video's native 161-frame count:
+seed and lets `video_generator` apply each model's native parameters. The new
+vertical benchmark target uses ~3.24 s (81 frames @ 25 fps).
 
 | Model | Resolution | Frames | FPS | Duration |
 |---|---|---|---|---|
-| `ltx_video_095_i2v` | 1024×576 | 161 | 25 | 6.44 s |
+| `ltx_video_095_i2v` | 576×1024 (9:16) | 81 | 25 | ~3.24 s |
 
-> **Widescreen + resolution caveat (honest):** the native output moved to
- > **1024×576 (true 16:9)** so the conditioning image and the video share one
- > aspect ratio (no more squished source — see §4). The original benchmark bar was
- > "≥ 720p"; 1024×576 is *close* to 720p (576 vs 720 tall) but is not 720p, so
- > that bar is still **not met** at native resolution. Hitting 1280×720 would
- > require an upsampled generation that the 64 GB run avoids (risking OOM /
- > artifacts); the **≥ 4 s duration bar** is the one that's retained. The
- > post-generation **enhancement pass** (§11) — and its opt-in *super-resolution
- > seam* (§11) — is the path to 720p and beyond, without re-loading a heavy i2v
- > model and **without auto-downloading** anything.
+> **Vertical 9:16 benchmark configuration:** the native output moved to
+> **576×1024 (9:16)** so the conditioning image and the video share one
+> aspect ratio (no more squished source — see §4). The original landscape
+> 1024×576 (16:9) default has been replaced by this vertical configuration
+> for the 2026 benchmark. The benchmark target is ~3.24 s (81 frames @ 25 fps)
+> focused on subtle motion and character consistency. The post-generation
+> **enhancement pass** (§11) — and its opt-in *super-resolution seam* (§11) —
+> is the path to longer durations and different aspect ratios, without
+> re-loading a heavy i2v model and **without auto-downloading** anything.
 
 Every generation is wrapped in timing (`duration_ms`) and RSS sampling
 (`peak_memory_mb`) and the pipeline is torn down (`cleanup_pipeline`) in a
@@ -258,22 +246,40 @@ so outputs are directly comparable. The suite follows the rules:
 - A summary prints path, resolution, duration, latency and peak memory for
   each model.
 
-### The benchmark scenario — "Café conversation"
+### The benchmark scenario — "Café conversation (vertical 9:16)"
 
-The definitive test scene is a **two-character conversation** (chosen to
-exercise the talking-scenes requirement of §10):
-
-- Characters: **Nikita** (left, long curly red hair, natural friendly
-  expression) and **Roger** (right, bald dark-skinned man, muscular build,
-  calm friendly expression) — both face-validated in one frame.
-- Scene: both sitting at a small table in a quiet, stylish café in the
-  morning, waist-up, facing each other, medium cinematic shot, warm morning
-  light, photorealistic.
-- Video: natural conversation, subtle gestures, gentle head movements,
-  cinematic motion.
-- Dialogue (for the audio stage): Nikita *"Good morning, Roger."* / Roger
-  *"Good morning to you too, Nikita."*; background: quiet, relaxed café
-  ambience.
+The definitive test scene for the vertical 9:16 LTX Video benchmark:
+- **Aspect ratio:** 576×1024 (9:16), optimized for mobile / Instagram Story /
+  Reels-style presentation on a phone.
+- **Duration:** ~3.24 seconds (81 frames @ 25 fps), focused on a single simple
+  action.
+- **Purpose:** test whether LTX Video can maintain character identity, facial
+  consistency, body anatomy, clothing consistency, scene consistency, temporal
+  stability, and natural subtle movement over ~3 seconds.
+- **Characters:** Nikita and Roger — both visually consistent throughout the
+  shot.
+- **Scene:** Nikita and Roger are sitting together at a small table in a quiet,
+  realistic café during the morning. Nikita looks at Roger and makes a subtle
+  natural movement, gently turning her head toward him and smiling. Roger remains
+  mostly still and looks at Nikita. Both characters remain visually consistent
+  throughout the shot. Natural breathing and subtle facial movement. Stable
+  camera, realistic lighting, realistic anatomy, cinematic composition.
+  Minimal movement, calm and natural acting.
+- **Motion:** deliberately uses very simple and controlled motion — subtle head
+  movement, natural blinking, breathing, slight body movement, looking toward
+  another character, small hand movements, subtle facial expressions. Slow
+  camera movement, if any. Static camera preferred.
+- **Camera:** stable cinematic camera. Prefer static camera, subtle push-in,
+  subtle pull-out, very slow camera movement. Avoid handheld camera shake,
+  rapid camera movement, dramatic camera rotations, fast tracking shots.
+- **Motion forbids:** complex body movements, running, jumping, dancing,
+  fighting, fast camera movement, multiple simultaneous actions, complicated
+  interactions between characters, exaggerated gestures, rapid changes in pose,
+  large movements across the frame.
+- **Negative prompt:** concise, focused on observed failure modes:
+  distorted face, warped face, deformed anatomy, distorted body, extra limbs,
+  deformed hands, temporal flickering, frame artifacts, warped background,
+  unnatural motion, unstable identity, blurry details, duplicated body parts.
 
 ### Comparing results
 
@@ -285,44 +291,31 @@ exercise the talking-scenes requirement of §10):
    model. Wan 2.2 I2V A14B was dropped because it OOMs on the 64 GB host, and
    HunyuanVideo-I2V was dropped for architecture/size — see §3.
 
-## 8. Operating constraints (this machine)
+## 8. Operating constraints (this machine) — ARCHIVED
 
-Machine: Apple M5 Pro MacBook Pro (Mac17,9), 18-core CPU / 20-core GPU,
-Metal 4, 64 GB unified memory, torch 2.13 (MPS), diffusers 0.39.0.
-
-**Verdict: memory is the binding constraint — it is what forced the model
-choice.** The benchmark's original candidate, Wan 2.2 I2V A14B, is a dual
-14B-expert MoE stored F32 on disk (~119 GB: ~53 GB `transformer` + ~53 GB
-`transformer_2` + a ~11 GB text encoder) and is **killed (`Killed: 9` /
-SIGKILL) inside `from_pretrained`, before any sampling step**, on this 64 GB
-host even at the smallest config (480×320 / 33 frames / 20 steps — a trivial
-load that would be comfortable on a desktop GPU). Lowering resolution, frame
-count, or steps does not help — the OOM is at *load time*, so those knobs are
-irrelevant to it. The surviving model is **LTX-Video 0.9.5**
-(`Lightricks/LTX-Video-0.9.5`), whose ~3.6 GB transformer (≈24 GB total) loads
-comfortably.
-
-| i2v candidate | Footprint | Verdict on 64 GB |
-|---|---|---|
-| Wan 2.2 I2V A14B | ~119 GB on disk (F32), ~54 GB resident in bf16 | **OOM** — `Killed: 9` at load; abandoned |
-| LTX-Video 0.9.5 | ~24 GB total, 3.6 GB transformer | **Survives** — fits with headroom; chosen |
-
-Practical rules:
-
-1. **Memory, not throughput, decides the model.** The Wan→LTX swap was driven
-   by load-time OOM, not speed. A future move back to Wan (or to a larger
-   model) is only viable with more unified memory, GPU offload to a real
-   accelerator, or MLX/quantized weights small enough for the 64 GB pool.
-2. `_load_pipeline` calls `enable_model_cpu_offload()` on the accelerator
-   (cuda/mps) backend so the ≈17 GB text encoder is streamed off-device one
-   component at a time, keeping the live footprint within the machine's free
-   memory.
-3. **LTX-Video 0.9.5 is not optimized for MPS.** Diffusers' LTX pipeline on
-   Metal may fall back to CPU for some ops; a future move to `mlx` / GGUF
-   weights (as the reference implementation uses for LTX-2) would sharpen speed.
-4. **Thermal note:** sustained video inference throttles the M5 Pro over long
-   runs; a single 50-step 6.44 s generation finishes before that matters, but
-   the benchmark is run once, not in a tight loop.
+> **Status: i2v generation ARCHIVED.** Video generation has been disabled
+> due to insufficient GPU/unified memory on this machine.
+>
+> Machine: Apple M5 Pro MacBook Pro (Mac17,9), 18-core CPU / 20-core GPU,
+> Metal 4, 64 GB unified memory, torch 2.13 (MPS), diffusers 0.39.0.
+>
+> **Verdict: memory is the binding constraint.** LTX-Video 0.9.5 (~3.6 GB
+> transformer, ~24 GB total) nearly fits but ultimately requires more VRAM than
+> available for reliable operation without offload. ALL i2v models have been
+> archived.
+>
+> **Required for re-introduction:**
+> - A machine with >= 80 GB unified memory (e.g., Mac Pro with M2 Ultra, or
+>   a multi-GPU workstation), **or**
+> - Model quantization/MLX-ification to reduce VRAM footprint below 32 GB,
+>   **or**
+> - GPU offload to a discrete NVIDIA accelerator with >= 16 GB VRAM.
+>
+> Practical rules (archived):
+> 1. **Memory decides the model.** Insufficient VRAM prevents any i2v model
+>    from loading, regardless of resolution/frame count adjustments.
+> 2. Future re-introduction requires addressing the memory gap before any
+>    configuration changes are meaningful.
 
 ## 9. Verification & tests
 

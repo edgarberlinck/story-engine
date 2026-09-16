@@ -2,6 +2,9 @@ import sqlite3
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 
+from services.database.object_service import ObjectService
+from services.database.location_service import LocationService
+
 
 class DatabaseService:
     def __init__(self, db_path: str = "story_engine.db"):
@@ -150,6 +153,11 @@ class DatabaseService:
         # Cascade delete related data
         cursor.execute("DELETE FROM character_versions WHERE project = ?", (project_id,))
         cursor.execute("DELETE FROM scenes WHERE project = ?", (project_id,))
+        cursor.execute("DELETE FROM objects WHERE project = ?", (project_id,))
+        cursor.execute("DELETE FROM locations WHERE project = ?", (project_id,))
+        cursor.execute("DELETE FROM timeline WHERE project = ?", (project_id,))
+        cursor.execute("DELETE FROM audio_scene_representations WHERE project = ?", (project_id,))
+        cursor.execute("DELETE FROM project_settings WHERE project = ?", (project_id,))
         conn.commit()
         conn.close()
         # Return whether the project row itself was deleted (not the last
@@ -157,5 +165,7 @@ class DatabaseService:
         return deleted_projects > 0
 
 
-# Create a singleton instance
+# Create singleton instances
+object_service = ObjectService()
+location_service = LocationService()
 db_service = DatabaseService()
