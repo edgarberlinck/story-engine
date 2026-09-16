@@ -424,6 +424,32 @@ class VoiceEngine:
             and (self.design_model_dir / "model.safetensors").exists()
         )
 
+    def unload(self) -> None:
+        """Release the loaded TTS models and free accelerator memory.
+
+        Each 1.7B checkpoint holds ~3.5 GB on MPS in float16; keeping both
+        resident after a long export wastes RAM. Call this once generation
+        is finished (the models lazily reload on the next use).
+        """
+        import gc
+
+        released = self._model is not None or self._design_model is not None
+        self._model = None
+        self._design_model = None
+        if not released:
+            return
+        gc.collect()
+        try:
+            import torch
+
+            if torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:  # noqa: BLE001
+            pass
+        logger.info("Voice engine models unloaded")
+
     def generate_voice_line(
         self,
         line: str,

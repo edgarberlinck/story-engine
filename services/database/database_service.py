@@ -155,9 +155,14 @@ class DatabaseService:
         cursor.execute("DELETE FROM scenes WHERE project = ?", (project_id,))
         cursor.execute("DELETE FROM objects WHERE project = ?", (project_id,))
         cursor.execute("DELETE FROM locations WHERE project = ?", (project_id,))
-        cursor.execute("DELETE FROM timeline WHERE project = ?", (project_id,))
         cursor.execute("DELETE FROM audio_scene_representations WHERE project = ?", (project_id,))
         cursor.execute("DELETE FROM project_settings WHERE project = ?", (project_id,))
+        cursor.execute(
+            "DELETE FROM chapter_contents WHERE chapter_id IN "
+            "(SELECT id FROM chapters WHERE project = ?)",
+            (project_id,),
+        )
+        cursor.execute("DELETE FROM chapters WHERE project = ?", (project_id,))
         conn.commit()
         conn.close()
         # Return whether the project row itself was deleted (not the last

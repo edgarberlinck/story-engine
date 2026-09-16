@@ -45,3 +45,7 @@ outputs/
 .coverage
 
 logs/
+
+# Private book material (not for publication)
+docs/test-books/
+scripts/seed_*.py

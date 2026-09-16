@@ -14,6 +14,9 @@ Narrator segments honor the project-level narrator configuration (plan §2):
 
 import hashlib
 import logging
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -27,6 +30,16 @@ from utils.project_paths import scene_dir
 
 logger = logging.getLogger(__name__)
 
+# Qwen3-TTS output tends to read slower than a natural audiobook pace, so
+# speech is nudged slightly faster by default. Authors can override per
+# segment with [Speed=1.2] / <character speed="0.9"> in the markup.
+DEFAULT_SPEECH_SPEED = 1.12
+
+
+def _effective_speed(segment: AudioSceneSegment) -> float:
+    speed = getattr(segment, "speed", None)
+    return float(speed) if speed else DEFAULT_SPEECH_SPEED
+
 
 def _segment_cache_key(segment: AudioSceneSegment) -> str:
     """Hash of every field that affects the generated audio."""
@@ -35,7 +48,7 @@ def _segment_cache_key(segment: AudioSceneSegment) -> str:
         for x in (
             segment.segment_type, segment.speaker, segment.text,
             segment.emotion, segment.tone, segment.intensity,
-            segment.delivery, segment.voice,
+            segment.delivery, segment.voice, _effective_speed(segment),
         )
     )
     return hashlib.sha1(parts.encode("utf-8")).hexdigest()[:16]
@@ -104,8 +117,37 @@ def generate_segment_audio(
     import soundfile as sf
 
     sf.write(str(wav_path), wav, sr)
+    _apply_speed(wav_path, _effective_speed(segment))
     logger.info("Segment audio written: %s", wav_path)
     return wav_path
+
+
+def _apply_speed(wav_path: Path, speed: float) -> None:
+    """Time-stretch the WAV in place with ffmpeg's atempo (pitch preserved).
+
+    A no-op when the speed is ~1.0 or ffmpeg is unavailable.
+    """
+    if abs(speed - 1.0) < 0.01:
+        return
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        logger.warning("ffmpeg not found; speech speed %.2f not applied", speed)
+        return
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        proc = subprocess.run(
+            [ffmpeg, "-y", "-i", str(wav_path),
+             "-af", f"atempo={max(0.5, min(2.0, speed)):.3f}",
+             "-c:a", "pcm_s16le", str(tmp_path)],
+            capture_output=True, text=True,
+        )
+        if proc.returncode == 0:
+            shutil.move(str(tmp_path), str(wav_path))
+        else:
+            logger.warning("atempo failed: %s", proc.stderr[-300:])
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def _generate_narrator_audio(project: str, text: str, segment: AudioSceneSegment):

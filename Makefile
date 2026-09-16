@@ -5,6 +5,7 @@
 help:
 	@echo "Available commands:"
 	@echo "  make test     - Run all tests"
+	@echo "  make write    - Launch the app for writing (Writing tab is the default)"
 	@echo "  make watch    - Watch for test changes"
 	@echo "  make install  - Install dependencies and download models"
 	@echo "  make models   - Download models only"
@@ -16,9 +17,13 @@ help:
 	@echo "  make benchmark_fullbody_recognition - Run full body face recognition benchmark"
 
 # UI targets
-.PHONY: ui cli
+.PHONY: ui cli write
 ui:
 	@echo "Launching Story Engine UI..."
+	.venv/bin/python ui/main.py
+
+write:
+	@echo "Launching Story Engine — happy writing! (open a project; the Writing tab is first)"
 	.venv/bin/python ui/main.py
 
 cli:

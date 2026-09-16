@@ -96,18 +96,18 @@ class ProjectViewScreen(QWidget):
             QTabBar::tab:selected { background: white; color: #4CAF50; }
             QTabWidget::pane { border: 1px solid #ddd; border-radius: 0 6px 6px 6px; background: white; }
         """)
+        self.tabs.addTab(self._build_writing_tab(), "Writing")
         self.tabs.addTab(self._build_characters_tab(), "Characters")
         self.tabs.addTab(self._build_objects_tab(), "Objects")
         self.tabs.addTab(self._build_locations_tab(), "Locations")
         self.tabs.addTab(self._build_scenes_tab(), "Scenes")
-        self.tabs.addTab(self._build_timeline_tab(), "Timeline")
         layout.addWidget(self.tabs)
 
         self.load_characters()
         self.load_objects()
         self.load_locations()
         self.load_scenes()
-        self.load_timeline()
+        self.load_audio_scenes()
 
     @property
     def project_slug(self):
@@ -118,13 +118,34 @@ class ProjectViewScreen(QWidget):
         self.load_objects()
         self.load_locations()
         self.load_scenes()
-        self.load_timeline()
+        self.load_audio_scenes()
 
     def configure_narrator(self):
         from ui.dialogs.narrator_config_dialog import NarratorConfigDialog
         chars = character_manager.list_characters(self.project_slug)
         dialog = NarratorConfigDialog(self, project=self.project_slug, characters=chars)
         dialog.exec()
+
+    # -- Writing tab -----------------------------------------------------------
+
+    def _build_writing_tab(self):
+        from ui.components.writing_tab import WritingTab
+        self.writing_tab = WritingTab(
+            self.project_slug, on_compiled=self._on_chapter_compiled
+        )
+        return self.writing_tab
+
+    def _on_chapter_compiled(self, scene_numbers):
+        """After compiling a chapter, refresh and reveal the audio scenes."""
+        self.load_audio_scenes()
+        self.tabs.setCurrentIndex(self.tabs.count() - 1)  # jump to Scenes tab
+        # Highlight the first compiled scene.
+        if scene_numbers:
+            for row in range(self.audio_scene_list.count()):
+                entry = self.audio_scene_list.item(row).data(Qt.UserRole)
+                if entry["scene_number"] == scene_numbers[0]:
+                    self.audio_scene_list.setCurrentRow(row)
+                    break
 
     # -- Characters tab -------------------------------------------------------
 
@@ -345,125 +366,40 @@ class ProjectViewScreen(QWidget):
             location_manager.delete_location(self.project_slug, loc["name"])
             self.load_locations()
 
-    # -- Timeline tab ---------------------------------------------------------
-
-    def _build_timeline_tab(self):
-        from PySide6.QtWidgets import QTableWidget
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        hint = QLabel(
-            "You direct the timeline: chapter/scene order, day and time are "
-            "yours to define. The engine only warns about inconsistencies."
-        )
-        hint.setStyleSheet("color: #666;")
-        hint.setWordWrap(True)
-        layout.addWidget(hint)
-
-        toolbar = QHBoxLayout()
-        self.timeline_warn_label = QLabel("")
-        self.timeline_warn_label.setStyleSheet("color: #E65100; font-style: italic;")
-        self.timeline_warn_label.setWordWrap(True)
-        toolbar.addWidget(self.timeline_warn_label, 1)
-        btn_add_entry = QPushButton("+ Add Entry")
-        btn_add_entry.clicked.connect(self.add_timeline_entry)
-        btn_del_entry = QPushButton("Delete Entry")
-        btn_del_entry.clicked.connect(self.delete_timeline_entry)
-        btn_save_tl = QPushButton("Save Timeline")
-        btn_save_tl.clicked.connect(self.save_timeline)
-        toolbar.addWidget(btn_add_entry)
-        toolbar.addWidget(btn_del_entry)
-        toolbar.addWidget(btn_save_tl)
-        layout.addLayout(toolbar)
-
-        self.timeline_table = QTableWidget(0, 5)
-        self.timeline_table.setHorizontalHeaderLabels(
-            ["Chapter", "Scene", "Day", "Time", "Duration (min)"]
-        )
-        self.timeline_table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.timeline_table)
-        return tab
-
-    def load_timeline(self):
-        from PySide6.QtWidgets import QTableWidgetItem
-        from services.database.timeline_service import timeline_service
-
-        entries = timeline_service.list_entries(self.project_slug)
-        self.timeline_table.setRowCount(len(entries))
-        for row, e in enumerate(entries):
-            values = [
-                str(e["chapter_number"]), str(e["scene_number"]),
-                str(e["day"]), e["time_of_day"] or "",
-                "" if e["duration_minutes"] is None else str(e["duration_minutes"]),
-            ]
-            for col, v in enumerate(values):
-                self.timeline_table.setItem(row, col, QTableWidgetItem(v))
-
-        warnings = timeline_service.detect_inconsistencies(self.project_slug)
-        self.timeline_warn_label.setText(" \u26a0 ".join(warnings) if warnings else "")
-
-    def add_timeline_entry(self):
-        from PySide6.QtWidgets import QTableWidgetItem
-        row = self.timeline_table.rowCount()
-        self.timeline_table.insertRow(row)
-        prev_chapter = self.timeline_table.item(row - 1, 0).text() if row else "1"
-        prev_scene = self.timeline_table.item(row - 1, 1).text() if row else "0"
-        try:
-            next_scene = str(int(prev_scene) + 1)
-        except ValueError:
-            next_scene = "1"
-        defaults = [prev_chapter, next_scene, "1", "08:00", ""]
-        for col, v in enumerate(defaults):
-            self.timeline_table.setItem(row, col, QTableWidgetItem(v))
-
-    def delete_timeline_entry(self):
-        from services.database.timeline_service import timeline_service
-        row = self.timeline_table.currentRow()
-        if row < 0:
-            return
-        chapter = self.timeline_table.item(row, 0)
-        scene = self.timeline_table.item(row, 1)
-        if chapter and scene:
-            try:
-                timeline_service.delete_entry(
-                    self.project_slug, int(chapter.text()), int(scene.text())
-                )
-            except ValueError:
-                pass
-        self.timeline_table.removeRow(row)
-        self.load_timeline()
-
-    def save_timeline(self):
-        from services.database.timeline_service import timeline_service
-        errors = []
-        for row in range(self.timeline_table.rowCount()):
-            def cell(col):
-                item = self.timeline_table.item(row, col)
-                return item.text().strip() if item else ""
-            try:
-                chapter = int(cell(0))
-                scene = int(cell(1))
-                day = int(cell(2))
-                time_of_day = cell(3) or "08:00"
-                duration = int(cell(4)) if cell(4) else None
-            except ValueError:
-                errors.append(f"Row {row + 1}: chapter/scene/day/duration must be numbers.")
-                continue
-            timeline_service.save_entry(
-                self.project_slug, chapter, scene, day, time_of_day, duration,
-            )
-        if errors:
-            QMessageBox.warning(self, "Timeline", "\n".join(errors))
-        self.load_timeline()
-
     # -- Scenes tab ---------------------------------------------------------
 
     def _build_scenes_tab(self):
+        from PySide6.QtWidgets import QListWidget, QSplitter, QGroupBox
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(15, 15, 15, 15)
 
+        splitter = QSplitter(Qt.Vertical)
+
+        # -- Audio scenes (compiled from the Writing tab) ----------------------
+        audio_group = QGroupBox("Audio Scenes (compiled from Writing)")
+        audio_layout = QVBoxLayout(audio_group)
+        audio_toolbar = QHBoxLayout()
+        self.audio_scene_hint = QLabel(
+            "Double-click a scene to edit segments, voices and preview audio."
+        )
+        self.audio_scene_hint.setStyleSheet("color: #666;")
+        audio_toolbar.addWidget(self.audio_scene_hint, 1)
+        btn_edit_audio = QPushButton("Edit Selected\u2026")
+        btn_edit_audio.clicked.connect(self._edit_selected_audio_scene)
+        audio_toolbar.addWidget(btn_edit_audio)
+        audio_layout.addLayout(audio_toolbar)
+
+        self.audio_scene_list = QListWidget()
+        self.audio_scene_list.itemDoubleClicked.connect(
+            lambda item: self._edit_audio_scene_row(item)
+        )
+        audio_layout.addWidget(self.audio_scene_list)
+        splitter.addWidget(audio_group)
+
+        # -- Image scenes ------------------------------------------------------
+        image_group = QGroupBox("Image Scenes")
+        image_layout = QVBoxLayout(image_group)
         toolbar = QHBoxLayout()
         self.scene_status_label = QLabel("")
         self.scene_status_label.setStyleSheet("color: #4CAF50; font-style: italic;")
@@ -472,12 +408,12 @@ class ProjectViewScreen(QWidget):
         self.btn_new_scene = QPushButton("+ New Scene")
         self.btn_new_scene.clicked.connect(self.create_scene)
         toolbar.addWidget(self.btn_new_scene)
-        layout.addLayout(toolbar)
+        image_layout.addLayout(toolbar)
 
-        self.scene_empty_label = QLabel("No scenes yet. Click \"+ New Scene\" to generate one.")
+        self.scene_empty_label = QLabel("No image scenes yet. Click \"+ New Scene\" to generate one.")
         self.scene_empty_label.setStyleSheet("color: #999; padding: 20px;")
         self.scene_empty_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.scene_empty_label)
+        image_layout.addWidget(self.scene_empty_label)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -486,8 +422,61 @@ class ProjectViewScreen(QWidget):
         self.scene_grid.setSpacing(15)
         self.scene_grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         scroll.setWidget(grid_host)
-        layout.addWidget(scroll)
+        image_layout.addWidget(scroll)
+        splitter.addWidget(image_group)
+
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+        layout.addWidget(splitter)
         return tab
+
+    def load_audio_scenes(self):
+        """List the compiled audio scene representations."""
+        import json
+        from PySide6.QtWidgets import QListWidgetItem
+        from services.audio_scene_service import audio_scene_service
+
+        self.audio_scene_list.clear()
+        entries = audio_scene_service.list_representations(self.project_slug)
+        entries.sort(key=lambda e: e["scene_number"])
+        for e in entries:
+            try:
+                data = json.loads(e["representation_json"])
+                title = data.get("title") or f"Scene {e['scene_number']}"
+                n_segments = len(data.get("segments", []))
+                speakers = ", ".join(data.get("characters_present", [])[:4])
+            except (ValueError, KeyError):
+                title, n_segments, speakers = f"Scene {e['scene_number']}", 0, ""
+            label = f"Scene {e['scene_number']:>3} \u2014 {title}  ({n_segments} segments)"
+            if speakers:
+                label += f"  [{speakers}]"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, e)
+            self.audio_scene_list.addItem(item)
+        self.audio_scene_hint.setText(
+            f"{len(entries)} audio scene(s). Double-click to edit segments, "
+            "voices and preview audio."
+            if entries else
+            "No audio scenes yet. Write a chapter in the Writing tab and "
+            "click \u266a Compile to Audio Scenes."
+        )
+
+    def _edit_selected_audio_scene(self):
+        item = self.audio_scene_list.currentItem()
+        if item:
+            self._edit_audio_scene_row(item)
+
+    def _edit_audio_scene_row(self, item):
+        entry = item.data(Qt.UserRole)
+        from ui.dialogs.scene_editor_dialog import SceneEditorDialog
+        dialog = SceneEditorDialog(
+            self,
+            project=self.project_slug,
+            scene_id=str(entry.get("scene_id", "")),
+            scene_number=entry["scene_number"],
+        )
+        dialog.exec()
+        self.load_audio_scenes()
 
     def load_scenes(self):
         while self.scene_grid.count():

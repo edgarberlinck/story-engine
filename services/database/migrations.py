@@ -94,23 +94,11 @@ def migrate_database(db_path: str = "story_engine.db"):
         )
     """)
 
-    # NEW: Timeline table
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS timeline (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project TEXT NOT NULL,
-            chapter_id TEXT NOT NULL,
-            chapter_number INTEGER NOT NULL,
-            scene_id INTEGER,
-            scene_number INTEGER NOT NULL,
-            day INTEGER NOT NULL,
-            time_of_day TEXT NOT NULL,
-            duration_minutes INTEGER,
-            events_json TEXT NOT NULL DEFAULT '[]',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(project, chapter_id, scene_number)
-        )
-    """)
+    # Timeline table removed: narrative order lives in the manuscript
+    # (chapter positions + compiled scene numbers) and each audio scene
+    # representation carries its own {day, time}. Old DBs may still contain
+    # a legacy 'timeline' table; it is dropped here.
+    cur.execute("DROP TABLE IF EXISTS timeline")
 
     # NEW: Audio scene representations table
     cur.execute("""
@@ -136,13 +124,36 @@ def migrate_database(db_path: str = "story_engine.db"):
         )
     """)
 
+    # NEW: Manuscript tables (writing layer ported from writing-tools)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS chapters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            title TEXT NOT NULL,
+            chapter_type TEXT NOT NULL DEFAULT 'regular',
+            position INTEGER NOT NULL,
+            compiled_scenes_json TEXT NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS chapter_contents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chapter_id INTEGER NOT NULL,
+            locale TEXT NOT NULL,
+            content TEXT NOT NULL DEFAULT '',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(chapter_id, locale)
+        )
+    """)
+
     # Create index for faster lookups
     cur.execute("CREATE INDEX IF NOT EXISTS idx_char_versions_proj_name ON character_versions(project, character_name)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_scenes_proj ON scenes(project)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_char_attrs_proj_name ON character_attributes(project, character_name)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_objects_proj_name ON objects(project, name)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_chapters_proj ON chapters(project, position)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_locations_proj ON locations(project)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_timeline_proj ON timeline(project)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_scene_proj ON audio_scene_representations(project)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_scene_scene ON audio_scene_representations(scene_id)")
 

@@ -33,6 +33,7 @@ class AudioSceneSegment:
         timing: Optional[Dict[str, float]] = None,
         sound_effects: Optional[List[str]] = None,
         music: Optional[bool] = None,
+        speed: Optional[float] = None,
     ):
         self.segment_type = segment_type
         self.speaker = speaker
@@ -45,6 +46,7 @@ class AudioSceneSegment:
         self.timing = timing or {}
         self.sound_effects = sound_effects or []
         self.music = music
+        self.speed = speed
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -59,6 +61,7 @@ class AudioSceneSegment:
             "timing": self.timing,
             "sound_effects": self.sound_effects,
             "music": self.music,
+            "speed": self.speed,
         }
 
     @staticmethod
@@ -75,6 +78,7 @@ class AudioSceneSegment:
             timing=data.get("timing", {}),
             sound_effects=data.get("sound_effects", []),
             music=data.get("music"),
+            speed=data.get("speed"),
         )
         return seg
 
@@ -140,6 +144,7 @@ class AudioSceneRepresentation:
         timing: Optional[Dict[str, float]] = None,
         sound_effects: Optional[List[str]] = None,
         music: Optional[bool] = None,
+        speed: Optional[float] = None,
     ):
         """Add a segment to the representation."""
         self.segments.append(
@@ -155,6 +160,7 @@ class AudioSceneRepresentation:
                 timing=timing,
                 sound_effects=sound_effects,
                 music=music,
+                speed=speed,
             )
         )
 
@@ -248,7 +254,8 @@ class AudioSceneService:
         conn = self._connect()
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            "SELECT * FROM audio_scene_representations WHERE project = ? ORDER BY scene_number DESC",
+            "SELECT * FROM audio_scene_representations"
+            " WHERE project = ? ORDER BY scene_number DESC",
             (project,),
         ).fetchall()
         conn.close()
