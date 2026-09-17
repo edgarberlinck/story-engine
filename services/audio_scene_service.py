@@ -34,6 +34,8 @@ class AudioSceneSegment:
         sound_effects: Optional[List[str]] = None,
         music: Optional[bool] = None,
         speed: Optional[float] = None,
+        accepted: bool = False,
+        accepted_hash: str = "",
     ):
         self.segment_type = segment_type
         self.speaker = speaker
@@ -47,6 +49,8 @@ class AudioSceneSegment:
         self.sound_effects = sound_effects or []
         self.music = music
         self.speed = speed
+        self.accepted = bool(accepted)
+        self.accepted_hash = accepted_hash or ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -62,6 +66,8 @@ class AudioSceneSegment:
             "sound_effects": self.sound_effects,
             "music": self.music,
             "speed": self.speed,
+            "accepted": self.accepted,
+            "accepted_hash": self.accepted_hash,
         }
 
     @staticmethod
@@ -79,6 +85,9 @@ class AudioSceneSegment:
             sound_effects=data.get("sound_effects", []),
             music=data.get("music"),
             speed=data.get("speed"),
+            # Backward compatible with old blobs lacking these fields.
+            accepted=bool(data.get("accepted", False)),
+            accepted_hash=data.get("accepted_hash", "") or "",
         )
         return seg
 
@@ -186,8 +195,7 @@ class AudioSceneService:
 
     def _init_table(self):
         conn = self._connect()
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS audio_scene_representations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL,
@@ -197,8 +205,7 @@ class AudioSceneService:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project, scene_number)
             )
-            """
-        )
+            """)
         # Also ensure the scenes table has a place to reference the representation
         conn.commit()
         conn.close()
@@ -241,7 +248,9 @@ class AudioSceneService:
         ).fetchone()
         if row:
             data = dict(row)
-            data["representation_json"] = data["representation_json"]  # already a string
+            data["representation_json"] = data[
+                "representation_json"
+            ]  # already a string
             repr_data = json.loads(data["representation_json"])
             representation = AudioSceneRepresentation.from_dict(repr_data)
         else:

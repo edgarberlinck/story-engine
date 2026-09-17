@@ -17,16 +17,32 @@ sounds afraid but tries to hide it").
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton,
-    QScrollArea, QWidget, QFrame, QApplication, QComboBox, QDoubleSpinBox,
-    QSpinBox, QGroupBox, QFormLayout, QListWidget, QListWidgetItem,
-    QMessageBox, QLineEdit, QCheckBox
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QTextEdit,
+    QPushButton,
+    QWidget,
+    QFrame,
+    QComboBox,
+    QDoubleSpinBox,
+    QSpinBox,
+    QGroupBox,
+    QFormLayout,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QLineEdit,
+    QCheckBox,
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QPixmap
 
 from services.audio_scene_service import (
-    audio_scene_service, AudioSceneRepresentation, AudioSceneSegment,
+    audio_scene_service,
+    AudioSceneRepresentation,
+    AudioSceneSegment,
 )
 
 
@@ -44,6 +60,7 @@ class _LLMAssistThread(QThread):
     def run(self):
         try:
             from core.scene_assist import assist_scene
+
             proposal = assist_scene(self.representation, self.user_request)
             if proposal is None:
                 self.failed.emit(
@@ -73,6 +90,7 @@ class _PreviewThread(QThread):
     def run(self):
         try:
             from core.audio_preview import generate_segment_audio
+
             paths = []
             for idx, segment in self.jobs:
                 path = generate_segment_audio(
@@ -81,6 +99,28 @@ class _PreviewThread(QThread):
                 if path:
                     paths.append(str(path))
             self.finished_ok.emit(paths)
+        except Exception as e:  # noqa: BLE001
+            self.failed.emit(str(e))
+
+
+class _FinalizeThread(QThread):
+    """Run scene finalization (mix speech + beds) off the UI thread."""
+
+    finished_ok = Signal(str)  # final wav path
+    failed = Signal(str)
+
+    def __init__(self, project, scene_number, representation):
+        super().__init__()
+        self.project = project
+        self.scene_number = scene_number
+        self.representation = representation
+
+    def run(self):
+        try:
+            from core.scene_finalizer import finalize_scene
+
+            path = finalize_scene(self.project, self.scene_number, self.representation)
+            self.finished_ok.emit(str(path))
         except Exception as e:  # noqa: BLE001
             self.failed.emit(str(e))
 
@@ -114,7 +154,9 @@ class _EntityChip(QFrame):
         img_path = entity.get("visual_identity") or entity.get("reference_image")
         pix = QPixmap(img_path) if img_path and Path(img_path).is_file() else QPixmap()
         if not pix.isNull():
-            thumb.setPixmap(pix.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            thumb.setPixmap(
+                pix.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
         else:
             thumb.setText("?")
             thumb.setStyleSheet("background: #eee; color: #999; border-radius: 4px;")
@@ -130,7 +172,10 @@ class _EntityChip(QFrame):
         if entity_type == "location":
             state = entity.get("state", "initial")
             self.setProperty("state", state)
-            self.setStyleSheet(self.styleSheet() + f'QFrame#entityChip[state="{state}"] {{ border-color: #4CAF50; }}')
+            self.setStyleSheet(
+                self.styleSheet()
+                + f'QFrame#entityChip[state="{state}"] {{ border-color: #4CAF50; }}'
+            )
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -138,12 +183,25 @@ class _EntityChip(QFrame):
         super().mousePressEvent(event)
 
 
+def _segment_label(segment):
+    """List label for a segment; accepted segments get a green check mark."""
+    prefix = "\u2714 " if getattr(segment, "accepted", False) else ""
+    return (
+        prefix
+        + (segment.speaker or "narrator")
+        + ": "
+        + (segment.text[:30] if segment.text else "")
+    )
+
+
 class _SegmentEditor(QWidget):
     """Widget for editing one audio scene segment."""
 
     changed = Signal(dict)  # segment dict changes
 
-    def __init__(self, segment, all_characters, all_objects, all_locations, parent=None):
+    def __init__(
+        self, segment, all_characters, all_objects, all_locations, parent=None
+    ):
         super().__init__(parent)
         self.segment = segment
         self.all_characters = all_characters
@@ -151,6 +209,15 @@ class _SegmentEditor(QWidget):
         self.all_locations = all_locations
 
         layout = QFormLayout(self)
+
+        # Accepted indicator (segment audio locked in by the user).
+        self.accepted_label = QLabel("")
+        self.accepted_label.setStyleSheet(
+            "color: #2e7d32; font-weight: 600; border: 1px solid #2e7d32;"
+            " border-radius: 4px; padding: 2px 6px;"
+        )
+        self.accepted_label.setVisible(False)
+        layout.addRow("", self.accepted_label)
 
         # Type
         self.type_combo = QComboBox()
@@ -184,8 +251,18 @@ class _SegmentEditor(QWidget):
 
         # Emotion
         self.emotion_combo = QComboBox()
-        emotion_values = [""] + ["happy", "serious", "calm", "friendly", "confident",
-                                  "mysterious", "sad", "angry", "fearful", "stressed"]
+        emotion_values = [""] + [
+            "happy",
+            "serious",
+            "calm",
+            "friendly",
+            "confident",
+            "mysterious",
+            "sad",
+            "angry",
+            "fearful",
+            "stressed",
+        ]
         self.emotion_combo.addItems(emotion_values)
         idx = self.emotion_combo.findText(segment.emotion or "")
         if idx >= 0:
@@ -195,8 +272,14 @@ class _SegmentEditor(QWidget):
 
         # Tone
         self.tone_combo = QComboBox()
-        tone_values = [""] + ["confrontational", "descriptive", "friendly", "narrative",
-                               "cinematic", "natural"]
+        tone_values = [""] + [
+            "confrontational",
+            "descriptive",
+            "friendly",
+            "narrative",
+            "cinematic",
+            "natural",
+        ]
         self.tone_combo.addItems(tone_values)
         idx = self.tone_combo.findText(segment.tone or "")
         if idx >= 0:
@@ -208,14 +291,24 @@ class _SegmentEditor(QWidget):
         self.intensity_spin = QDoubleSpinBox()
         self.intensity_spin.setRange(0.0, 1.0)
         self.intensity_spin.setSingleStep(0.1)
-        self.intensity_spin.setValue(segment.intensity if segment.intensity is not None else 0.5)
+        self.intensity_spin.setValue(
+            segment.intensity if segment.intensity is not None else 0.5
+        )
         self.intensity_spin.valueChanged.connect(self._on_changed)
         layout.addRow("Intensity:", self.intensity_spin)
 
         # Delivery
         self.delivery_combo = QComboBox()
-        delivery_values = [""] + ["calm", "fast and forceful", "breathless", "tense", "quiet",
-                                   "shaky", "relaxed", "fast and unpredictable"]
+        delivery_values = [""] + [
+            "calm",
+            "fast and forceful",
+            "breathless",
+            "tense",
+            "quiet",
+            "shaky",
+            "relaxed",
+            "fast and unpredictable",
+        ]
         self.delivery_combo.addItems(delivery_values)
         idx = self.delivery_combo.findText(segment.delivery or "")
         if idx >= 0:
@@ -262,7 +355,9 @@ class _SegmentEditor(QWidget):
 
         # Music
         self.music_check = QCheckBox("Music")
-        self.music_check.setChecked(segment.music if segment.music is not None else False)
+        self.music_check.setChecked(
+            segment.music if segment.music is not None else False
+        )
         self.music_check.toggled.connect(self._on_changed)
         layout.addRow("", self.music_check)
 
@@ -282,11 +377,18 @@ class _SegmentEditor(QWidget):
             "start": self.start_spin.value(),
             "end": self.end_spin.value(),
         }
-        self.segment.sound_effects = [self.sfx_list.item(i).text()
-                                      for i in range(self.sfx_list.count())]
+        self.segment.sound_effects = [
+            self.sfx_list.item(i).text() for i in range(self.sfx_list.count())
+        ]
         self.segment.music = self.music_check.isChecked()
 
+        self._update_accepted_indicator()
         self.changed.emit(self.segment.to_dict())
+
+    def _update_accepted_indicator(self):
+        accepted = bool(getattr(self.segment, "accepted", False))
+        self.accepted_label.setText("\u2714 Accepted" if accepted else "")
+        self.accepted_label.setVisible(accepted)
 
     def set_segment(self, segment):
         """Populate UI from a segment."""
@@ -304,7 +406,9 @@ class _SegmentEditor(QWidget):
             idx = self.tone_combo.findText(segment.tone or "")
             if idx >= 0:
                 self.tone_combo.setCurrentIndex(idx)
-            self.intensity_spin.setValue(segment.intensity if segment.intensity is not None else 0.5)
+            self.intensity_spin.setValue(
+                segment.intensity if segment.intensity is not None else 0.5
+            )
             idx = self.delivery_combo.findText(segment.delivery or "")
             if idx >= 0:
                 self.delivery_combo.setCurrentIndex(idx)
@@ -317,6 +421,7 @@ class _SegmentEditor(QWidget):
             for s in segment.sound_effects or []:
                 self.sfx_list.addItem(s)
             self.music_check.setChecked(bool(segment.music))
+            self._update_accepted_indicator()
         finally:
             self._loading = False
 
@@ -337,8 +442,11 @@ class SceneEditorDialog(QDialog):
         self.scene_number = scene_number
         self._llm_thread = None
         self._preview_thread = None
+        self._finalize_thread = None
         self._play_queue = []
-        self.setWindowTitle(f"Scene {scene_number} Editor" if scene_number else "New Scene Editor")
+        self.setWindowTitle(
+            f"Scene {scene_number} Editor" if scene_number else "New Scene Editor"
+        )
         self.setMinimumSize(900, 700)
 
         # Load existing representation or create new
@@ -385,6 +493,12 @@ class SceneEditorDialog(QDialog):
         self.btn_regen_line.clicked.connect(self._regenerate_line)
         self.btn_preview_scene = QPushButton("\u25b6\u25b6 Preview Scene")
         self.btn_preview_scene.clicked.connect(self._preview_scene)
+        self.btn_accept_line = QPushButton("\u2714 Accept Line")
+        self.btn_accept_line.clicked.connect(self._accept_line)
+        self.btn_finalize = QPushButton("Finalize Scene")
+        self.btn_finalize.clicked.connect(self._finalize_scene)
+        self.btn_play_final = QPushButton("\u25b6 Play Final")
+        self.btn_play_final.clicked.connect(self._play_final)
         self.btn_help = QPushButton("LLM Assistance")
         self.btn_help.clicked.connect(self._llm_assistance)
         toolbar.addWidget(btn_add_segment)
@@ -392,9 +506,13 @@ class SceneEditorDialog(QDialog):
         toolbar.addWidget(self.btn_preview_line)
         toolbar.addWidget(self.btn_regen_line)
         toolbar.addWidget(self.btn_preview_scene)
+        toolbar.addWidget(self.btn_accept_line)
+        toolbar.addWidget(self.btn_finalize)
+        toolbar.addWidget(self.btn_play_final)
         toolbar.addStretch()
         toolbar.addWidget(self.btn_help)
         layout.addLayout(toolbar)
+        self._update_final_buttons()
 
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("color: #4CAF50; font-style: italic;")
@@ -454,7 +572,9 @@ class SceneEditorDialog(QDialog):
         left_group = QGroupBox("Segments")
         left_layout = QVBoxLayout(left_group)
         self.segment_list = QListWidget()
-        self.segment_list.addItems([(s.speaker or "narrator") + ": " + (s.text[:30] if s.text else "") for s in self.representation.segments])
+        self.segment_list.addItems(
+            [_segment_label(s) for s in self.representation.segments]
+        )
         self.segment_list.currentItemChanged.connect(self._segment_selected)
         left_layout.addWidget(self.segment_list)
         left_layout.addStretch()
@@ -464,9 +584,16 @@ class SceneEditorDialog(QDialog):
         right_group = QGroupBox("Segment Editor")
         right_layout = QVBoxLayout(right_group)
         self._segment_editor = _SegmentEditor(
-            self.representation.segments[0] if self.representation.segments
-            else AudioSceneSegment(segment_type="narration", speaker="narrator", text=""),
-            all_characters, all_objects, all_locations
+            (
+                self.representation.segments[0]
+                if self.representation.segments
+                else AudioSceneSegment(
+                    segment_type="narration", speaker="narrator", text=""
+                )
+            ),
+            all_characters,
+            all_objects,
+            all_locations,
         )
         # Connect segment editor changes to update the list
         self._segment_editor.changed.connect(self._on_segment_editor_changed)
@@ -505,11 +632,9 @@ class SceneEditorDialog(QDialog):
     def _segment_selected(self, item):
         """Load the selected segment into the editor."""
         if not item:
-            self._segment_editor.set_segment(AudioSceneSegment(
-                segment_type="narration",
-                speaker="narrator",
-                text=""
-            ))
+            self._segment_editor.set_segment(
+                AudioSceneSegment(segment_type="narration", speaker="narrator", text="")
+            )
             return
 
         # The list rows map 1:1 to representation.segments.
@@ -530,6 +655,16 @@ class SceneEditorDialog(QDialog):
         need refreshing here.
         """
         row = self.segment_list.currentRow()
+        # An edit that changes the audio invalidates a prior acceptance.
+        if 0 <= row < len(self.representation.segments):
+            seg = self.representation.segments[row]
+            if seg.accepted and self.project is not None:
+                from core.audio_preview import segment_cache_key
+
+                if segment_cache_key(self.project, seg) != seg.accepted_hash:
+                    seg.accepted = False
+                    seg.accepted_hash = ""
+                    self._segment_editor._update_accepted_indicator()
         self._refresh_segment_list()
         if 0 <= row < self.segment_list.count():
             self.segment_list.blockSignals(True)
@@ -549,7 +684,7 @@ class SceneEditorDialog(QDialog):
             tone="",
             intensity=0.5,
             delivery="",
-            voice=""
+            voice="",
         )
         self.representation.segments.append(new_seg)
         self.segment_list.addItem("narrator: ")
@@ -567,21 +702,29 @@ class SceneEditorDialog(QDialog):
         # Don't remove the last segment
         if self.segment_list.count() <= 1:
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Cannot Remove", "Must keep at least one segment.")
+
+            QMessageBox.warning(
+                self, "Cannot Remove", "Must keep at least one segment."
+            )
             return
 
         # Emit signal with scene_id for tracking
         from PySide6.QtWidgets import QMessageBox
+
         self.segment_removed.emit(self.scene_id or "unsaved")
         del self.representation.segments[current_row]
 
         # Refresh list
         self.segment_list.clear()
-        self.segment_list.addItems([(s.speaker or "narrator") + ": " + (s.text[:30] if s.text else "") for s in self.representation.segments])
+        self.segment_list.addItems(
+            [_segment_label(s) for s in self.representation.segments]
+        )
 
         # Select the next or first segment
         if self.segment_list.count() > 0:
-            self.segment_list.setCurrentRow(min(current_row, self.segment_list.count() - 1))
+            self.segment_list.setCurrentRow(
+                min(current_row, self.segment_list.count() - 1)
+            )
             self._segment_selected(self.segment_list.currentItem())
 
     def _llm_assistance(self):
@@ -591,8 +734,10 @@ class SceneEditorDialog(QDialog):
         reviews the proposal before it is applied (plan §5).
         """
         from PySide6.QtWidgets import QInputDialog
+
         request, ok = QInputDialog.getMultiLineText(
-            self, "LLM Assistance",
+            self,
+            "LLM Assistance",
             "Describe the change you want. Examples:\n"
             "- Make Nikita sound more irritated.\n"
             "- Rewrite this dialogue so Roger sounds afraid but tries to hide it.\n"
@@ -614,11 +759,13 @@ class SceneEditorDialog(QDialog):
 
         # User review before applying (plan §5): show a readable summary.
         import json
+
         preview = json.dumps(proposal.to_dict(), indent=2)
         if len(preview) > 4000:
             preview = preview[:4000] + "\n\u2026 (truncated)"
         reply = QMessageBox.question(
-            self, "Review LLM Proposal",
+            self,
+            "Review LLM Proposal",
             "The LLM proposes this modified representation. Apply it?\n\n" + preview,
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
@@ -641,8 +788,7 @@ class SceneEditorDialog(QDialog):
     def _refresh_segment_list(self):
         self.segment_list.clear()
         self.segment_list.addItems(
-            [(s.speaker or "narrator") + ": " + (s.text[:30] if s.text else "")
-             for s in self.representation.segments]
+            [_segment_label(s) for s in self.representation.segments]
         )
 
     def _current_segment_job(self):
@@ -678,6 +824,121 @@ class SceneEditorDialog(QDialog):
         self.btn_preview_line.setEnabled(enabled)
         self.btn_regen_line.setEnabled(enabled)
         self.btn_preview_scene.setEnabled(enabled)
+        self.btn_accept_line.setEnabled(enabled)
+        self.btn_finalize.setEnabled(enabled)
+
+    # -- Accept / finalize -----------------------------------------------
+
+    def _accept_line(self):
+        """Generate the selected fragment and lock it in as accepted."""
+        job = self._current_segment_job()
+        if job is None:
+            QMessageBox.information(self, "Accept", "Select a segment first.")
+            return
+        if self.scene_number is None or not self.project:
+            QMessageBox.information(
+                self, "Accept", "Save the scene first so audio can be cached."
+            )
+            return
+        idx, segment = job
+        self._set_preview_enabled(False)
+        self.status_label.setText("Generating audio for acceptance\u2026")
+        self._preview_thread = _PreviewThread(
+            self.project, self.scene_number, [job], force=False
+        )
+        self._preview_thread.finished_ok.connect(
+            lambda paths, seg=segment: self._on_accept_ready(seg, paths)
+        )
+        self._preview_thread.failed.connect(self._on_preview_failed)
+        self._preview_thread.start()
+
+    def _on_accept_ready(self, segment, paths):
+        self._set_preview_enabled(True)
+        self.status_label.setText("")
+        if not paths:
+            QMessageBox.information(
+                self, "Accept", "Nothing was generated (empty segment?)."
+            )
+            return
+        from core.audio_preview import segment_cache_key
+
+        segment.accepted = True
+        segment.accepted_hash = segment_cache_key(self.project, segment)
+        audio_scene_service.save_representation(
+            self.project,
+            self.scene_id or "",
+            self.scene_number,
+            self.representation,
+        )
+        row = self.segment_list.currentRow()
+        self._refresh_segment_list()
+        if 0 <= row < self.segment_list.count():
+            self.segment_list.setCurrentRow(row)
+        self._segment_editor._update_accepted_indicator()
+        self.status_label.setText("Segment accepted \u2714")
+
+    def _final_wav_path(self):
+        if self.scene_number is None or not self.project:
+            return None
+        from core.scene_finalizer import final_scene_path
+
+        return final_scene_path(self.project, self.scene_number)
+
+    def _update_final_buttons(self):
+        path = self._final_wav_path()
+        exists = bool(path and path.exists())
+        self.btn_play_final.setEnabled(exists)
+        if exists:
+            self.status_label.setText("Final mix available \u2714")
+
+    def _finalize_scene(self):
+        if self.scene_number is None or not self.project:
+            QMessageBox.information(
+                self, "Finalize", "Save the scene first so audio can be cached."
+            )
+            return
+        pending = [
+            s
+            for s in self.representation.segments
+            if (s.text or "").strip() and not s.accepted
+        ]
+        if pending:
+            reply = QMessageBox.question(
+                self,
+                "Finalize Scene",
+                f"{len(pending)} segment(s) are not accepted yet. "
+                "Finalize anyway (missing audio will be generated)?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        self._set_preview_enabled(False)
+        self.status_label.setText("Finalizing scene\u2026 (mixing speech + beds)")
+        self._finalize_thread = _FinalizeThread(
+            self.project, self.scene_number, self.representation
+        )
+        self._finalize_thread.finished_ok.connect(self._on_finalize_done)
+        self._finalize_thread.failed.connect(self._on_finalize_failed)
+        self._finalize_thread.start()
+
+    def _on_finalize_done(self, path):
+        self._set_preview_enabled(True)
+        self.status_label.setText(f"Finalized: {path}")
+        self._update_final_buttons()
+
+    def _on_finalize_failed(self, error):
+        self._set_preview_enabled(True)
+        self.status_label.setText("")
+        QMessageBox.warning(self, "Finalize Scene", error)
+
+    def _play_final(self):
+        path = self._final_wav_path()
+        if not path or not path.exists():
+            QMessageBox.information(self, "Play Final", "No final mix yet.")
+            return
+        self._play_queue = [str(path)]
+        self._play_next()
 
     def _start_preview(self, jobs, force):
         if self.scene_number is None or not self.project:
@@ -716,6 +977,7 @@ class SceneEditorDialog(QDialog):
             return
         import sys
         from PySide6.QtCore import QProcess
+
         path = self._play_queue.pop(0)
         player = "afplay" if sys.platform == "darwin" else "aplay"
         self._player = QProcess(self)
@@ -725,12 +987,16 @@ class SceneEditorDialog(QDialog):
     def _export_representation(self):
         """Export the current representation as JSON."""
         import json
+
         repr_dict = self.representation.to_dict()
         json_str = json.dumps(repr_dict, indent=2)
         # Copy to clipboard
         from PySide6.QtWidgets import QApplication
+
         QApplication.clipboard().setText(json_str)
-        QMessageBox.information(self, "Exported", "Scene representation JSON copied to clipboard.")
+        QMessageBox.information(
+            self, "Exported", "Scene representation JSON copied to clipboard."
+        )
 
     def _save_and_accept(self):
         """Persist the representation (when bound to a scene) and close."""
@@ -755,7 +1021,13 @@ class SceneEditorDialog(QDialog):
             "title": self.title_edit.text(),
             "day": self.day_spin.value(),
             "time": self.time_edit.text(),
-            "characters_present": [self.char_list.item(i).text() for i in range(self.char_list.count())],
-            "objects_present": [self.obj_list.item(i).text() for i in range(self.obj_list.count())],
-            "locations_present": [self.loc_list.item(i).text() for i in range(self.loc_list.count())],
+            "characters_present": [
+                self.char_list.item(i).text() for i in range(self.char_list.count())
+            ],
+            "objects_present": [
+                self.obj_list.item(i).text() for i in range(self.obj_list.count())
+            ],
+            "locations_present": [
+                self.loc_list.item(i).text() for i in range(self.loc_list.count())
+            ],
         }
