@@ -54,7 +54,9 @@ class VideoEnhancerPureFunctionTest(unittest.TestCase):
 
         self.assertLess(out[1].mean(), frames[1].mean())
         self.assertGreater(out[1].mean(), 0)
-        before_diff = np.abs(frames[1].astype(np.int16) - frames[0].astype(np.int16)).mean()
+        before_diff = np.abs(
+            frames[1].astype(np.int16) - frames[0].astype(np.int16)
+        ).mean()
         after_diff = np.abs(out[1].astype(np.int16) - out[0].astype(np.int16)).mean()
         self.assertLess(after_diff, before_diff)
 
@@ -74,8 +76,9 @@ class VideoEnhancerPureFunctionTest(unittest.TestCase):
 
     def test_super_resolve_without_local_model_is_noop(self):
         frames = [np.zeros((4, 4, 3), dtype=np.uint8)]
-        with patch.object(ve, "_resolve_local_sr_model", return_value=None), \
-             patch("builtins.print") as printed:
+        with patch.object(ve, "_resolve_local_sr_model", return_value=None), patch(
+            "builtins.print"
+        ) as printed:
             out = ve.super_resolve_video(frames)
 
         self.assertIs(out, frames)
@@ -90,7 +93,9 @@ class VideoEnhancerIOTest(unittest.TestCase):
     def test_write_and_read_frames_round_trip_and_extensions(self):
         frames = self._frames()
         with tempfile.TemporaryDirectory() as tmp:
-            mkv = ve.write_frames(os.path.join(tmp, "clip"), frames, fps=5.0, container="mkv", crf=18)
+            mkv = ve.write_frames(
+                os.path.join(tmp, "clip"), frames, fps=5.0, container="mkv", crf=18
+            )
             self.assertTrue(mkv.endswith(".mkv"))
             self.assertTrue(os.path.isfile(mkv))
 
@@ -99,8 +104,12 @@ class VideoEnhancerIOTest(unittest.TestCase):
             self.assertEqual(read_back[0].shape, frames[0].shape)
             self.assertEqual(read_back[0].dtype, np.uint8)
 
-            mp4 = ve.write_frames(os.path.join(tmp, "movie"), frames, fps=5.0, container="mp4", crf=18)
-            avi = ve.write_frames(os.path.join(tmp, "movie"), frames, fps=5.0, container="avi", crf=18)
+            mp4 = ve.write_frames(
+                os.path.join(tmp, "movie"), frames, fps=5.0, container="mp4", crf=18
+            )
+            avi = ve.write_frames(
+                os.path.join(tmp, "movie"), frames, fps=5.0, container="avi", crf=18
+            )
             self.assertTrue(mp4.endswith(".mp4"))
             self.assertTrue(avi.endswith(".avi"))
 
@@ -110,20 +119,35 @@ class VideoEnhancerIOTest(unittest.TestCase):
     def test_enhance_video_end_to_end_metrics_and_enhanced_stem(self):
         frames = self._frames(count=4)
         with tempfile.TemporaryDirectory() as tmp:
-            src = ve.write_frames(os.path.join(tmp, "sample_enhanced"), frames, fps=5.0, container="mp4", crf=18)
+            src = ve.write_frames(
+                os.path.join(tmp, "sample_enhanced"),
+                frames,
+                fps=5.0,
+                container="mp4",
+                crf=18,
+            )
             out_dir = os.path.join(tmp, "out")
             result = ve.enhance_video(
                 src,
                 output_dir=out_dir,
                 fps=5.0,
-                enhancement={"temporal": 0.2, "denoise": 0.2, "container": "mkv", "crf": 14},
+                enhancement={
+                    "temporal": 0.2,
+                    "denoise": 0.2,
+                    "container": "mkv",
+                    "crf": 14,
+                },
             )
 
             self.assertEqual(set(result), {"video_path", "metrics_path", "metrics"})
             self.assertTrue(os.path.isfile(result["video_path"]))
             self.assertTrue(os.path.isfile(result["metrics_path"]))
-            self.assertTrue(os.path.basename(result["video_path"]).startswith("sample_enhanced."))
-            self.assertNotIn("enhanced_enhanced", os.path.basename(result["video_path"]))
+            self.assertTrue(
+                os.path.basename(result["video_path"]).startswith("sample_enhanced.")
+            )
+            self.assertNotIn(
+                "enhanced_enhanced", os.path.basename(result["video_path"])
+            )
 
             with open(result["metrics_path"]) as f:
                 metrics = json.load(f)
@@ -138,37 +162,51 @@ class VideoEnhancerIOTest(unittest.TestCase):
 
 class VideoEnhancerSuperResolutionTest(unittest.TestCase):
     def test_resolve_returns_none_when_nothing_present(self):
-        with patch("os.path.isdir", return_value=False), patch("os.listdir", return_value=[]):
+        with patch("os.path.isdir", return_value=False), patch(
+            "os.listdir", return_value=[]
+        ):
             self.assertIsNone(ve._resolve_local_sr_model(None, None))
 
     def test_resolve_finds_explicit_model_on_disk(self):
-        with patch("os.path.isdir", return_value=True), patch("os.listdir", return_value=["weights"]):
+        with patch("os.path.isdir", return_value=True), patch(
+            "os.listdir", return_value=["weights"]
+        ):
             self.assertEqual(ve._resolve_local_sr_model("some/path", None), "some/path")
 
     def test_super_resolve_with_local_model_is_noop_no_download(self):
         frames = [np.zeros((4, 4, 3), dtype=np.uint8)]
-        with patch.object(ve, "_resolve_local_sr_model", return_value="fake-sr-model"), \
-             patch("builtins.print"):
+        with patch.object(
+            ve, "_resolve_local_sr_model", return_value="fake-sr-model"
+        ), patch("builtins.print"):
             out = ve.super_resolve_video(frames)
 
         self.assertIs(out, frames)
 
     def test_super_resolve_load_failure_degrades_gracefully(self):
         frames = [np.zeros((4, 4, 3), dtype=np.uint8)]
-        with patch.object(ve, "_resolve_local_sr_model", return_value="fake-sr-model"), \
-             patch.dict("sys.modules", {"diffusers": None, "diffusers.ImageToVideoPipeline": None}), \
-             patch("builtins.print"):
+        with patch.object(
+            ve, "_resolve_local_sr_model", return_value="fake-sr-model"
+        ), patch.dict(
+            "sys.modules", {"diffusers": None, "diffusers.ImageToVideoPipeline": None}
+        ), patch(
+            "builtins.print"
+        ):
             out = ve.super_resolve_video(frames)
 
         self.assertIs(out, frames)
 
     def test_enhance_video_runs_super_resolve_when_enabled(self):
         rng = np.random.default_rng(1)
-        frames = [rng.integers(0, 256, size=(16, 16, 3), dtype=np.uint8) for _ in range(3)]
+        frames = [
+            rng.integers(0, 256, size=(16, 16, 3), dtype=np.uint8) for _ in range(3)
+        ]
         with tempfile.TemporaryDirectory() as tmp:
-            src = ve.write_frames(os.path.join(tmp, "sample"), frames, fps=5.0, container="mp4", crf=18)
-            with patch.object(ve, "_resolve_local_sr_model", return_value="fake-sr-model"), \
-                 patch("builtins.print"):
+            src = ve.write_frames(
+                os.path.join(tmp, "sample"), frames, fps=5.0, container="mp4", crf=18
+            )
+            with patch.object(
+                ve, "_resolve_local_sr_model", return_value="fake-sr-model"
+            ), patch("builtins.print"):
                 result = ve.enhance_video(
                     src,
                     output_dir=tmp,
@@ -187,7 +225,9 @@ class VideoEnhancerSuperResolutionTest(unittest.TestCase):
             self.assertTrue(os.path.isfile(result["video_path"]))
 
     def test_enhance_video_empty_input_raises_valueerror(self):
-        with patch("os.path.isfile", return_value=True), patch.object(ve, "read_frames", return_value=[]):
+        with patch("os.path.isfile", return_value=True), patch.object(
+            ve, "read_frames", return_value=[]
+        ):
             with self.assertRaises(ValueError):
                 ve.enhance_video("anything.mp4")
 

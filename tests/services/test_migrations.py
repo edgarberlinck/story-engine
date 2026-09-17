@@ -5,7 +5,10 @@ Tests for database migrations and services.
 import unittest
 import tempfile
 import os
-from services.database.migrations import migrate_database, seed_character_versions_from_existing
+from services.database.migrations import (
+    migrate_database,
+    seed_character_versions_from_existing,
+)
 from services.database.database_service import DatabaseService
 from services.database.character_version_service import CharacterVersionService
 from services.database.scene_service import SceneService

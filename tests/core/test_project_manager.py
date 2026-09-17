@@ -16,6 +16,7 @@ class TestProjectManager(unittest.TestCase):
         self.tmpdb.close()
         # Monkey patch db path
         from services.database import database_service
+
         self.original_path = database_service.db_service.db_path
         database_service.db_service.db_path = self.db_path
         # Re-initialize the schema against the patched (temp) database so the
@@ -25,6 +26,7 @@ class TestProjectManager(unittest.TestCase):
 
     def tearDown(self):
         from services.database import database_service
+
         database_service.db_service.db_path = self.original_path
         if os.path.exists(self.db_path):
             os.unlink(self.db_path)

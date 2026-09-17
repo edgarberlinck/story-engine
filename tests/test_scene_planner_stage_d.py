@@ -52,7 +52,9 @@ class TestStrategyGuardrailGate(unittest.TestCase):
         self.assertEqual(_pre_llm_strategy_gate(1), STRATEGY_SINGLE_PASS)
 
     def test_one_character_over_budget_progressive(self):
-        self.assertEqual(_pre_llm_strategy_gate(1, over_clip_budget=True), STRATEGY_PROGRESSIVE)
+        self.assertEqual(
+            _pre_llm_strategy_gate(1, over_clip_budget=True), STRATEGY_PROGRESSIVE
+        )
 
     def test_two_characters_deferred_to_llm(self):
         # The gate returns None (non-trivial) so Stage D / LLM decides.
@@ -82,8 +84,10 @@ class TestStageDSelectStrategy(unittest.TestCase):
         with patch("core.scene_planner.generate_text_with_llm", return_value=None):
             d = stage_d_select_strategy(
                 "Nikita on the left, Roger on the right of the stage",
-                [_rc("Nikita", scene_position_hint="left of the stage"),
-                 _rc("Roger", scene_position_hint="right of the stage")],
+                [
+                    _rc("Nikita", scene_position_hint="left of the stage"),
+                    _rc("Roger", scene_position_hint="right of the stage"),
+                ],
             )
         self.assertEqual(d.strategy, STRATEGY_ASSET_COMPOSITION)
         self.assertTrue(d.requires_spatial_precision)
@@ -204,14 +208,18 @@ class TestPromptBuilderBugFix(unittest.TestCase):
             characters=[
                 CharacterSceneData(
                     name="Nikita",
-                    identity=CharacterIdentity(name="Nikita", gender="woman", hair_color="red"),
+                    identity=CharacterIdentity(
+                        name="Nikita", gender="woman", hair_color="red"
+                    ),
                     position="left",
                     clothing="black suit",
                     action="playing guitar",
                 ),
                 CharacterSceneData(
                     name="Roger",
-                    identity=CharacterIdentity(name="Roger", gender="man", hair_color="black"),
+                    identity=CharacterIdentity(
+                        name="Roger", gender="man", hair_color="black"
+                    ),
                     position="right",
                     clothing="formal",
                     action="playing drums",

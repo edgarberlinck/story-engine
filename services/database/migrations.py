@@ -148,14 +148,26 @@ def migrate_database(db_path: str = "story_engine.db"):
     """)
 
     # Create index for faster lookups
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_char_versions_proj_name ON character_versions(project, character_name)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_char_versions_proj_name ON character_versions(project, character_name)"
+    )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_scenes_proj ON scenes(project)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_char_attrs_proj_name ON character_attributes(project, character_name)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_objects_proj_name ON objects(project, name)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_chapters_proj ON chapters(project, position)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_char_attrs_proj_name ON character_attributes(project, character_name)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_objects_proj_name ON objects(project, name)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_chapters_proj ON chapters(project, position)"
+    )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_locations_proj ON locations(project)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_scene_proj ON audio_scene_representations(project)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_audio_scene_scene ON audio_scene_representations(scene_id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_audio_scene_proj ON audio_scene_representations(project)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_audio_scene_scene ON audio_scene_representations(scene_id)"
+    )
 
     conn.commit()
     conn.close()
@@ -174,15 +186,28 @@ def seed_character_versions_from_existing(db_path: str = "story_engine.db"):
         conn.close()
         return
 
-    cur.execute("SELECT project, name, prompt, seed, model, reference_image, created_at FROM characters")
+    cur.execute(
+        "SELECT project, name, prompt, seed, model, reference_image, created_at FROM characters"
+    )
     rows = cur.fetchall()
 
     for r in rows:
-        cur.execute("""
+        cur.execute(
+            """
             INSERT OR IGNORE INTO character_versions
             (project, character_name, version, prompt, seed, model, image_path, created_at, is_default)
             VALUES (?, ?, 1, ?, ?, ?, ?, ?)
-        """, (r["project"], r["name"], r["prompt"], r["seed"], r["model"], r["reference_image"], r["created_at"]))
+        """,
+            (
+                r["project"],
+                r["name"],
+                r["prompt"],
+                r["seed"],
+                r["model"],
+                r["reference_image"],
+                r["created_at"],
+            ),
+        )
 
     # Mark as default
     cur.execute("""

@@ -73,7 +73,9 @@ class SoundEngine:
     def _load(self):
         if self._model is None:
             from transformers import (
-                AutoProcessor, MusicgenConfig, MusicgenForConditionalGeneration,
+                AutoProcessor,
+                MusicgenConfig,
+                MusicgenForConditionalGeneration,
             )
 
             # Workaround for a transformers regression (seen in 4.57.x):
@@ -95,7 +97,9 @@ class SoundEngine:
         inputs = processor(text=[prompt], padding=True, return_tensors="pt")
         max_new_tokens = max(1, int(seconds * _FRAMES_PER_SECOND))
         audio = model.generate(
-            **inputs, do_sample=True, guidance_scale=3.0,
+            **inputs,
+            do_sample=True,
+            guidance_scale=3.0,
             max_new_tokens=max_new_tokens,
         )
         sr = model.config.audio_encoder.sampling_rate

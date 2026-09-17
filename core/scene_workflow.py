@@ -25,7 +25,7 @@ def generate_scene_with_llm_orchestration(
     use_multi_step: bool = True,
     enforce_token_budget: bool = True,
     model: str = DEFAULT_SCENE_MODEL,
-    seed: int = 42
+    seed: int = 42,
 ) -> Dict[str, Any]:
     """
     Generate scene using LLM orchestration for planning and decomposition.
@@ -58,8 +58,11 @@ def generate_scene_with_llm_orchestration(
         characters = character_service.find_characters_in_text(prompt, project)
 
     if not characters or not use_multi_step:
-        print("Using direct single-pass generation" if not characters else
-              "Multi-step disabled, using direct single-pass generation")
+        print(
+            "Using direct single-pass generation"
+            if not characters
+            else "Multi-step disabled, using direct single-pass generation"
+        )
         return generate_scene(
             prompt=prompt,
             project=project,
@@ -83,37 +86,35 @@ def generate_scene_with_llm_orchestration(
         model=model,
         seed=seed,
     )
-    result['orchestration_type'] = 'scene_pipeline'
+    result["orchestration_type"] = "scene_pipeline"
     return result
 
 
 def enhance_scene_with_context_awareness(
-    prompt: str,
-    project: str,
-    characters: List[Dict]
+    prompt: str, project: str, characters: List[Dict]
 ) -> str:
     """
     Enhance scene prompt with context-aware character handling.
-    
+
     This handles cases where character generation style doesn't match
     scene context (e.g., fantasy clothing in bar scene).
-    
+
     Uses LLM to determine what should be preserved vs adapted.
     """
-    
+
     from core.scene_planner import stage_a_context_resolution
-    
+
     # Resolve characters against scene context
     resolved = stage_a_context_resolution(prompt, characters)
-    
+
     # Build enhanced prompt with context-aware adjustments
     enhanced = prompt
     for char_res in resolved:
-        if char_res.presentation_decision == 'REPLACE':
+        if char_res.presentation_decision == "REPLACE":
             print(f"Note: {char_res.name} presentation adapted for scene")
             # Add scene-appropriate guidance
             enhanced += f"\n{char_res.name} wearing scene-appropriate attire"
-    
+
     return enhanced
 
 
@@ -121,31 +122,25 @@ def enhance_scene_with_context_awareness(
 if __name__ == "__main__":
     # Example from user:
     # "Nikita was generated using Fantasy Clothing, but she's dressed differently in the scene"
-    
+
     scene_desc = """There's a very small stage with red curtains. 
 In front of stage, tables with people watching.
 Nikita is sitting on chair playing black Gibson Explorer guitar.
 Roger is behind drums.
 Camera from back of bar."""
-    
+
     characters = [
         {
-            'name': 'Nikita',
-            'prompt': 'fantasy art style, woman with long black hair, ornate elven armor, glowing runes'
+            "name": "Nikita",
+            "prompt": "fantasy art style, woman with long black hair, ornate elven armor, glowing runes",
         },
-        {
-            'name': 'Roger',
-            'prompt': 'man, bald head, casual clothing'
-        }
+        {"name": "Roger", "prompt": "man, bald head, casual clothing"},
     ]
-    
+
     # Generate with LLM orchestration
     result = generate_scene_with_llm_orchestration(
-        prompt=scene_desc,
-        project="demo",
-        characters=characters,
-        use_multi_step=True
+        prompt=scene_desc, project="demo", characters=characters, use_multi_step=True
     )
-    
+
     print("\nGeneration complete!")
     print(f"Result: {result}")

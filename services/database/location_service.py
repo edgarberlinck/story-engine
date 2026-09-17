@@ -19,8 +19,7 @@ class LocationService:
 
     def _init_table(self):
         conn = self._connect()
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS locations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL DEFAULT 'test_project',
@@ -37,8 +36,7 @@ class LocationService:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project, name)
             )
-            """
-        )
+            """)
         conn.commit()
         conn.close()
 
@@ -74,16 +72,35 @@ class LocationService:
                 objects_present_json = COALESCE(excluded.objects_present_json, locations.objects_present_json),
                 characters_associated_json = COALESCE(excluded.characters_associated_json, locations.characters_associated_json)
             """,
-            (project, name, loc_type, description, parent_location, visual_identity, props, "initial", state_history, objects_present, characters_associated, datetime.now()),
+            (
+                project,
+                name,
+                loc_type,
+                description,
+                parent_location,
+                visual_identity,
+                props,
+                "initial",
+                state_history,
+                objects_present,
+                characters_associated,
+                datetime.now(),
+            ),
         )
         conn.commit()
         # Get the row ID - need to re-query since INSERT OR REPLACE may not give lastrowid
-        row = conn.execute("SELECT id FROM locations WHERE project = ? AND name = ?", (project, name)).fetchone()
-        row_id = row[0] if row else conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        row = conn.execute(
+            "SELECT id FROM locations WHERE project = ? AND name = ?", (project, name)
+        ).fetchone()
+        row_id = (
+            row[0] if row else conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        )
         conn.close()
         return row_id
 
-    def get_location(self, name: str, project: str = "test_project") -> Optional[Dict[str, Any]]:
+    def get_location(
+        self, name: str, project: str = "test_project"
+    ) -> Optional[Dict[str, Any]]:
         conn = self._connect()
         conn.row_factory = sqlite3.Row
         row = conn.execute(
@@ -112,7 +129,9 @@ class LocationService:
             loc["properties"] = json.loads(loc.get("properties_json") or "{}")
             loc["state_history"] = json.loads(loc.get("state_history_json") or "[]")
             loc["objects_present"] = json.loads(loc.get("objects_present_json") or "[]")
-            loc["characters_associated"] = json.loads(loc.get("characters_associated_json") or "[]")
+            loc["characters_associated"] = json.loads(
+                loc.get("characters_associated_json") or "[]"
+            )
             result.append(loc)
         return result
 
@@ -132,11 +151,12 @@ class LocationService:
     ) -> List[Dict[str, Any]]:
         """Return all known locations whose name appears in the given text."""
         import re
+
         found = []
         text_lower = text.lower()
         for loc in self.list_locations(project):
             name_lower = loc["name"].lower()
-            pattern = r'\b' + re.escape(name_lower) + r'\b'
+            pattern = r"\b" + re.escape(name_lower) + r"\b"
             if re.search(pattern, text_lower):
                 found.append(loc)
         return found
@@ -160,7 +180,9 @@ class LocationService:
         state_history.append(new_state)
 
         objects_present_json = json.dumps(objects_present if objects_present else [])
-        characters_associated_json = json.dumps(characters_associated if characters_associated else [])
+        characters_associated_json = json.dumps(
+            characters_associated if characters_associated else []
+        )
 
         conn.execute(
             """
@@ -171,7 +193,14 @@ class LocationService:
                 characters_associated_json = ?
             WHERE project = ? AND name = ?
             """,
-            (new_state, json.dumps(state_history), objects_present_json, characters_associated_json, project, name),
+            (
+                new_state,
+                json.dumps(state_history),
+                objects_present_json,
+                characters_associated_json,
+                project,
+                name,
+            ),
         )
         conn.commit()
         success = conn.total_changes > 0

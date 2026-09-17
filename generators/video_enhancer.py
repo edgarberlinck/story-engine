@@ -59,6 +59,7 @@ DEFAULT_ENHANCEMENT = {
 # patch them in unit tests without touching a real video file.
 # ---------------------------------------------------------------------------
 
+
 def read_frames(video_path: str) -> List[np.ndarray]:
     """Read every frame of a video as a list of HxWx3 uint8 numpy arrays."""
     frames: List[np.ndarray] = []
@@ -116,13 +117,16 @@ def write_frames(
 # isolation, no I/O).
 # ---------------------------------------------------------------------------
 
+
 def _temporal_normalize(frames: List[np.ndarray]) -> np.ndarray:
     """Stack frames into a [F, H, W, C] float32 array for vectorized smoothing."""
     arr = np.stack(frames, axis=0).astype(np.float32)
     return arr
 
 
-def temporal_smooth(frames: List[np.ndarray], strength: float, window: int = 1) -> List[np.ndarray]:
+def temporal_smooth(
+    frames: List[np.ndarray], strength: float, window: int = 1
+) -> List[np.ndarray]:
     """Average each frame with its neighbours to reduce temporal flicker/warp.
 
     For every frame `f` this blends the `2*window + 1` neighbour window centered
@@ -140,7 +144,7 @@ def temporal_smooth(frames: List[np.ndarray], strength: float, window: int = 1) 
     for i in range(n):
         lo = max(0, i - window)
         hi = min(n - 1, i + window)
-        window_mean = arr[lo:hi + 1].mean(axis=0)
+        window_mean = arr[lo : hi + 1].mean(axis=0)
         smoothed[i] = (1.0 - strength) * arr[i] + strength * window_mean
 
     out = np.clip(smoothed, 0.0, 255.0).astype(np.uint8)
@@ -169,7 +173,10 @@ def spatial_denoise(frames: List[np.ndarray], sigma: float) -> List[np.ndarray]:
 # model directory exists, otherwise it is a graceful no-op with a warning.
 # ---------------------------------------------------------------------------
 
-def _resolve_local_sr_model(sr_model: Optional[str], sr_dir: Optional[str]) -> Optional[str]:
+
+def _resolve_local_sr_model(
+    sr_model: Optional[str], sr_dir: Optional[str]
+) -> Optional[str]:
     """Locate a locally-installed super-resolution model, if any.
 
     Resolution order: an explicit `sr_model` name under `models/image_to_video`
@@ -218,17 +225,23 @@ def super_resolve_video(
     """
     model = _resolve_local_sr_model(sr_model, sr_dir)
     if model is None:
-        print("[video_enhancer] Super-resolution skipped: no local SR model "
-              "found (opt-in; NOT auto-downloaded). Pass sr_model= or install a "
-              "local super-resolution model to enable it.")
+        print(
+            "[video_enhancer] Super-resolution skipped: no local SR model "
+            "found (opt-in; NOT auto-downloaded). Pass sr_model= or install a "
+            "local super-resolution model to enable it."
+        )
         return frames
 
     print(f"[video_enhancer] Applying local super-resolution '{model}' (x{scale})")
     try:
-        from diffusers import ImageToVideoPipeline  # noqa: F401  (keeps diffusers out of module import)
+        from diffusers import (
+            ImageToVideoPipeline,
+        )  # noqa: F401  (keeps diffusers out of module import)
     except Exception as e:  # noqa: BLE001 -- SR must never break the base path
-        print(f"[video_enhancer] Could not load SR model '{model}' ({e}); "
-              "using original resolution.")
+        print(
+            f"[video_enhancer] Could not load SR model '{model}' ({e}); "
+            "using original resolution."
+        )
         return frames
 
     # Placeholder implementation: a real SR model would be loaded and applied
@@ -240,6 +253,7 @@ def super_resolve_video(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def enhance_video(
     video_path: str,
@@ -275,9 +289,9 @@ def enhance_video(
     out_dir = output_dir or os.path.dirname(os.path.abspath(video_path))
     if output_basename is None:
         stem = os.path.splitext(os.path.basename(video_path))[0]
-         # Strip a trailing "_enhanced" so re-running an enhanced clip does not
-         # stack suffixes (e.g. "x_enhanced" -> "x_enhanced", not "_enhanced_enhanced").
-        stem = stem[:-len("_enhanced")] if stem.endswith("_enhanced") else stem
+        # Strip a trailing "_enhanced" so re-running an enhanced clip does not
+        # stack suffixes (e.g. "x_enhanced" -> "x_enhanced", not "_enhanced_enhanced").
+        stem = stem[: -len("_enhanced")] if stem.endswith("_enhanced") else stem
         output_basename = f"{stem}_enhanced"
     out_path = os.path.join(out_dir, f"{output_basename}.{cfg['container']}")
     os.makedirs(out_dir, exist_ok=True)
@@ -291,14 +305,17 @@ def enhance_video(
     # 1. (optional) super-resolution -- only when a local model is present.
     if cfg.get("super_resolve"):
         frames = super_resolve_video(
-            frames, sr_model=sr_model, sr_dir=sr_dir,
+            frames,
+            sr_model=sr_model,
+            sr_dir=sr_dir,
             scale=int(cfg.get("sr_scale", 2)),
         )
 
     # 2. temporal smoothing -- the main anti-distortion/flicker pass.
     before = frames
-    frames = temporal_smooth(frames, float(cfg.get("temporal", 0.0)),
-                            int(cfg.get("temporal_window", 1)))
+    frames = temporal_smooth(
+        frames, float(cfg.get("temporal", 0.0)), int(cfg.get("temporal_window", 1))
+    )
 
     # 3. light spatial denoise.
     frames = spatial_denoise(frames, float(cfg.get("denoise", 0.0)))
@@ -332,9 +349,7 @@ def enhance_video(
         "mean_abs_frame_change": changed,
         "duration_ms": duration_ms,
     }
-    metrics_path = os.path.join(
-        out_dir, f"{output_basename}_metrics.json"
-     )
+    metrics_path = os.path.join(out_dir, f"{output_basename}_metrics.json")
     with open(metrics_path, "w") as f:
         json.dump(metrics, f, indent=2)
 

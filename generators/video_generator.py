@@ -245,9 +245,7 @@ def generate_video(
         "output": video_path,
         **{k: v for k, v in params.items()},
     }
-    metrics_path = os.path.join(
-        output_dir, f"{output_basename}_benchmark_metrics.json"
-    )
+    metrics_path = os.path.join(output_dir, f"{output_basename}_benchmark_metrics.json")
     with open(metrics_path, "w") as f:
         json.dump(metrics, f, indent=2)
     print(f"Metrics saved to: {metrics_path}")

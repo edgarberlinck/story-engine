@@ -14,6 +14,7 @@ class DatabaseService:
     def init_database(self):
         """Initialize the database with required tables"""
         from services.database.migrations import migrate_database
+
         migrate_database(self.db_path)
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -151,11 +152,15 @@ class DatabaseService:
         cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         deleted_projects = cursor.rowcount
         # Cascade delete related data
-        cursor.execute("DELETE FROM character_versions WHERE project = ?", (project_id,))
+        cursor.execute(
+            "DELETE FROM character_versions WHERE project = ?", (project_id,)
+        )
         cursor.execute("DELETE FROM scenes WHERE project = ?", (project_id,))
         cursor.execute("DELETE FROM objects WHERE project = ?", (project_id,))
         cursor.execute("DELETE FROM locations WHERE project = ?", (project_id,))
-        cursor.execute("DELETE FROM audio_scene_representations WHERE project = ?", (project_id,))
+        cursor.execute(
+            "DELETE FROM audio_scene_representations WHERE project = ?", (project_id,)
+        )
         cursor.execute("DELETE FROM project_settings WHERE project = ?", (project_id,))
         cursor.execute(
             "DELETE FROM chapter_contents WHERE chapter_id IN "

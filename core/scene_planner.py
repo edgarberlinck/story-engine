@@ -14,17 +14,22 @@ from pathlib import Path
 # Import with fallback if torch not available
 try:
     from generators.text_generator import generate_text_with_llm
+
     LLM_AVAILABLE = True
 except Exception:
     LLM_AVAILABLE = False
+
     def generate_text_with_llm(*args, **kwargs):
         """Fallback when LLM unavailable."""
         return None
-        
+
+
 from utils.token_budget import count_tokens
+
 try:
     from utils.token_budget import verify_token_budget
 except ImportError:
+
     def verify_token_budget(prompt, budget):
         return count_tokens(prompt) <= budget, count_tokens(prompt)
 
@@ -32,6 +37,7 @@ except ImportError:
 @dataclass
 class ResolvedCharacter:
     """LLM-resolved character with context-aware attributes."""
+
     name: str
     identity: List[str]
     default_presentation: List[str]
@@ -41,31 +47,33 @@ class ResolvedCharacter:
     dropped_reason: str
     # Scene-specific fields used by the asset-composition path (design doc
     # §2.2). Optional; only populated when the scene text describes them.
-    scene_pose: Optional[str] = None          # e.g. "sitting on a chair"
-    scene_action: Optional[str] = None        # e.g. "playing a black Gibson Explorer guitar"
+    scene_pose: Optional[str] = None  # e.g. "sitting on a chair"
+    scene_action: Optional[str] = None  # e.g. "playing a black Gibson Explorer guitar"
     scene_position_hint: Optional[str] = None  # e.g. "left side of the stage"
 
 
 @dataclass
 class ResolvedObject:
     """LLM-resolved object/artifact with context-aware attributes."""
+
     name: str
-    identity: List[str]       # MUST survive verbatim (material, key features)
+    identity: List[str]  # MUST survive verbatim (material, key features)
     default_presentation: List[str]  # gear/style from generation-time
     presentation_decision: str  # KEEP | REPLACE | ADAPT
     scene_presentation: List[str]  # what it should look like in this scene
     dropped: List[str]
     dropped_reason: str
     # Scene-specific fields
-    scene_pose: Optional[str] = None          # e.g. "on the table"
+    scene_pose: Optional[str] = None  # e.g. "on the table"
     scene_position_hint: Optional[str] = None  # e.g. "center stage"
 
 
 @dataclass
 class ResolvedLocation:
     """LLM-resolved location with context-aware attributes."""
+
     name: str
-    identity: List[str]       # MUST survive verbatim (key defining features)
+    identity: List[str]  # MUST survive verbatim (key defining features)
     default_presentation: List[str]  # visual style from generation-time
     presentation_decision: str  # KEEP | REPLACE | ADAPT
     scene_presentation: List[str]  # how it should appear in this scene
@@ -79,6 +87,7 @@ class ResolvedLocation:
 @dataclass
 class SceneLayerPlan:
     """One layer in LLM-decomposed scene."""
+
     name: str
     prompt: str
     must_include: List[str] = field(default_factory=list)
@@ -90,6 +99,7 @@ class SceneLayerPlan:
 @dataclass
 class ScenePlan:
     """Complete scene decomposition from LLM."""
+
     camera: str
     layers: List[SceneLayerPlan]
     single_pass_feasible: bool
@@ -110,6 +120,7 @@ def _extract_json_blocks(text: str) -> str:
     original text if nothing JSON-like is found.
     """
     import re
+
     if not text:
         return text
     # Strip markdown code fences (```json ... ```).
@@ -123,7 +134,7 @@ def _extract_json_blocks(text: str) -> str:
     if end == -1 or (candidate.rfind("}") != -1 and candidate.rfind("}") > end):
         end = candidate.rfind("}")
     if start != -1 and end != -1 and end > start:
-        return candidate[start:end + 1]
+        return candidate[start : end + 1]
     return candidate
 
 
@@ -137,8 +148,9 @@ def _extract_character_snippets(
     continuations), so the fallback path never has to touch the raw stored
     character prompt (which contains generation-time artifacts)."""
     import re
+
     sentences = [
-        s.strip().rstrip('.')
+        s.strip().rstrip(".")
         for s in re.split(r"(?<=[.!?])\s+|\n+", scene_description)
         if s.strip()
     ]
@@ -150,7 +162,7 @@ def _extract_character_snippets(
         if name.lower() in lower and not any(o in lower for o in others):
             # Trim positional lead-ins like "On the left side of the stage is Nikita,"
             m = re.search(rf"\b{re.escape(name)}\b[,:]?\s*(.+)", sent, re.IGNORECASE)
-            snippet = m.group(1).strip(' ,') if m and m.group(1).strip(' ,') else sent
+            snippet = m.group(1).strip(" ,") if m and m.group(1).strip(" ,") else sent
             snippets.append(snippet)
             capturing = True
             continue
@@ -173,39 +185,48 @@ def stage_a_context_resolution(
 ) -> List[Union[ResolvedCharacter, ResolvedObject, ResolvedLocation]]:
     """
     Stage A: Resolve character descriptions against scene context.
-    
+
     Returns characters with identity preserved and presentation adapted.
     This prevents issues like Fantasy Clothing in bar scenes.
     """
-    
+
     # Build prompt for LLM
-    chars_json = json.dumps([
-        {
-            'name': c['name'],
-            'stored_prompt': c.get('prompt', ''),
-            'attributes': c.get('attributes', {})
-        }
-        for c in characters
-    ], indent=2)
-    
-    objs_json = json.dumps([
-        {
-            'name': o['name'],
-            'stored_prompt': o.get('prompt', ''),
-            'attributes': o.get('attributes', {})
-        }
-        for o in (objects or [])
-    ], indent=2)
-    
-    locs_json = json.dumps([
-        {
-            'name': l['name'],
-            'stored_prompt': l.get('prompt', ''),
-            'attributes': l.get('attributes', {})
-        }
-        for l in (locations or [])
-    ], indent=2)
-    
+    chars_json = json.dumps(
+        [
+            {
+                "name": c["name"],
+                "stored_prompt": c.get("prompt", ""),
+                "attributes": c.get("attributes", {}),
+            }
+            for c in characters
+        ],
+        indent=2,
+    )
+
+    objs_json = json.dumps(
+        [
+            {
+                "name": o["name"],
+                "stored_prompt": o.get("prompt", ""),
+                "attributes": o.get("attributes", {}),
+            }
+            for o in (objects or [])
+        ],
+        indent=2,
+    )
+
+    locs_json = json.dumps(
+        [
+            {
+                "name": l["name"],
+                "stored_prompt": l.get("prompt", ""),
+                "attributes": l.get("attributes", {}),
+            }
+            for l in (locations or [])
+        ],
+        indent=2,
+    )
+
     llm_prompt = f"""You resolve character/object/location descriptions against a scene context.
 
 SCENE: {scene_description}
@@ -239,13 +260,15 @@ Rules:
 - Return valid JSON only
 
 Return JSON array with items type-discriminated by "__type__" field ("character", "object", "location"). Each item should have a "name" field and the relevant attributes above."""
-    
+
     # Try LLM
     if not LLM_AVAILABLE:
         print("LLM unavailable, using fallback")
     else:
         try:
-            result = generate_text_with_llm(llm_prompt, model_name="phi3_mini", max_new_tokens=1024)
+            result = generate_text_with_llm(
+                llm_prompt, model_name="phi3_mini", max_new_tokens=1024
+            )
             # Parse JSON from result (may need cleaning/fence stripping)
             if result:
                 chars_data = json.loads(_extract_json_blocks(result))
@@ -254,7 +277,13 @@ Return JSON array with items type-discriminated by "__type__" field ("character"
                     # Items are type-discriminated by "__type__" field
                     item_type = item.pop("__type__", "character")
                     # Allow the LLM to omit the new optional fields.
-                    for optional in ("scene_pose", "scene_action", "scene_position_hint", "current_state", "scene_state_hint"):
+                    for optional in (
+                        "scene_pose",
+                        "scene_action",
+                        "scene_position_hint",
+                        "current_state",
+                        "scene_state_hint",
+                    ):
                         item.setdefault(optional, None)
                     if item_type == "object":
                         cls = ResolvedObject
@@ -269,98 +298,114 @@ Return JSON array with items type-discriminated by "__type__" field ("character"
                 return resolved
         except Exception as e:
             print(f"LLM context resolution failed: {e}")
-    
+
     # Fallback: derive identity + scene presentation from the SCENE TEXT
     # itself (never from the raw stored prompt, which carries generation
     # artifacts like "fantasy clothing" / "standing upright").
-    all_names = [c['name'] for c in characters]
+    all_names = [c["name"] for c in characters]
     fallback = []
     for c in characters:
-        snippets = _extract_character_snippets(scene_description, c['name'], all_names)
+        snippets = _extract_character_snippets(scene_description, c["name"], all_names)
         identity = snippets[:1]
         presentation = snippets[1:]
-        fallback.append(ResolvedCharacter(
-            name=c['name'],
-            identity=identity,
-            default_presentation=[],
-            presentation_decision="ADAPT" if snippets else "KEEP",
-            scene_presentation=presentation,
-            dropped=["<stored character prompt>"] if snippets else [],
-            dropped_reason=(
-                "Fallback resolution: used scene-description snippet instead "
-                "of raw stored prompt to avoid generation-time artifacts."
-                if snippets else ""
-            ),
-        ))
+        fallback.append(
+            ResolvedCharacter(
+                name=c["name"],
+                identity=identity,
+                default_presentation=[],
+                presentation_decision="ADAPT" if snippets else "KEEP",
+                scene_presentation=presentation,
+                dropped=["<stored character prompt>"] if snippets else [],
+                dropped_reason=(
+                    "Fallback resolution: used scene-description snippet instead "
+                    "of raw stored prompt to avoid generation-time artifacts."
+                    if snippets
+                    else ""
+                ),
+            )
+        )
     # Add fallback objects if available
     if objects:
         for o in objects:
-            obj_name = o.get('name', '')
-            fallback.append(ResolvedObject(
-                name=obj_name,
-                identity=[obj_name],  # simple fallback: just the name
-                default_presentation=[],
-                presentation_decision="ADAPT",
-                scene_presentation=[],
-                dropped=[],
-                dropped_reason="Fallback: no scene text describing object",
-            ))
+            obj_name = o.get("name", "")
+            fallback.append(
+                ResolvedObject(
+                    name=obj_name,
+                    identity=[obj_name],  # simple fallback: just the name
+                    default_presentation=[],
+                    presentation_decision="ADAPT",
+                    scene_presentation=[],
+                    dropped=[],
+                    dropped_reason="Fallback: no scene text describing object",
+                )
+            )
     # Add fallback locations if available
     if locations:
         for l in locations:
-            loc_name = l.get('name', '')
-            fallback.append(ResolvedLocation(
-                name=loc_name,
-                identity=[loc_name],  # simple fallback: just the name
-                default_presentation=[],
-                presentation_decision="ADAPT",
-                scene_presentation=[],
-                dropped=[],
-                dropped_reason="Fallback: no scene text describing location",
-                current_state="initial",
-            ))
+            loc_name = l.get("name", "")
+            fallback.append(
+                ResolvedLocation(
+                    name=loc_name,
+                    identity=[loc_name],  # simple fallback: just the name
+                    default_presentation=[],
+                    presentation_decision="ADAPT",
+                    scene_presentation=[],
+                    dropped=[],
+                    dropped_reason="Fallback: no scene text describing location",
+                    current_state="initial",
+                )
+            )
     return fallback
 
 
 def stage_b_decompose_scene(
     scene_description: str,
     resolved_entities: List[Union[ResolvedCharacter, ResolvedObject, ResolvedLocation]],
-    project_style: Optional[str] = None
+    project_style: Optional[str] = None,
 ) -> ScenePlan:
     """Stage B: Decompose scene into layers via LLM."""
-    
+
     # Categorize entities
     characters = [e for e in resolved_entities if isinstance(e, ResolvedCharacter)]
     objects = [e for e in resolved_entities if isinstance(e, ResolvedObject)]
     locations = [e for e in resolved_entities if isinstance(e, ResolvedLocation)]
-    
-    chars_desc = json.dumps([
-        {
-            'name': c.name,
-            'identity': c.identity,
-            'scene_presentation': c.scene_presentation
-        }
-        for c in characters
-    ], indent=2)
-    
-    objs_desc = json.dumps([
-        {
-            'name': o.name,
-            'identity': o.identity,
-            'scene_presentation': o.scene_presentation
-        }
-        for o in objects
-    ], indent=2)
-    
-    locs_desc = json.dumps([
-        {
-            'name': l.name,
-            'identity': l.identity,
-            'scene_presentation': l.scene_presentation
-        }
-        for l in locations
-    ], indent=2)
-    
+
+    chars_desc = json.dumps(
+        [
+            {
+                "name": c.name,
+                "identity": c.identity,
+                "scene_presentation": c.scene_presentation,
+            }
+            for c in characters
+        ],
+        indent=2,
+    )
+
+    objs_desc = json.dumps(
+        [
+            {
+                "name": o.name,
+                "identity": o.identity,
+                "scene_presentation": o.scene_presentation,
+            }
+            for o in objects
+        ],
+        indent=2,
+    )
+
+    locs_desc = json.dumps(
+        [
+            {
+                "name": l.name,
+                "identity": l.identity,
+                "scene_presentation": l.scene_presentation,
+            }
+            for l in locations
+        ],
+        indent=2,
+    )
+
     llm_prompt = f"""You are a scene director planning multi-step image generation.
 The image model handles ~1-2 subjects well per step.
 
@@ -415,41 +460,43 @@ Rules:
   not needed."""
 
     try:
-        result = generate_text_with_llm(llm_prompt, model_name="phi3_mini", max_new_tokens=1024)
+        result = generate_text_with_llm(
+            llm_prompt, model_name="phi3_mini", max_new_tokens=1024
+        )
         # Parse JSON (strip fences/lead-in from the model's raw completion)
         data = json.loads(_extract_json_blocks(result))
-        
+
         layers = []
-        for l in data.get('layers', []):
-            layers.append(SceneLayerPlan(
-                name=l['name'],
-                prompt=l['prompt'],
-                must_include=l.get('must_include', []),
-                region_hint=l.get('region_hint'),
-                depends_on=l.get('depends_on')
-            ))
-        
+        for l in data.get("layers", []):
+            layers.append(
+                SceneLayerPlan(
+                    name=l["name"],
+                    prompt=l["prompt"],
+                    must_include=l.get("must_include", []),
+                    region_hint=l.get("region_hint"),
+                    depends_on=l.get("depends_on"),
+                )
+            )
+
         return ScenePlan(
-            camera=data.get('camera', ''),
+            camera=data.get("camera", ""),
             layers=layers,
-            single_pass_feasible=data.get('single_pass_feasible', False),
-            rationale=data.get('rationale', ''),
+            single_pass_feasible=data.get("single_pass_feasible", False),
+            rationale=data.get("rationale", ""),
             resolved_characters=characters,
             resolved_objects=objects,
             resolved_locations=locations,
-            canvas_layout=data.get('canvas_layout'),
+            canvas_layout=data.get("canvas_layout"),
         )
     except Exception as e:
         print(f"LLM decomposition failed: {e}, using fallback")
-        
+
         # Fallback to simple two-layer approach
         return ScenePlan(
             camera="wide shot",
             layers=[
                 SceneLayerPlan(
-                    name="base_environment",
-                    prompt=scene_description,
-                    must_include=[]
+                    name="base_environment", prompt=scene_description, must_include=[]
                 )
             ],
             single_pass_feasible=True,
@@ -461,15 +508,14 @@ Rules:
 
 
 def stage_c_token_budget_fit(
-    layer_plan: SceneLayerPlan,
-    token_limit: int = 77
+    layer_plan: SceneLayerPlan, token_limit: int = 77
 ) -> SceneLayerPlan:
     """Stage C: Fit layer prompt to token budget via LLM rephrasing."""
-    
+
     current_tokens = count_tokens(layer_plan.prompt)
     if current_tokens <= token_limit:
         return layer_plan
-    
+
     # Try LLM compression
     compress_prompt = f"""Compress this image prompt to ≤ {token_limit} CLIP tokens (currently {current_tokens}).
 Keep ALL identity traits verbatim.
@@ -478,10 +524,10 @@ Prioritize: 1) subject identity 2) action 3) setting
 PROMPT: {layer_plan.prompt}
 
 Return only the compressed prompt, no explanations."""
-    
+
     try:
         result = generate_text_with_llm(compress_prompt, model_name="phi3_mini")
-        
+
         new_tokens = count_tokens(result)
         if new_tokens <= token_limit:
             # Verify identity preserved
@@ -491,13 +537,14 @@ Return only the compressed prompt, no explanations."""
             return layer_plan
     except Exception as e:
         print(f"LLM compression failed: {e}")
-    
+
     # Fallback to token budget truncation
     from utils.token_budget import TokenBudgetManager
+
     manager = TokenBudgetManager()
     layer_plan.original_prompt = layer_plan.prompt
     layer_plan.prompt = manager.truncate_to_tokens(layer_plan.prompt, token_limit)
-    
+
     return layer_plan
 
 
@@ -510,6 +557,7 @@ STRATEGY_ASSET_COMPOSITION = "asset_composition"
 @dataclass
 class StrategyDecision:
     """Result of Stage D strategy selection."""
+
     strategy: str
     reason: str
     character_count: int = 0
@@ -566,26 +614,36 @@ def stage_d_select_strategy(
     # >=2 characters: ask the LLM. Detect explicit spatial requirements as a
     # cheap pre-filter to seed the default when the LLM is unavailable.
     position_keywords = [
-        "left", "right", "center", "behind", "in front", "beside",
-        "on the stage", "next to", "foreground", "background",
+        "left",
+        "right",
+        "center",
+        "behind",
+        "in front",
+        "beside",
+        "on the stage",
+        "next to",
+        "foreground",
+        "background",
     ]
     lower = scene_description.lower()
     has_position_hints = any(
-        rc.scene_position_hint
-        or any(k in lower for k in position_keywords)
+        rc.scene_position_hint or any(k in lower for k in position_keywords)
         for rc in resolved_characters
     )
 
     llm_decision = None
     if LLM_AVAILABLE:
         try:
-            chars_desc = json.dumps([
-                {
-                    "name": rc.name,
-                    "scene_position_hint": rc.scene_position_hint,
-                }
-                for rc in resolved_characters
-            ], indent=2)
+            chars_desc = json.dumps(
+                [
+                    {
+                        "name": rc.name,
+                        "scene_position_hint": rc.scene_position_hint,
+                    }
+                    for rc in resolved_characters
+                ],
+                indent=2,
+            )
             llm_prompt = f"""You select an image-generation strategy for a scene.
 
 SCENE: {scene_description}
@@ -606,13 +664,17 @@ Return valid JSON only: {{
   "strategy": "asset_composition",
   "reason": "2 characters with distinct spatial positions and identity requirements"
 }}"""
-            result = generate_text_with_llm(llm_prompt, model_name="phi3_mini", max_new_tokens=256)
+            result = generate_text_with_llm(
+                llm_prompt, model_name="phi3_mini", max_new_tokens=256
+            )
             if result:
                 data = json.loads(_extract_json_blocks(result))
                 llm_decision = data.get("strategy")
                 llm_reason = data.get("reason", "")
                 if llm_decision in (
-                    STRATEGY_SINGLE_PASS, STRATEGY_PROGRESSIVE, STRATEGY_ASSET_COMPOSITION
+                    STRATEGY_SINGLE_PASS,
+                    STRATEGY_PROGRESSIVE,
+                    STRATEGY_ASSET_COMPOSITION,
                 ):
                     return StrategyDecision(
                         strategy=llm_decision,
@@ -625,7 +687,9 @@ Return valid JSON only: {{
 
     # Default when LLM unavailable or returned something invalid: prefer
     # asset_composition when explicit spatial/identity requirements exist.
-    strategy = STRATEGY_ASSET_COMPOSITION if has_position_hints else STRATEGY_PROGRESSIVE
+    strategy = (
+        STRATEGY_ASSET_COMPOSITION if has_position_hints else STRATEGY_PROGRESSIVE
+    )
     return StrategyDecision(
         strategy=strategy,
         reason=(
@@ -642,10 +706,10 @@ Return valid JSON only: {{
 
 class LLMScenePlanner:
     """Orchestrates LLM-based scene planning."""
-    
+
     def __init__(self, use_llm: bool = True):
         self.use_llm = use_llm
-    
+
     def plan_scene(
         self,
         scene_description: str,
@@ -655,29 +719,33 @@ class LLMScenePlanner:
         locations: Optional[List[Dict[str, Any]]] = None,
     ) -> ScenePlan:
         """Create complete scene plan via LLM delegation."""
-        
+
         if not self.use_llm:
             # Return empty plan for fallback
             return ScenePlan(
                 camera="",
                 layers=[],
                 single_pass_feasible=True,
-                rationale="LLM disabled"
+                rationale="LLM disabled",
             )
-        
+
         # Stage A: Context resolution
         print("Stage A: Resolving character/context...")
         resolved = stage_a_context_resolution(
             scene_description, characters, objects, locations
         )
-        
-        # Stage B: Decomposition  
+
+        # Stage B: Decomposition
         print("Stage B: Decomposing scene...")
         plan = stage_b_decompose_scene(scene_description, resolved, project_style)
-        plan.resolved_characters = [e for e in resolved if isinstance(e, ResolvedCharacter)]
+        plan.resolved_characters = [
+            e for e in resolved if isinstance(e, ResolvedCharacter)
+        ]
         plan.resolved_objects = [e for e in resolved if isinstance(e, ResolvedObject)]
-        plan.resolved_locations = [e for e in resolved if isinstance(e, ResolvedLocation)]
-        
+        plan.resolved_locations = [
+            e for e in resolved if isinstance(e, ResolvedLocation)
+        ]
+
         # Stage C: Token fitting
         print("Stage C: Fitting token budgets...")
         over_budget = False
@@ -686,7 +754,7 @@ class LLMScenePlanner:
             if fitted.original_prompt is not None:
                 over_budget = True
             plan.layers[i] = fitted
-        
+
         # Stage D: Strategy selection
         print("Stage D: Selecting generation strategy...")
         decision = stage_d_select_strategy(
@@ -696,64 +764,64 @@ class LLMScenePlanner:
             over_clip_budget=over_budget,
         )
         plan.strategy = decision.strategy
-        
+
         return plan
-    
+
     def save_plan(self, plan: ScenePlan, output_path: Path):
         """Save plan for audit trail."""
         data = {
-            'camera': plan.camera,
-            'single_pass_feasible': plan.single_pass_feasible,
-            'rationale': plan.rationale,
-            'strategy': plan.strategy,
-            'canvas_layout': plan.canvas_layout,
-            'layers': [
+            "camera": plan.camera,
+            "single_pass_feasible": plan.single_pass_feasible,
+            "rationale": plan.rationale,
+            "strategy": plan.strategy,
+            "canvas_layout": plan.canvas_layout,
+            "layers": [
                 {
-                    'name': l.name,
-                    'prompt': l.prompt,
-                    'original_prompt': l.original_prompt,
-                    'must_include': l.must_include,
-                    'region_hint': l.region_hint
+                    "name": l.name,
+                    "prompt": l.prompt,
+                    "original_prompt": l.original_prompt,
+                    "must_include": l.must_include,
+                    "region_hint": l.region_hint,
                 }
                 for l in plan.layers
             ],
-            'resolved_characters': [
+            "resolved_characters": [
                 {
-                    'name': c.name,
-                    'identity': c.identity,
-                    'presentation_decision': c.presentation_decision,
-                    'scene_presentation': c.scene_presentation,
-                    'scene_pose': c.scene_pose,
-                    'scene_action': c.scene_action,
-                    'scene_position_hint': c.scene_position_hint,
-                    'dropped': c.dropped
+                    "name": c.name,
+                    "identity": c.identity,
+                    "presentation_decision": c.presentation_decision,
+                    "scene_presentation": c.scene_presentation,
+                    "scene_pose": c.scene_pose,
+                    "scene_action": c.scene_action,
+                    "scene_position_hint": c.scene_position_hint,
+                    "dropped": c.dropped,
                 }
                 for c in plan.resolved_characters
             ],
-            'resolved_objects': [
+            "resolved_objects": [
                 {
-                    'name': o.name,
-                    'identity': o.identity,
-                    'presentation_decision': o.presentation_decision,
-                    'scene_presentation': o.scene_presentation,
-                    'scene_pose': o.scene_pose,
-                    'dropped': o.dropped
+                    "name": o.name,
+                    "identity": o.identity,
+                    "presentation_decision": o.presentation_decision,
+                    "scene_presentation": o.scene_presentation,
+                    "scene_pose": o.scene_pose,
+                    "dropped": o.dropped,
                 }
                 for o in plan.resolved_objects
             ],
-            'resolved_locations': [
+            "resolved_locations": [
                 {
-                    'name': l.name,
-                    'identity': l.identity,
-                    'presentation_decision': l.presentation_decision,
-                    'scene_presentation': l.scene_presentation,
-                    'current_state': l.current_state,
-                    'dropped': l.dropped
+                    "name": l.name,
+                    "identity": l.identity,
+                    "presentation_decision": l.presentation_decision,
+                    "scene_presentation": l.scene_presentation,
+                    "current_state": l.current_state,
+                    "dropped": l.dropped,
                 }
                 for l in plan.resolved_locations
-            ]
+            ],
         }
-        
+
         output_path.write_text(json.dumps(data, indent=2))
 
 
@@ -762,31 +830,38 @@ def create_llm_scene_plan(
     characters: List[Dict[str, Any]],
     objects: Optional[List[Dict[str, Any]]] = None,
     locations: Optional[List[Dict[str, Any]]] = None,
-    project_name: str = "default"
+    project_name: str = "default",
 ) -> ScenePlan:
     """Convenience function to create LLM-based scene plan."""
-    
+
     from utils.project_paths import scene_dir
-    
+
     # Get project for style info (with fallback)
     try:
         from services.database.project_service import get_project
+
         project = get_project(project_name)
-        project_style = project.get('style', 'photorealistic')
+        project_style = project.get("style", "photorealistic")
     except:
-        project_style = 'photorealistic'
-    
+        project_style = "photorealistic"
+
     planner = LLMScenePlanner(use_llm=True)
-    plan = planner.plan_scene(scene_description, characters, project_style, objects=objects, locations=locations)
-    
+    plan = planner.plan_scene(
+        scene_description,
+        characters,
+        project_style,
+        objects=objects,
+        locations=locations,
+    )
+
     # Save plan for audit
     try:
-        next_num = len(list((scene_dir(1, project_name)).parent.glob('*')))
+        next_num = len(list((scene_dir(1, project_name)).parent.glob("*")))
         plan_path = scene_dir(next_num or 1, project_name) / "plan.json"
         plan_path.parent.mkdir(parents=True, exist_ok=True)
         planner.save_plan(plan, plan_path)
         print(f"Plan saved to {plan_path}")
     except:
         pass
-    
+
     return plan

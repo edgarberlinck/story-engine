@@ -5,8 +5,16 @@ Dialog for creating scenes, with a character reference panel.
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton,
-    QScrollArea, QWidget, QFrame, QApplication,
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QTextEdit,
+    QPushButton,
+    QScrollArea,
+    QWidget,
+    QFrame,
+    QApplication,
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap
@@ -23,7 +31,9 @@ class _CharacterChip(QFrame):
         self.on_copied = on_copied
         self.setCursor(Qt.PointingHandCursor)
         self.setObjectName("charChip")
-        self.setToolTip(f"Click to copy \u201c{character['name']}\u201d to the clipboard")
+        self.setToolTip(
+            f"Click to copy \u201c{character['name']}\u201d to the clipboard"
+        )
         self.setStyleSheet("""
             QFrame#charChip {
                 border: 1px solid #ddd; border-radius: 6px; background: white;
@@ -42,7 +52,9 @@ class _CharacterChip(QFrame):
         path = character.get("reference_image")
         pix = QPixmap(path) if path and Path(path).is_file() else QPixmap()
         if not pix.isNull():
-            thumb.setPixmap(pix.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            thumb.setPixmap(
+                pix.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
         else:
             thumb.setText("?")
             thumb.setStyleSheet("background: #eee; color: #999; border-radius: 4px;")
@@ -108,7 +120,9 @@ class SceneDialog(QDialog):
         # Footer: status + buttons
         footer = QHBoxLayout()
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #4CAF50; font-size: 11px; font-style: italic;")
+        self.status_label.setStyleSheet(
+            "color: #4CAF50; font-size: 11px; font-style: italic;"
+        )
         footer.addWidget(self.status_label)
         footer.addStretch()
         btn_cancel = QPushButton("Cancel")
@@ -127,6 +141,4 @@ class SceneDialog(QDialog):
         QTimer.singleShot(2000, lambda: self.status_label.setText(""))
 
     def get_data(self):
-        return {
-            "prompt": self.prompt_edit.toPlainText()
-        }
+        return {"prompt": self.prompt_edit.toPlainText()}

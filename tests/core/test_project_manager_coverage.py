@@ -25,6 +25,7 @@ class TestProjectManagerCoverage(unittest.TestCase):
         self.tmpdb.close()
 
         from services.database import database_service
+
         self.original_db_path = database_service.db_service.db_path
         database_service.db_service.db_path = self.db_path
         database_service.db_service.init_database()
@@ -33,6 +34,7 @@ class TestProjectManagerCoverage(unittest.TestCase):
 
     def tearDown(self):
         from services.database import database_service
+
         database_service.db_service.db_path = self.original_db_path
         if os.path.exists(self.db_path):
             os.unlink(self.db_path)
@@ -40,7 +42,7 @@ class TestProjectManagerCoverage(unittest.TestCase):
     def _create(self, name="My Project", description="desc"):
         return ProjectManager().create_project(name, description)
 
-     # -- create / list ---------------------------------------------------
+    # -- create / list ---------------------------------------------------
 
     def test_create_and_list_projects(self):
         pm = ProjectManager()
@@ -53,14 +55,14 @@ class TestProjectManagerCoverage(unittest.TestCase):
         pm = ProjectManager()
         pid = self._create("My Project")
         self.assertTrue(pid.startswith("project_"))
-         # get_project round-trips the record.
+        # get_project round-trips the record.
         self.assertEqual(pm.get_project(pid)["name"], "My Project")
 
     def test_list_projects_empty(self):
         pm = ProjectManager()
         self.assertEqual(pm.list_projects(), [])
 
-     # -- update ----------------------------------------------------------
+    # -- update ----------------------------------------------------------
 
     def test_update_project_name_and_description(self):
         pm = ProjectManager()
@@ -82,13 +84,13 @@ class TestProjectManagerCoverage(unittest.TestCase):
         pm = ProjectManager()
         self.assertFalse(pm.update_project("project_nope"))
 
-     # -- get -------------------------------------------------------------
+    # -- get -------------------------------------------------------------
 
     def test_get_project_missing_returns_none(self):
         pm = ProjectManager()
         self.assertIsNone(pm.get_project("project_nope"))
 
-     # -- delete ----------------------------------------------------------
+    # -- delete ----------------------------------------------------------
 
     def test_delete_project_missing_returns_false(self):
         pm = ProjectManager()
@@ -104,8 +106,9 @@ class TestProjectManagerCoverage(unittest.TestCase):
         project_dir.mkdir(parents=True)
         (project_dir / "file.txt").write_text("x")
         try:
-            with patch("core.project_manager.OUTPUTS_ROOT", root), \
-                 patch("core.project_manager.shutil.rmtree") as rmtree:
+            with patch("core.project_manager.OUTPUTS_ROOT", root), patch(
+                "core.project_manager.shutil.rmtree"
+            ) as rmtree:
                 ok = pm.delete_project(pid)
             self.assertTrue(ok)
             rmtree.assert_called_once_with(project_dir)
@@ -120,8 +123,9 @@ class TestProjectManagerCoverage(unittest.TestCase):
         # Point OUTPUTS_ROOT at an empty temp root so the folder does not
         # exist; the cleanup branch is skipped but deletion still succeeds.
         root = Path(tempfile.mkdtemp())
-        with patch("core.project_manager.OUTPUTS_ROOT", root), \
-             patch("core.project_manager.shutil.rmtree") as rmtree:
+        with patch("core.project_manager.OUTPUTS_ROOT", root), patch(
+            "core.project_manager.shutil.rmtree"
+        ) as rmtree:
             ok = pm.delete_project(pid)
         self.assertTrue(ok)
         rmtree.assert_not_called()

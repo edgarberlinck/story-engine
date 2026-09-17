@@ -9,8 +9,12 @@ serving as immediate mitigation while Phase 2 architectural refactor is planned.
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from core.character_attributes import CHARACTER_STYLES, STYLE_FAMILIES, \
-    INCOMPATIBLE_FAMILY_PAIRS, FAMILY_BRIDGES
+from core.character_attributes import (
+    CHARACTER_STYLES,
+    STYLE_FAMILIES,
+    INCOMPATIBLE_FAMILY_PAIRS,
+    FAMILY_BRIDGES,
+)
 
 
 def detect_character_style(character_prompt: str) -> Optional[str]:
@@ -22,7 +26,7 @@ def detect_character_style(character_prompt: str) -> Optional[str]:
     """
     if not character_prompt:
         return None
-    
+
     text = character_prompt.lower()
     best_match: Optional[str] = None
     best_len = 0
@@ -53,9 +57,7 @@ class StyleConflict:
         )
 
 
-def find_style_conflicts(
-    characters: List[Dict[str, str]]
-) -> List[StyleConflict]:
+def find_style_conflicts(characters: List[Dict[str, str]]) -> List[StyleConflict]:
     """Given character records (each needs 'name' and 'prompt'), detect
     incompatible style-family combinations.
 
@@ -94,17 +96,19 @@ def find_style_conflicts(
     return conflicts
 
 
-def detect_scene_style_conflicts(prompt: str, project: str = "test_project") -> List[StyleConflict]:
+def detect_scene_style_conflicts(
+    prompt: str, project: str = "test_project"
+) -> List[StyleConflict]:
     """Detect style conflicts for characters referenced in a scene prompt.
-    
+
     Args:
         prompt: Scene prompt text
         project: Project name
-        
+
     Returns:
         List of StyleConflict objects
     """
     from services.database.character_service import character_service
-    
+
     characters = character_service.find_characters_in_text(prompt, project)
     return find_style_conflicts(characters)

@@ -29,6 +29,7 @@ for c in characters:
 
 # Verify pipeline selection logic
 from core.scene_pipeline import _select_strategy
+
 strategy = _select_strategy(len(characters))
 print(f"\nSelected strategy: {strategy}")
 
@@ -36,8 +37,8 @@ print(f"\nSelected strategy: {strategy}")
 test_config = {
     "project": project,
     "prompt": prompt,
-    "characters": [{"name": c['name']} for c in characters],
-    "strategy": strategy
+    "characters": [{"name": c["name"]} for c in characters],
+    "strategy": strategy,
 }
 
 output_dir = Path("/tmp/story_engine_test")
@@ -49,7 +50,7 @@ print(f"\nTest config saved to: {config_path}")
 print("\nPipeline implementation complete!")
 print("Modules created:")
 print("  - core/character_asset_generator.py")
-print("  - core/scene_compositor.py")  
+print("  - core/scene_compositor.py")
 print("  - core/scene_pipeline.py")
 print("  - Updated core/scene_workflow.py")
 

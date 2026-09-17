@@ -54,6 +54,7 @@ class TestBenchmarkImageGenerator(unittest.TestCase):
     def test_deprecated_import_still_works(self):
         """Old import path should keep working (backward compatibility)."""
         from generators.image_generator import benchmark_models as legacy_bm
+
         self.assertTrue(callable(legacy_bm))
 
 

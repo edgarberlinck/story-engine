@@ -10,7 +10,7 @@ from PySide6.QtGui import QPixmap
 
 
 class ObjectCard(QFrame):
-    clicked = Signal(dict)          # object dict
+    clicked = Signal(dict)  # object dict
     delete_requested = Signal(dict)
 
     def __init__(self, obj):
@@ -39,12 +39,16 @@ class ObjectCard(QFrame):
         if image_path and Path(image_path).is_file():
             pix = QPixmap(image_path)
             if not pix.isNull():
-                thumb.setPixmap(pix.scaled(150, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                thumb.setPixmap(
+                    pix.scaled(150, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                )
             else:
                 thumb.setText("No image")
         else:
             thumb.setText("No image")
-            thumb.setStyleSheet("background-color: #eee; color: #999; border-radius: 4px;")
+            thumb.setStyleSheet(
+                "background-color: #eee; color: #999; border-radius: 4px;"
+            )
 
         name_label = QLabel(self.object["name"])
         name_label.setAlignment(Qt.AlignCenter)
@@ -68,6 +72,7 @@ class ObjectCard(QFrame):
 
     def contextMenuEvent(self, event):
         from PySide6.QtWidgets import QMenu
+
         menu = QMenu(self)
         delete_action = menu.addAction("Delete Object")
         if menu.exec(event.globalPos()) == delete_action:

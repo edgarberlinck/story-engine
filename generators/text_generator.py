@@ -30,11 +30,13 @@ from utils.model_metrics import ModelMetrics
 try:
     from transformers import pipeline as hf_pipeline
     from transformers.utils import logging as hf_logging
+
     _HF_AVAILABLE = True
 except Exception:  # pragma: no cover - transformers is a core dependency
     hf_pipeline = None
     hf_logging = None
     _HF_AVAILABLE = False
+
 
 def resolve_model_path(model_type, model_name, hub_id):
     """Resolve a model to its locally installed path (from `make install`).
@@ -48,54 +50,58 @@ def resolve_model_path(model_type, model_name, hub_id):
         str: Local path if the model was installed, otherwise the hub id.
     """
     from models import MODEL_PATHS
-    
+
     local_path = os.path.join(str(project_root), MODEL_PATHS[model_type], model_name)
     if os.path.isdir(local_path) and os.listdir(local_path):
         return local_path
-    print(f"Warning: {model_name} not found locally at {local_path}. "
-          f"Run 'make install' first. Falling back to hub download: {hub_id}")
+    print(
+        f"Warning: {model_name} not found locally at {local_path}. "
+        f"Run 'make install' first. Falling back to hub download: {hub_id}"
+    )
     return hub_id
+
 
 def generate_filename_from_prompt(prompt):
     """Generate a concise filename from the prompt using text generation models.
-    
+
     Args:
         prompt (str): Description of the image to generate
-        
+
     Returns:
         str: Generated filename (without extension, max 20 characters)
     """
     # Handle empty or None prompt
     if not prompt:
         return "generated_image"
-    
+
     # Clean and normalize the prompt for filename creation
-    clean_prompt = re.sub(r'[^\w\s-]', '', prompt.lower())
-    clean_prompt = re.sub(r'[-\s]+', '_', clean_prompt)
-    
-    # Take first meaningful words to form a concise filename  
-    words = [w for w in clean_prompt.split('_') if w and len(w) >= 2]
-    
+    clean_prompt = re.sub(r"[^\w\s-]", "", prompt.lower())
+    clean_prompt = re.sub(r"[-\s]+", "_", clean_prompt)
+
+    # Take first meaningful words to form a concise filename
+    words = [w for w in clean_prompt.split("_") if w and len(w) >= 2]
+
     # Use first two words or the entire cleaned prompt (limited to 20 chars)
     if len(words) >= 2:
-        filename = '_'.join(words[:2])
+        filename = "_".join(words[:2])
     else:
         filename = clean_prompt
-    
+
     # Ensure it starts with a letter or number and is at least 3 characters
     if filename and not filename[0].isalnum():
         filename = "img_" + filename
-        
-    # Trim to max 20 characters for conciseness  
+
+    # Trim to max 20 characters for conciseness
     filename = filename[:20]
-    
+
     # If the result is empty after all processing, return a default
     if not filename:
         filename = "generated_image"
-    
+
     print(f"Generated concise filename from prompt '{prompt}': {filename}")
-    
+
     return filename
+
 
 def generate_prompt_with_llm(description, model_name="phi3_mini"):
     """Use a local text generation model to expand a short description
@@ -155,6 +161,7 @@ def generate_prompt_with_llm(description, model_name="phi3_mini"):
         # Free memory (and multiprocessing resources) before diffusion
         # models load.
         from generators.image_generator import cleanup_pipeline
+
         cleanup_pipeline(generator)
         generator = None
 
@@ -245,6 +252,7 @@ def generate_text_with_llm(
         print(f"LLM completion failed ({e}); returning None.")
     finally:
         from generators.image_generator import cleanup_pipeline
+
         cleanup_pipeline(generator)
         generator = None
 

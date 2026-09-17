@@ -61,6 +61,7 @@ class SceneLogger:
     @staticmethod
     def _slugify(name: str) -> str:
         import re
+
         slug = re.sub(r"[^\w\s-]", "", name.strip())
         slug = re.sub(r"[-\s]+", "_", slug)
         return slug or "unnamed"
@@ -112,73 +113,85 @@ class SceneLogger:
 
 def scene_logging(*, scene_name_arg: str, prompt_arg: str) -> Callable:
     """Decorator to log scene generation runs with all prints, prompts, and metadata.
-    
+
     Args:
         scene_name_arg: Name of the argument that contains the scene name or number
         prompt_arg: Name of the argument that contains the prompt to be logged
-        
+
     Returns:
         Decorator function that wraps the target function
     """
+
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs) -> Any:
             # Get arguments by name
             sig = inspect.signature(func)
             bound = sig.bind(*args, **kwargs)
             bound.apply_defaults()
-            
+
             scene_number = bound.arguments.get(scene_name_arg)
             original_prompt = bound.arguments.get(prompt_arg)
-            project = bound.arguments.get('project', None)
-            
+            project = bound.arguments.get("project", None)
+
             # Resolve auto-assigned scene numbers up front so the log lands in
             # logs/scenes/<project>/scene_<N>/ instead of scene_pending/.
             if scene_number is None:
                 try:
                     from utils.project_paths import next_scene_number
-                    scene_number = next_scene_number(project) if project else next_scene_number()
+
+                    scene_number = (
+                        next_scene_number(project) if project else next_scene_number()
+                    )
                     # Pass the resolved number through to the wrapped function
                     # so it uses the same scene directory.
                     bound.arguments[scene_name_arg] = scene_number
                 except Exception:
                     scene_number = None
-            
+
             temp_scene_num = scene_number if scene_number is not None else "pending"
-            
+
             # Create logger and context for capturing prints
             with SceneLogger(temp_scene_num, project) as logger:
                 # Log original prompt before generation
                 if original_prompt:
                     logger.log_section("ORIGINAL PROMPT", str(original_prompt))
-                
+
                 try:
                     result = func(*bound.args, **bound.kwargs)
-                    
+
                     # After generation, get actual scene number if it changed
                     final_scene_number = None
                     if isinstance(result, dict):
-                        final_scene_number = result.get('scene_number')
-                        
+                        final_scene_number = result.get("scene_number")
+
                         # Log generated prompts from result
-                        if 'strategy' in result:
-                            logger.log_section("STRATEGY", str(result['strategy']))
-                        if 'enriched_prompt' in result:
-                            logger.log_section("GENERATED ENRICHED PROMPT", str(result['enriched_prompt']))
-                        if 'prompt' in result and result['prompt'] != original_prompt:
-                            logger.log_section("FINAL PROMPT USED", str(result['prompt']))
-                        if 'negative_prompt' in result:
-                            logger.log_section("NEGATIVE PROMPT", str(result['negative_prompt']))
-                    
+                        if "strategy" in result:
+                            logger.log_section("STRATEGY", str(result["strategy"]))
+                        if "enriched_prompt" in result:
+                            logger.log_section(
+                                "GENERATED ENRICHED PROMPT",
+                                str(result["enriched_prompt"]),
+                            )
+                        if "prompt" in result and result["prompt"] != original_prompt:
+                            logger.log_section(
+                                "FINAL PROMPT USED", str(result["prompt"])
+                            )
+                        if "negative_prompt" in result:
+                            logger.log_section(
+                                "NEGATIVE PROMPT", str(result["negative_prompt"])
+                            )
+
                     # If scene number was auto-assigned, move log to correct location
                     if final_scene_number and temp_scene_num == "pending":
                         # Re-log with correct scene number (simplified - just continue)
                         pass
-                    
+
                     return result
-                    
+
                 except Exception as e:
                     logger.log_section("GENERATION ERROR", f"{type(e).__name__}: {e}")
                     raise
-                    
+
         return wrapper
+
     return decorator

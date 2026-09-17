@@ -4,39 +4,38 @@
 
 ## Overview
 
-Story Engine is an ML-driven pipeline for producing character-based video
-content (e.g. vertical dramas). It generates images from text prompts,
-animates them into video clips with image-to-video models, and manages the
-supporting data (projects, scenes, characters) in a persistent SQLite
-database — all from a desktop UI or CLI.
+**Story Engine** is an ML-driven pipeline for producing **immersive audiobooks** from a
+descriptive markup language. Authors write stories using XML-like tags or bracket shorthand,
+and the pipeline generates per-character isolated audio, background beds, and a mixed final
+scene — all orchestrated from a desktop UI or CLI. Video generation has been removed; the
+focus is purely on high-quality, consistent audio production.
+
+Story data is persisted in a lightweight SQLite database. Every scene, character, and
+voice assignment is tracked, making it easy to preview, edit, accept, and finalize audio
+productions with full reproducibility.
 
 ## Features
 
-- **Image generation** — text-to-image via SDXL and FLUX.1-dev
-- **Image-to-video generation** — LTX-Video 0.9.5 I2V
-- **Face recognition** — benchmarking for consistent character identity
-- **Project management** — create, list, search, and update projects (SQLite-backed)
-- **Scene & character management** — structured story data with versioned
-  character attributes
-- **Desktop UI** — PySide6-based application with stack navigation
-- **CLI** — Typer-based interface for project/character/scene operations
-- **Background workers** — thread-pool infrastructure for heavy generation tasks
-- **Model management** — centralized registries, metadata, and an automated
-  install script with concurrent downloads and progress tracking
-
-## Prerequisites
-
-- Python 3.11+ (developed on 3.14, Apple Silicon / macOS)
-- A [Hugging Face](https://huggingface.co/) account authenticated for the
-  models you want to use:
-
-```bash
-pip install huggingface_hub
-huggingface-cli login
-```
-
-> Some models are gated. FLUX.1-dev requires accepting its license on
-> Hugging Face before the download will succeed.
+- **Text-to-audio markup** — write stories with `<scene>`, `<character>`, `<sound>`, and
+  `<music>` tags (or bracket shorthand). The parser is tolerant and mixes notation styles.
+- **Per-character voice assignment** — each character has a persistent voice profile
+  (`voice_path`, `voice_prompt`) for consistent timbre across all fragments.
+- **Background beds** — generate `<sound>` (sound effects) and `<music>` beds via MusicGen;
+  dialogue is ducked under the bed automatically.
+- **Per-fragment preview** — listen to any fragment in isolation (character or background);
+  accept fragments to pre-generate and cache their WAV files.
+- **Accept & pre-generate** — mark fragments as accepted; the system generates and caches
+  their audio. Accepted fragments are visually indicated and persist across sessions.
+- **Finalize scene** — stitch all pre-generated fragments into one mixed piece with proper
+  gaps, speaker-change silences, and bed ducking. The final mix is saved as
+  `scene_final.wav` and can be played from the UI.
+- **Voice drift prevention** — a per-character voice resolver pins one stable voice per
+  character (designed voice from `voice_prompt` if set, otherwise a preset pinned once),
+  so timbre never drifts between fragments.
+- **Multitrack timeline view** — Audacity-style track lanes with waveforms, mute/solo,
+  volume sliders, drag-to-retime, and zoom. Honors per-segment start offsets.
+- **Project management** — create, list, search, and update projects and scenes via UI or CLI.
+- **CLI** — Typer-based interface for all project/character/scene operations.
 
 ## Getting Started
 
@@ -46,8 +45,7 @@ huggingface-cli login
 make install
 ```
 
-Downloads can be large (FLUX ~34GB, LTX-Video ~24GB). To download models
-without reinstalling dependencies:
+Download models selectively:
 
 ```bash
 make models
@@ -62,25 +60,50 @@ make models-ui
 ### 2. Launch the app
 
 ```bash
-make ui     # Desktop UI
+make ui     # Desktop UI (PySide6)
 make cli    # CLI help
 ```
 
-## Project Structure
+## Quick start: your first audiobook
+
+Write a story using the markup language. Here's a minimal example:
+
+```xml
+<scene>
+  <character name="narrator" tone="neutral">
+    Once upon a time...
+  </character>
+  <character name="maestro" tone="confident">
+    The orchestra tuned up.
+  </character>
+  <sound preset="orchestra warm"/>
+  <music prompt="soft strings"/>
+</scene>
+```
+
+Or using bracket shorthand:
+
+```text
+[narrator] Once upon a time...
+[maestro] The orchestra tuned up.
+[sound preset=orchestra warm]
+[music prompt=soft strings]
+```
+
+Open the UI, create a new project, paste the markup, and click **Generate Scene** to
+render the audio. Then use the scene editor to preview fragments, accept them, and
+**Finalize Scene** to produce the final mixed audio.
+
+## Project structure
 
 ```
 .
-├── Makefile              # Automation (test, install, UI/CLI, benchmarks)
-├── models.py             # Model registries, metadata, and config helpers
+├── Makefile              # Automation (test, install, UI/CLI)
+├── models.py             # Model registries and config helpers
 ├── requirements.txt
 ├── core/                 # Project/scene/character managers (UI-facing logic)
 ├── services/database/    # SQLite-backed services (projects, scenes, characters)
-├── infrastructure/database/  # Database connection infrastructure
-├── generators/           # Image, video, and face-recognition generation engines
-│   ├── image_generator.py
-│   ├── video_generator.py
-│   ├── image_engine.py
-│   └── benchmark_*.py
+├── generators/           # Audio generation engines (MusicGen, Qwen3-TTS)
 ├── utils/                # Shared helpers (model metrics, paths)
 ├── workers/              # Background task infrastructure
 ├── ui/                   # PySide6 desktop application
@@ -88,26 +111,27 @@ make cli    # CLI help
 ├── scripts/install.py    # Model installation & verification
 ├── tests/                # Unit tests (cli, core, services, workers)
 ├── docs/                 # Human + LLM documentation
-├── outputs/              # Generated content
+│   └── llm/              # Audiobook specification and API docs
+├── outputs/              # Generated content (scenes, audio, waveforms)
 ├── models/               # Downloaded model weights
-└── story_engine.db       # SQLite database (created at runtime)
+├── story_engine.db       # SQLite database (created at runtime)
+└── README.md             # This file
 ```
 
-## Model Registries
+## Model registries
 
 `models.py` centralizes every model used by the project:
 
 | Category | Models |
 |---|---|
-| **Diffusion** (text-to-image) | SDXL (`sdxl`), FLUX.1-dev (`flux_dev`) |
-| **Image-to-video** | LTX-Video 0.9.5 I2V (`ltx_video_095_i2v`) |
+| **Text-to-audio** | Qwen3-TTS (`qwen3_tts`) |
+| **Background audio** | MusicGen medium (`musicgen_medium`) |
 | **Text generation** | Phi-3 Mini (`phi3_mini`), Gemma 2B (`gemma_2b`) |
-| **Segmentation** | DETR ResNet-50 Panoptic (`detr_resnet_50_panoptic`) |
 
-See [docs/image-to-video.md](docs/image-to-video.md) for the authoritative
-specification and runtime guidance on the image-to-video models.
+All audio generation runs locally (MLX on Apple Silicon) or via CPU fallback. No video
+models are included.
 
-## Automation Commands
+## Automation commands
 
 | Command | Description |
 |---|---|
@@ -118,11 +142,6 @@ specification and runtime guidance on the image-to-video models.
 | `make cli` | Show CLI help |
 | `make test` | Run all unit tests |
 | `make watch` | Re-run tests on file changes |
-| `make benchmark-image` | Image generation benchmark suite |
-| `make benchmark-video` | Image-to-video benchmark suite |
-| `make benchmark-face` | Face recognition benchmark (writes report) |
-| `make benchmark-face-sdxl` | Face recognition benchmark with SDXL |
-| `make benchmark_fullbody_recognition` | Full-body face recognition benchmark |
 | `make format` | Format code with Black |
 | `make lint` | Lint code with Flake8 |
 | `make check` | Run lint + test |
@@ -131,15 +150,18 @@ specification and runtime guidance on the image-to-video models.
 ## Documentation
 
 - `docs/humans/` — user guides (e.g. `project-service.md`)
-- `docs/llm/` — technical specifications for API integration
+- `docs/llm/` — technical specifications for API integration, including the full
+  audiobook markup specification (`audiobook-specification.md`)
 - `ROADMAP.md` — phase-by-phase development status
 
 ## Troubleshooting
 
-- **Hugging Face auth errors**: run `huggingface-cli login` and confirm your
-  account has access to the gated model repositories.
-- **Large downloads timing out**: large models (4GB+) may require a stable
-  connection; `scripts/install.py` retries and adapts concurrency to network
-  speed.
-- **macOS semaphore warnings during generation**: `TOKENIZERS_PARALLELISM`
-  is set to `false` in the generators to avoid fork-based tokenizer issues.
+- **Hugging Face auth errors**: run `huggingface-cli login` and confirm your account has
+  access to the gated model repositories.
+- **Large downloads timing out**: large models may require a stable connection;
+  `scripts/install.py` retries and adapts concurrency to network speed.
+- **No audio output**: ensure at least one `<sound>` or `<music>` tag (or bracketted
+  equivalent) is present in your scene, or the scene will render as pure narration.
+- **Voice sounds different between fragments**: this was a known issue (per-fragment voice
+  derivation) and is now fixed by the per-character voice resolver — each character’s
+  timbre is pinned once and reused across all segments.

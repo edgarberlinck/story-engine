@@ -25,8 +25,14 @@ from core.character_asset_generator import (
 class _FakeResolvedCharacter:
     """Mimics a ResolvedCharacter with the attributes the builder reads."""
 
-    def __init__(self, name, identity=None, scene_presentation=None,
-                 scene_pose=None, scene_action=None):
+    def __init__(
+        self,
+        name,
+        identity=None,
+        scene_presentation=None,
+        scene_pose=None,
+        scene_action=None,
+    ):
         self.name = name
         self.identity = identity or []
         self.scene_presentation = scene_presentation or []
@@ -48,8 +54,9 @@ class TestCharacterSeed(unittest.TestCase):
 
     def test_base_seed_offset(self):
         self.assertEqual(
-             character_seed("Alex", base_seed=0),
-             character_seed("Alex", base_seed=100) - 100)
+            character_seed("Alex", base_seed=0),
+            character_seed("Alex", base_seed=100) - 100,
+        )
 
     def test_default_base_seed(self):
         self.assertEqual(character_seed("Alex"), character_seed("Alex", 42))
@@ -65,6 +72,7 @@ class TestSanitizeArtifacts(unittest.TestCase):
     def setUp(self):
         # Helper is module-private; grab it directly.
         import core.character_asset_generator as m
+
         self._sanitize = m._sanitize_fragment
 
     def test_forbidden_list_nonempty(self):
@@ -103,25 +111,25 @@ class TestBuildCharacterAssetPrompt(unittest.TestCase):
 
     def test_object_input(self):
         rc = _FakeResolvedCharacter(
-             "Nikita",
-             identity=["young woman", "long red hair"],
-             scene_presentation=["fantasy clothing", "standing upright"],
-             scene_pose="neutral background",
-             scene_action="not a close-up",
+            "Nikita",
+            identity=["young woman", "long red hair"],
+            scene_presentation=["fantasy clothing", "standing upright"],
+            scene_pose="neutral background",
+            scene_action="not a close-up",
         )
         prompt = build_character_asset_prompt(rc)
         self.assertIn("Nikita", prompt)
         self.assertIn("young woman", prompt)
         self.assertIn(PLAIN_BACKGROUND_SUFFIX, prompt)
-         # Forbidden artifacts must be stripped from scene_presentation/pose.
+        # Forbidden artifacts must be stripped from scene_presentation/pose.
         self.assertNotIn("fantasy clothing", prompt.lower())
         self.assertNotIn("neutral background", prompt.lower())
 
     def test_dict_input(self):
         rc = {
-             "name": "Roger",
-             "identity": ["muscular man"],
-             "scene_presentation": ["casual clothes"],
+            "name": "Roger",
+            "identity": ["muscular man"],
+            "scene_presentation": ["casual clothes"],
         }
         prompt = build_character_asset_prompt(rc)
         self.assertIn("Roger", prompt)
@@ -134,19 +142,19 @@ class TestBuildCharacterAssetPrompt(unittest.TestCase):
         self.assertIn("cinematic", prompt)
 
     def test_object_missing_attrs_use_getattr_default(self):
-         # Attribute present but None -> treated as empty.
+        # Attribute present but None -> treated as empty.
         rc = _FakeResolvedCharacter("Alex")
         prompt = build_character_asset_prompt(rc)
         self.assertIn("Alex", prompt)
         self.assertNotIn("None", prompt)
 
     def test_token_budget_truncation(self):
-           # A very long prompt with a tiny budget must be truncated to fit.
+        # A very long prompt with a tiny budget must be truncated to fit.
         rc = _FakeResolvedCharacter(
-               "VeryLongNameHere",
-             identity=[f"word {i}" for i in range(40)],
-             scene_presentation=[f"pose {i}" for i in range(40)],
-          )
+            "VeryLongNameHere",
+            identity=[f"word {i}" for i in range(40)],
+            scene_presentation=[f"pose {i}" for i in range(40)],
+        )
         prompt = build_character_asset_prompt(rc, token_limit=8)
         # The full prompt would be far longer than the truncated result.
         full = build_character_asset_prompt(rc, token_limit=100000)
@@ -163,8 +171,8 @@ class TestGenerateCharacterAsset(unittest.TestCase):
 
     def test_generate_single_mocked(self):
         rc = _FakeResolvedCharacter("Alex")
-         # generate_images is imported *inside* the function from
-         # generators.image_engine, so patch it at its source.
+        # generate_images is imported *inside* the function from
+        # generators.image_engine, so patch it at its source.
         with patch("generators.image_engine.generate_images") as gen:
             fake_path = "/tmp/fake_image.png"
             gen.return_value = [fake_path]
@@ -176,7 +184,7 @@ class TestGenerateCharacterAsset(unittest.TestCase):
         self.assertEqual(asset.seed, character_seed("Alex"))
         self.assertIn("Alex", asset.prompt_used)
         gen.assert_called_once()
-         # Verify the prompt/seed flow through to generate_images.
+        # Verify the prompt/seed flow through to generate_images.
         _, kwargs = gen.call_args
         self.assertEqual(kwargs["seed"], character_seed("Alex"))
         self.assertEqual(kwargs["model_name"], "sdxl")
@@ -192,7 +200,8 @@ class TestGenerateCharacterAsset(unittest.TestCase):
             with patch("generators.image_engine.generate_images") as gen:
                 gen.return_value = [str(src)]
                 asset = generate_character_asset(
-                     rc, project="proj", model="sdxl", output_dir=out_dir)
+                    rc, project="proj", model="sdxl", output_dir=out_dir
+                )
 
             target = out_dir / "asset_Alex.png"
             self.assertTrue(target.exists())
@@ -200,7 +209,7 @@ class TestGenerateCharacterAsset(unittest.TestCase):
             self.assertEqual(target.read_text(), "fakepng")
 
     def test_dict_input_default_name(self):
-         # A dict without a name key falls back to "character".
+        # A dict without a name key falls back to "character".
         rc = {}
         with patch("generators.image_engine.generate_images") as gen:
             gen.return_value = ["/tmp/x.png"]
@@ -217,13 +226,13 @@ class TestGenerateCharacterAssets(unittest.TestCase):
         with patch("generators.image_engine.generate_images") as gen:
             gen.return_value = ["/tmp/img.png"]
             assets = generate_character_assets(
-                 [rc1, rc2], project="proj", model="sdxl",
-                 base_seed=7)
+                [rc1, rc2], project="proj", model="sdxl", base_seed=7
+            )
 
         self.assertEqual(len(assets), 2)
         self.assertEqual([a.name for a in assets], ["Alice", "Bob"])
         self.assertEqual(gen.call_count, 2)
-         # Seeds use the per-character name + shared base_seed.
+        # Seeds use the per-character name + shared base_seed.
         self.assertEqual(assets[0].seed, character_seed("Alice", 7))
         self.assertEqual(assets[1].seed, character_seed("Bob", 7))
 

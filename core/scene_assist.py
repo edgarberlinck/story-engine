@@ -19,14 +19,24 @@ from services.audio_scene_service import AudioSceneRepresentation
 
 try:
     from generators.text_generator import generate_text_with_llm
+
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
 
 
 _ALLOWED_SEGMENT_KEYS = {
-    "type", "speaker", "text", "emotion", "tone", "intensity",
-    "delivery", "voice", "timing", "sound_effects", "music",
+    "type",
+    "speaker",
+    "text",
+    "emotion",
+    "tone",
+    "intensity",
+    "delivery",
+    "voice",
+    "timing",
+    "sound_effects",
+    "music",
 }
 
 
@@ -94,7 +104,9 @@ def assist_scene(
     for seg in data.get("segments", []):
         if not isinstance(seg, dict):
             continue
-        cleaned_segments.append({k: v for k, v in seg.items() if k in _ALLOWED_SEGMENT_KEYS})
+        cleaned_segments.append(
+            {k: v for k, v in seg.items() if k in _ALLOWED_SEGMENT_KEYS}
+        )
     if not cleaned_segments:
         return None
     data["segments"] = cleaned_segments

@@ -25,7 +25,9 @@ from PIL import Image, ImageFilter, ImageDraw
 try:
     from models import SEGMENTATION_MODELS, MODEL_PATHS
 except Exception:
-    SEGMENTATION_MODELS = {"detr_resnet_50_panoptic": "facebook/detr-resnet-50-panoptic"}
+    SEGMENTATION_MODELS = {
+        "detr_resnet_50_panoptic": "facebook/detr-resnet-50-panoptic"
+    }
     MODEL_PATHS = {"segmentation": "models/segmentation"}
 
 
@@ -37,8 +39,8 @@ _PANOPTIC_AVAILABLE: Optional[bool] = None
 # cutout into an opaque rectangle) — the classic "sticker" artifact. We reject
 # masks that are implausibly small (captured almost nothing) or implausibly
 # large (background not removed), and fall through to a different method.
-MIN_MASK_COVERAGE = 0.05   # at least 5% of the frame must be the character
-MAX_MASK_COVERAGE = 0.70   # at most 70% — anything more is background leakage
+MIN_MASK_COVERAGE = 0.05  # at least 5% of the frame must be the character
+MAX_MASK_COVERAGE = 0.70  # at most 70% — anything more is background leakage
 
 
 def _mask_coverage(mask: np.ndarray) -> float:
@@ -71,6 +73,7 @@ def _resolve_segmentation_model_path() -> str:
     `resolve_model_path()` conventions used elsewhere in the project."""
     try:
         from generators.image_generator import resolve_model_path
+
         return resolve_model_path(
             "segmentation",
             "detr_resnet_50_panoptic",
@@ -105,7 +108,9 @@ def _get_panoptic_pipeline():
         _PANOPTIC_AVAILABLE = True
         return _PANOPTIC_PIPELINE
     except Exception as e:
-        warnings.warn(f"DETR panoptic segmentation unavailable, will use chroma-key fallback: {e}")
+        warnings.warn(
+            f"DETR panoptic segmentation unavailable, will use chroma-key fallback: {e}"
+        )
         _PANOPTIC_AVAILABLE = False
         return None
 
@@ -177,8 +182,10 @@ def _border_flood_background(
         bgf = bg.astype(np.float32)
         # Number of 4-neighbours that are already background, per pixel.
         n = (
-            np.roll(bgf, 1, 0) + np.roll(bgf, -1, 0)
-            + np.roll(bgf, 1, 1) + np.roll(bgf, -1, 1)
+            np.roll(bgf, 1, 0)
+            + np.roll(bgf, -1, 0)
+            + np.roll(bgf, 1, 1)
+            + np.roll(bgf, -1, 1)
         )
         # Sum of neighbour colours weighted by whether that neighbour is bg.
         s = (
@@ -219,16 +226,22 @@ def _segment_with_chroma_key(
     # removed most of the frame), fall back to the corner-threshold estimate.
     bg_frac = bg.sum() / bg.size
     if bg_frac < 0.30:
-        corners = np.concatenate([
-            arr[:corner_sample, :corner_sample].reshape(-1, 3),
-            arr[:corner_sample, -corner_sample:].reshape(-1, 3),
-            arr[-corner_sample:, :corner_sample].reshape(-1, 3),
-            arr[-corner_sample:, -corner_sample:].reshape(-1, 3),
-        ], axis=0)
+        corners = np.concatenate(
+            [
+                arr[:corner_sample, :corner_sample].reshape(-1, 3),
+                arr[:corner_sample, -corner_sample:].reshape(-1, 3),
+                arr[-corner_sample:, :corner_sample].reshape(-1, 3),
+                arr[-corner_sample:, -corner_sample:].reshape(-1, 3),
+            ],
+            axis=0,
+        )
         bg_color = np.median(corners, axis=0)
         dist = np.sqrt(((arr - bg_color) ** 2).sum(axis=2))
-        threshold = max(20.0, float(np.std(dist)) * 0.25 + 12.0) if aggressive \
+        threshold = (
+            max(20.0, float(np.std(dist)) * 0.25 + 12.0)
+            if aggressive
             else max(30.0, float(np.std(dist)) * 0.5 + 20.0)
+        )
         bg = dist > threshold
 
     mask = ~bg
@@ -307,7 +320,9 @@ def segment_character(
     return mask_path, cutout_path, bbox, method
 
 
-def _draw_shadow(canvas: Image.Image, anchor_px: Tuple[int, int], width_px: int) -> Image.Image:
+def _draw_shadow(
+    canvas: Image.Image, anchor_px: Tuple[int, int], width_px: int
+) -> Image.Image:
     """Draw a soft, blurred dark ellipse under the character's anchor point
     to approximate a contact shadow. Purely deterministic, not AI.
     """
@@ -382,7 +397,7 @@ def validate_cutout(
         x0, y0, x1, y1 = xs.min(), ys.min(), xs.max(), ys.max()
         cov = ((x1 - x0 + 1) / w) * ((y1 - y0 + 1) / h)
         metrics["bbox_cover"] = round(float(cov), 4)
-        border_touch = (x0 <= 2 or y0 <= 2 or x1 >= w - 3 or y1 >= h - 3)
+        border_touch = x0 <= 2 or y0 <= 2 or x1 >= w - 3 or y1 >= h - 3
         if cov > max_bbox_cover and border_touch:
             issues.append("opaque region spans the full frame (background not removed)")
     # 4. Must not be empty / fully transparent.
@@ -474,7 +489,9 @@ def compose_scene(
     return canvas
 
 
-def default_canvas_layout(character_names: List[str], width: int = 1024, height: int = 1024) -> Dict[str, Any]:
+def default_canvas_layout(
+    character_names: List[str], width: int = 1024, height: int = 1024
+) -> Dict[str, Any]:
     """Cheap deterministic fallback layout when the LLM plan doesn't supply
     `canvas_layout` (evenly spaced across the frame, bottom-anchored)."""
     n = max(1, len(character_names))
@@ -485,10 +502,12 @@ def default_canvas_layout(character_names: List[str], width: int = 1024, height:
             x = 0.28 if i == 0 else 0.72
         else:
             x = (i + 1) / (n + 1)
-        placements.append({
-            "name": name,
-            "anchor": [x, 0.85],
-            "scale": 0.5,
-            "z": i + 1,
-        })
+        placements.append(
+            {
+                "name": name,
+                "anchor": [x, 0.85],
+                "scale": 0.5,
+                "z": i + 1,
+            }
+        )
     return {"width": width, "height": height, "placements": placements}

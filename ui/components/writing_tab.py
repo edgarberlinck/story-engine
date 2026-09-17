@@ -7,14 +7,26 @@ compiles into audio scenes.
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QListWidget,
-    QListWidgetItem, QPlainTextEdit, QTabWidget, QComboBox, QSplitter,
-    QMessageBox, QInputDialog,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPlainTextEdit,
+    QTabWidget,
+    QComboBox,
+    QSplitter,
+    QMessageBox,
+    QInputDialog,
 )
 from PySide6.QtCore import Qt
 
 from services.database.manuscript_service import (
-    manuscript_service, CHAPTER_TYPES, SUPPORTED_LOCALES,
+    manuscript_service,
+    CHAPTER_TYPES,
+    SUPPORTED_LOCALES,
 )
 
 MARKUP_HELP = """\
@@ -117,11 +129,9 @@ class WritingTab(QWidget):
                 "Write your story here.\n\n"
                 "[Narrator] It was a quiet morning...\n"
                 "[Nikita] Good morning! [Feeling=warm]\n\n"
-                "Or use markup: <scene><character name=\"nikita\">...</character></scene>"
+                'Or use markup: <scene><character name="nikita">...</character></scene>'
             )
-            editor.textChanged.connect(
-                lambda c=code: self._content_changed(c)
-            )
+            editor.textChanged.connect(lambda c=code: self._content_changed(c))
             self.editors[code] = editor
             self.lang_tabs.addTab(editor, label)
         right_layout.addWidget(self.lang_tabs)
@@ -198,9 +208,11 @@ class WritingTab(QWidget):
         if not ch:
             return
         reply = QMessageBox.question(
-            self, "Delete Chapter",
+            self,
+            "Delete Chapter",
             f"Delete chapter \"{ch['title']}\" and all its language contents?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
@@ -249,6 +261,7 @@ class WritingTab(QWidget):
         locale = self._current_locale()
 
         from core.story_compiler import compile_chapter
+
         result = compile_chapter(self.project_slug, ch["id"], locale)
 
         if result.error:
@@ -273,6 +286,7 @@ class WritingTab(QWidget):
 
     def _export_audiobook(self):
         from ui.dialogs.export_audiobook_dialog import ExportAudiobookDialog
+
         dialog = ExportAudiobookDialog(
             self, project=self.project_slug, default_locale=self._current_locale()
         )

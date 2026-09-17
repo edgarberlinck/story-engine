@@ -7,8 +7,16 @@ The narrator can be:
 """
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QRadioButton, QButtonGroup, QComboBox, QTextEdit, QGroupBox,
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QRadioButton,
+    QButtonGroup,
+    QComboBox,
+    QTextEdit,
+    QGroupBox,
     QMessageBox,
 )
 
@@ -30,14 +38,18 @@ class NarratorConfigDialog(QDialog):
         current = project_settings_service.get_narrator(project)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(
-            "Choose who narrates this project. Narration segments use this "
-            "voice unless a segment overrides it."
-        ))
+        layout.addWidget(
+            QLabel(
+                "Choose who narrates this project. Narration segments use this "
+                "voice unless a segment overrides it."
+            )
+        )
 
         # Mode selection
         self.mode_group = QButtonGroup(self)
-        self.radio_dedicated = QRadioButton("Dedicated narrator voice (designed from a prompt)")
+        self.radio_dedicated = QRadioButton(
+            "Dedicated narrator voice (designed from a prompt)"
+        )
         self.radio_character = QRadioButton("An existing character narrates")
         self.mode_group.addButton(self.radio_dedicated)
         self.mode_group.addButton(self.radio_character)

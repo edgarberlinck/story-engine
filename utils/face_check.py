@@ -11,6 +11,7 @@ from typing import Optional
 def is_face_check_available() -> bool:
     try:
         import face_recognition  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -44,8 +45,10 @@ def character_appears_in_image(
 
     import os
 
-    for label, path in (("reference", reference_image_path),
-                        ("scene", scene_image_path)):
+    for label, path in (
+        ("reference", reference_image_path),
+        ("scene", scene_image_path),
+    ):
         if not os.path.isfile(path):
             print(f"Warning: {label} image not found: {path}; skipping check.")
             return None

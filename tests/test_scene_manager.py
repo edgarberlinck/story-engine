@@ -40,14 +40,15 @@ class TestSceneManager(unittest.TestCase):
 
     # -- list_scenes ------------------------------------------------------
     def test_list_scenes_no_directory(self):
-          # No scenes dir on disk -> sync no-ops, empty list returned.
+        # No scenes dir on disk -> sync no-ops, empty list returned.
         result = self.sm.list_scenes("ghost_project")
         self.assertEqual(result, [])
 
     def test_list_scenes_imports_from_filesystem(self):
-          # A scene dir with scene.png that is NOT in the DB should be
-          # imported into the DB and then returned by list_scenes.
+        # A scene dir with scene.png that is NOT in the DB should be
+        # imported into the DB and then returned by list_scenes.
         from pathlib import Path
+
         scene_dir = Path(self.out_root) / "proj" / "scenes" / "scene_1"
         scene_dir.mkdir(parents=True)
         (scene_dir / "scene.png").write_text("fake png bytes")
@@ -62,6 +63,7 @@ class TestSceneManager(unittest.TestCase):
 
     def test_list_scenes_skips_non_scene_and_known(self):
         from pathlib import Path
+
         scenes = Path(self.out_root) / "proj" / "scenes"
         # A non-matching directory and an empty "scene_2" with no image.
         (scenes / "random_folder").mkdir(parents=True)
@@ -77,21 +79,22 @@ class TestSceneManager(unittest.TestCase):
             result = self.sm.list_scenes("proj")
 
         numbers = sorted(s["scene_number"] for s in result)
-          # Only scene_3 (render.png) imported; random_folder skipped, scene_2
-          # (no image) skipped.
+        # Only scene_3 (render.png) imported; random_folder skipped, scene_2
+        # (no image) skipped.
         self.assertEqual(numbers, [3])
         self.assertTrue(result[0]["image_path"].endswith("render.png"))
 
     def test_list_scenes_already_known_is_idempotent(self):
         from pathlib import Path
+
         scene_dir = Path(self.out_root) / "proj" / "scenes" / "scene_1"
         scene_dir.mkdir(parents=True)
         (scene_dir / "scene.png").write_text("data")
 
         with patch("core.scene_manager.OUTPUTS_ROOT", Path(self.out_root)):
-             # First call imports it.
+            # First call imports it.
             self.sm.list_scenes("proj")
-             # Second call must not duplicate.
+            # Second call must not duplicate.
             result = self.sm.list_scenes("proj")
 
         self.assertEqual(len(result), 1)
@@ -99,24 +102,25 @@ class TestSceneManager(unittest.TestCase):
     # -- create_scene -----------------------------------------------------
     def test_create_scene_saves_metadata(self):
         fake_result = {
-             "scene_number": 7,
-             "prompt": "a serene lake",
-             "image_path": "/some/scene.png",
+            "scene_number": 7,
+            "prompt": "a serene lake",
+            "image_path": "/some/scene.png",
         }
-        with patch("core.scene_manager.generate_scene",
-                    return_value=fake_result) as mock_gen:
+        with patch(
+            "core.scene_manager.generate_scene", return_value=fake_result
+        ) as mock_gen:
             saved = self.sm.create_scene(
-                 "proj", "a serene lake", seed=99, model="flux_klein"
-             )
+                "proj", "a serene lake", seed=99, model="flux_klein"
+            )
 
-          # generate_scene was called with the forwarded kwargs.
+        # generate_scene was called with the forwarded kwargs.
         mock_gen.assert_called_once()
         kwargs = mock_gen.call_args.kwargs
         self.assertEqual(kwargs["prompt"], "a serene lake")
         self.assertEqual(kwargs["project"], "proj")
         self.assertEqual(kwargs["seed"], 99)
 
-          # Metadata persisted via the service.
+        # Metadata persisted via the service.
         self.assertEqual(saved["scene_number"], 7)
         self.assertEqual(saved["prompt"], "a serene lake")
         self.assertEqual(saved["image_path"], "/some/scene.png")
@@ -129,15 +133,14 @@ class TestSceneManager(unittest.TestCase):
 
     def test_create_scene_with_explicit_number(self):
         fake_result = {
-             "scene_number": 3,
-             "prompt": "city",
-             "image_path": "/c.png",
+            "scene_number": 3,
+            "prompt": "city",
+            "image_path": "/c.png",
         }
-        with patch("core.scene_manager.generate_scene",
-                    return_value=fake_result):
+        with patch("core.scene_manager.generate_scene", return_value=fake_result):
             saved = self.sm.create_scene(
-                 "proj", "city", scene_number=3, model="sdxl", seed=1
-             )
+                "proj", "city", scene_number=3, model="sdxl", seed=1
+            )
         self.assertEqual(saved["scene_number"], 3)
         self.assertEqual(saved["model"], "sdxl")
 

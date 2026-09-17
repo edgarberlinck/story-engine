@@ -61,8 +61,7 @@ def _gradient_bg_asset(size=(128, 128)):
     arr = np.stack([bg, bg, bg], axis=2).astype(np.uint8)
     xx, yy = np.meshgrid(np.arange(w), np.arange(h))
     blob = (
-        (xx - w // 2) ** 2 / (0.18 * w) ** 2
-        + (yy - h // 2) ** 2 / (0.35 * h) ** 2
+        (xx - w // 2) ** 2 / (0.18 * w) ** 2 + (yy - h // 2) ** 2 / (0.35 * h) ** 2
     ) <= 1
     arr = np.where(blob[..., None], (200, 40, 40), arr).astype(np.uint8)
     return Image.fromarray(arr)
@@ -96,7 +95,7 @@ def _person_result(arr, label="person"):
 
 def _inband_blob(h=128, w=128):
     m = np.zeros((h, w), dtype=bool)
-    m[h // 4: 3 * h // 4, w // 4: 3 * w // 4] = True
+    m[h // 4 : 3 * h // 4, w // 4 : 3 * w // 4] = True
     return m
 
 
@@ -168,9 +167,7 @@ class TestGetPanopticPipeline(unittest.TestCase):
         fake_tf.pipeline = boom
         sc._PANOPTIC_PIPELINE = None
         sc._PANOPTIC_AVAILABLE = None
-        with patch.dict(
-            sys.modules, {"transformers": fake_tf}
-        ), patch.object(
+        with patch.dict(sys.modules, {"transformers": fake_tf}), patch.object(
             sc, "_resolve_segmentation_model_path", return_value="/m"
         ), warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -182,9 +179,7 @@ class TestGetPanopticPipeline(unittest.TestCase):
         fake = _MaskedPipe()
         fake_tf = types.ModuleType("transformers")
         fake_tf.pipeline = lambda *a, **k: fake
-        with patch.dict(
-            sys.modules, {"transformers": fake_tf}
-        ), patch.object(
+        with patch.dict(sys.modules, {"transformers": fake_tf}), patch.object(
             sc, "_resolve_segmentation_model_path", return_value="/m"
         ):
             sc._PANOPTIC_PIPELINE = None
@@ -239,9 +234,7 @@ class TestSegmentWithDetr(unittest.TestCase):
             self.assertIsNone(sc._segment_with_detr(Image.new("RGB", (20, 20))))
 
     def test_zero_pixel_best_returns_none(self):
-        pipe = _MaskedPipe(
-            results=[_person_result(np.zeros((20, 20), dtype=bool))]
-        )
+        pipe = _MaskedPipe(results=[_person_result(np.zeros((20, 20), dtype=bool))])
         sc._PANOPTIC_PIPELINE = pipe
         self.assertIsNone(sc._segment_with_detr(Image.new("RGB", (20, 20))))
 
@@ -304,7 +297,8 @@ class TestSegmentCharacterChromaFallback(unittest.TestCase):
             src = _save_png(_gradient_bg_asset(), d)
             blob = _inband_blob()
             with patch.object(
-                sc, "_segment_with_chroma_key",
+                sc,
+                "_segment_with_chroma_key",
                 return_value=(blob, "chroma_key"),
             ):
                 mask_path, cutout_path, bbox, method = sc.segment_character(
@@ -320,7 +314,8 @@ class TestSegmentCharacterChromaFallback(unittest.TestCase):
             big = np.zeros((64, 64), dtype=bool)
             big[:, :51] = True
             with patch.object(
-                sc, "_segment_with_chroma_key",
+                sc,
+                "_segment_with_chroma_key",
                 return_value=(big, "chroma_key"),
             ):
                 _, cut_retry, _, method = sc.segment_character(
@@ -338,7 +333,8 @@ class TestSegmentCharacterChromaFallback(unittest.TestCase):
             src = _save_png(_gradient_bg_asset(), d)
             valid = _inband_blob()
             with patch.object(
-                sc, "_segment_with_chroma_key",
+                sc,
+                "_segment_with_chroma_key",
                 return_value=(valid, "chroma_key"),
             ):
                 mask_path, cutout_path, bbox, method = sc.segment_character(
@@ -353,7 +349,8 @@ class TestSegmentCharacterChromaFallback(unittest.TestCase):
             src = _save_png(_solid_rgba((64, 64), rgb=(120, 120, 120)), d)
             empty = np.zeros((64, 64), dtype=bool)
             with patch.object(
-                sc, "_segment_with_chroma_key",
+                sc,
+                "_segment_with_chroma_key",
                 return_value=(empty, "chroma_key"),
             ):
                 mask_path, cutout_path, bbox, method = sc.segment_character(
@@ -373,11 +370,13 @@ class TestComposeScene(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             bg = _save_png(
                 _solid_rgba((64, 64), rgb=(30, 30, 30), alpha=255),
-                d, "bg.png",
+                d,
+                "bg.png",
             )
             cut = _save_png(
                 _solid_rgba((32, 32), rgb=(200, 40, 40), alpha=255),
-                d, "cut.png",
+                d,
+                "cut.png",
             )
             canvas = sc.compose_scene(
                 bg,
@@ -444,14 +443,15 @@ class TestValidateCharacterAsset(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p = _save_png(
                 _solid_rgba((64, 64), alpha=255, rgb=(120, 120, 120)),
-                d, "cut.png",
-             )
+                d,
+                "cut.png",
+            )
             res = sc.validate_character_asset(p, name_hint="hero")
         self.assertEqual(res["name"], "hero")
         self.assertFalse(res["valid"])
 
     def test_rgba_convert_from_rgb(self):
-         # A non-RGBA cutout must be converted (line 357) and flagged opaque.
+        # A non-RGBA cutout must be converted (line 357) and flagged opaque.
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "rgb.png")
             Image.new("RGB", (40, 40), (150, 150, 150)).save(p)
@@ -459,18 +459,16 @@ class TestValidateCharacterAsset(unittest.TestCase):
         self.assertFalse(res["valid"])
         self.assertTrue(
             any("opaque" in i or "transparency" in i for i in res["issues"])
-         )
+        )
 
     def test_fully_transparent_reports_empty(self):
-         # A fully transparent cutout is an empty/degenerate asset (line 390).
+        # A fully transparent cutout is an empty/degenerate asset (line 390).
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "ft.png")
             Image.new("RGBA", (40, 40), (0, 0, 0, 0)).save(p)
             res = sc.validate_character_asset(p, name_hint="c")
         self.assertFalse(res["valid"])
-        self.assertTrue(
-            any("empty" in i or "transparent" in i for i in res["issues"])
-         )
+        self.assertTrue(any("empty" in i or "transparent" in i for i in res["issues"]))
 
 
 if __name__ == "__main__":

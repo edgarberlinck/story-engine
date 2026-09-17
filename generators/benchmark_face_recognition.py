@@ -40,20 +40,67 @@ NUM_CHARACTERS = 8
 RANDOM_SEED = 42
 
 # Attribute pools for random character generation.
-FIRST_NAMES = ["Aiyra", "Bruno", "Chen", "Dalia", "Erik", "Fatima", "Gustavo",
-               "Hana", "Igor", "Jamila", "Kauan", "Leila", "Mateus", "Naomi"]
-LAST_NAMES = ["Silva", "Larsson", "Okafor", "Tanaka", "Morales", "Petrov",
-              "Nakamura", "Costa", "Haddad", "Johansson"]
+FIRST_NAMES = [
+    "Aiyra",
+    "Bruno",
+    "Chen",
+    "Dalia",
+    "Erik",
+    "Fatima",
+    "Gustavo",
+    "Hana",
+    "Igor",
+    "Jamila",
+    "Kauan",
+    "Leila",
+    "Mateus",
+    "Naomi",
+]
+LAST_NAMES = [
+    "Silva",
+    "Larsson",
+    "Okafor",
+    "Tanaka",
+    "Morales",
+    "Petrov",
+    "Nakamura",
+    "Costa",
+    "Haddad",
+    "Johansson",
+]
 GENDERS = ["man", "woman"]
-AGES = ["young adult in their 20s", "adult in their 30s",
-        "middle-aged in their 50s", "elderly in their 70s"]
-ETHNICITIES = ["Brazilian indigenous", "Scandinavian", "East Asian",
-               "West African", "Middle Eastern", "Latin American",
-               "Mediterranean"]
-HAIR = ["short dark hair", "long blonde hair", "curly brown hair",
-        "gray hair", "braided black hair", "red hair"]
-FEATURES = ["gentle smile", "serious expression", "freckles",
-            "strong jawline", "round face", "thin face", "expressive eyes"]
+AGES = [
+    "young adult in their 20s",
+    "adult in their 30s",
+    "middle-aged in their 50s",
+    "elderly in their 70s",
+]
+ETHNICITIES = [
+    "Brazilian indigenous",
+    "Scandinavian",
+    "East Asian",
+    "West African",
+    "Middle Eastern",
+    "Latin American",
+    "Mediterranean",
+]
+HAIR = [
+    "short dark hair",
+    "long blonde hair",
+    "curly brown hair",
+    "gray hair",
+    "braided black hair",
+    "red hair",
+]
+FEATURES = [
+    "gentle smile",
+    "serious expression",
+    "freckles",
+    "strong jawline",
+    "round face",
+    "thin face",
+    "expressive eyes",
+]
 SCENE_TEMPLATES = [
     "{name} walking through a busy market street",
     "{name} sitting by a campfire at night",
@@ -118,15 +165,17 @@ def run_benchmark():
         # 2. Scene check: character must be found in their own scene
         scene_check = character_appears_in_image(reference, scene["image_path"])
 
-        entries.append({
-            "name": name,
-            "prompt": prompt,
-            "reference_image": reference,
-            "scene_prompt": scene_prompt,
-            "scene_image": scene["image_path"],
-            "self_check": self_check,
-            "scene_check": scene_check,
-        })
+        entries.append(
+            {
+                "name": name,
+                "prompt": prompt,
+                "reference_image": reference,
+                "scene_prompt": scene_prompt,
+                "scene_image": scene["image_path"],
+                "self_check": self_check,
+                "scene_check": scene_check,
+            }
+        )
 
     # 3. Cross checks: character vs every OTHER character's scene
     cross_checks = []
@@ -134,15 +183,15 @@ def run_benchmark():
         for b in entries:
             if a["name"] == b["name"]:
                 continue
-            match = character_appears_in_image(
-                a["reference_image"], b["scene_image"]
+            match = character_appears_in_image(a["reference_image"], b["scene_image"])
+            cross_checks.append(
+                {
+                    "character": a["name"],
+                    "scene_of": b["name"],
+                    "scene_image": b["scene_image"],
+                    "match": match,
+                }
             )
-            cross_checks.append({
-                "character": a["name"],
-                "scene_of": b["name"],
-                "scene_image": b["scene_image"],
-                "match": match,
-            })
 
     return {"characters": entries, "cross_checks": cross_checks}
 
@@ -229,8 +278,7 @@ def write_report(results: dict, summary: dict) -> Path:
     false_positives = [c for c in results["cross_checks"] if c["match"]]
     lines += ["## False positives", ""]
     if false_positives:
-        lines += ["| Character | Wrongly found in scene of | Scene |",
-                  "|---|---|---|"]
+        lines += ["| Character | Wrongly found in scene of | Scene |", "|---|---|---|"]
         lines += [
             f"| {c['character']} | {c['scene_of']} | {c['scene_image']} |"
             for c in false_positives
@@ -254,12 +302,18 @@ def main():
         md_path = write_report(results, summary)
 
         print("\n=== Face Recognition Benchmark Summary ===")
-        print(f"  Self check:      "
-              f"{pct(summary['self_check_pass'], summary['self_check_total'])}")
-        print(f"  Scene check:     "
-              f"{pct(summary['scene_check_pass'], summary['scene_check_total'])}")
-        print(f"  False positives: "
-              f"{pct(summary['false_positives'], summary['cross_check_total'])}")
+        print(
+            f"  Self check:      "
+            f"{pct(summary['self_check_pass'], summary['self_check_total'])}"
+        )
+        print(
+            f"  Scene check:     "
+            f"{pct(summary['scene_check_pass'], summary['scene_check_total'])}"
+        )
+        print(
+            f"  False positives: "
+            f"{pct(summary['false_positives'], summary['cross_check_total'])}"
+        )
         print(f"\nReport for manual review: {md_path}")
     except Exception as e:
         print(f"Error during benchmark: {e}")

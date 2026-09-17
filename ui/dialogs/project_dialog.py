@@ -2,7 +2,15 @@
 Dialog for creating/editing projects.
 """
 
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit
+from PySide6.QtWidgets import (
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QTextEdit,
+)
 
 
 class ProjectDialog(QDialog):
@@ -39,5 +47,5 @@ class ProjectDialog(QDialog):
     def get_data(self):
         return {
             "name": self.name_edit.text(),
-            "description": self.desc_edit.toPlainText()
+            "description": self.desc_edit.toPlainText(),
         }

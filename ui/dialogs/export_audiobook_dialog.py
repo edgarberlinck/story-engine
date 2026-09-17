@@ -6,8 +6,17 @@ sound/music cues) and join them into one final audio file with ffmpeg.
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget,
-    QListWidgetItem, QComboBox, QCheckBox, QFileDialog, QMessageBox,
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QListWidget,
+    QListWidgetItem,
+    QComboBox,
+    QCheckBox,
+    QFileDialog,
+    QMessageBox,
     QPlainTextEdit,
 )
 from PySide6.QtCore import Qt, QThread, Signal
@@ -17,7 +26,7 @@ from services.database.manuscript_service import manuscript_service, SUPPORTED_L
 
 class _ExportThread(QThread):
     progressed = Signal(str)
-    finished_ok = Signal(object)   # ExportResult
+    finished_ok = Signal(object)  # ExportResult
     failed = Signal(str)
 
     def __init__(self, project, chapter_ids, output_path, locale, include_cues):
@@ -31,6 +40,7 @@ class _ExportThread(QThread):
     def run(self):
         try:
             from core.audiobook_exporter import export_chapters
+
             result = export_chapters(
                 self.project,
                 self.chapter_ids,
@@ -56,11 +66,13 @@ class ExportAudiobookDialog(QDialog):
         self.setMinimumSize(560, 520)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(
-            "Select the chapters to export. Voices, sound effects and music "
-            "cues are generated (cached lines are reused) and joined into one "
-            "audio file."
-        ))
+        layout.addWidget(
+            QLabel(
+                "Select the chapters to export. Voices, sound effects and music "
+                "cues are generated (cached lines are reused) and joined into one "
+                "audio file."
+            )
+        )
 
         # Chapter checklist
         self.chapter_list = QListWidget()
@@ -94,9 +106,7 @@ class ExportAudiobookDialog(QDialog):
         row.addWidget(self.locale_combo)
         layout.addLayout(row)
 
-        self.cues_check = QCheckBox(
-            "Generate sound effects and music cues (MusicGen)"
-        )
+        self.cues_check = QCheckBox("Generate sound effects and music cues (MusicGen)")
         self.cues_check.setChecked(True)
         layout.addWidget(self.cues_check)
 
@@ -137,7 +147,8 @@ class ExportAudiobookDialog(QDialog):
         locale = self.locale_combo.currentData()
         default_name = f"{self.project}_{locale}.m4a"
         output_path, _ = QFileDialog.getSaveFileName(
-            self, "Save Audiobook As",
+            self,
+            "Save Audiobook As",
             str(Path.home() / default_name),
             "Audio files (*.m4a *.mp3 *.wav)",
         )
@@ -146,9 +157,14 @@ class ExportAudiobookDialog(QDialog):
 
         self.btn_export.setEnabled(False)
         self.log.clear()
-        self.log.appendPlainText("Starting export\u2026 (voices load on first use, be patient)")
+        self.log.appendPlainText(
+            "Starting export\u2026 (voices load on first use, be patient)"
+        )
         self._thread = _ExportThread(
-            self.project, chapter_ids, output_path, locale,
+            self.project,
+            chapter_ids,
+            output_path,
+            locale,
             self.cues_check.isChecked(),
         )
         self._thread.progressed.connect(self.log.appendPlainText)

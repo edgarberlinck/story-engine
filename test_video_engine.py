@@ -89,8 +89,14 @@ class TestVideoGenerator(unittest.TestCase):
     def test_all_models_have_params(self):
         self.assertEqual(set(AVAILABLE_VIDEO_MODELS), set(MODEL_GENERATION_PARAMS))
         for params in MODEL_GENERATION_PARAMS.values():
-            for key in ("width", "height", "num_frames", "fps",
-                        "guidance_scale", "num_inference_steps"):
+            for key in (
+                "width",
+                "height",
+                "num_frames",
+                "fps",
+                "guidance_scale",
+                "num_inference_steps",
+            ):
                 self.assertIn(key, params)
 
     def test_invalid_model_rejected(self):
@@ -99,6 +105,7 @@ class TestVideoGenerator(unittest.TestCase):
 
     def test_missing_image_rejected(self):
         import generators.video_generator as vg
+
         with patch.object(vg, "AVAILABLE_VIDEO_MODELS", {"fake_i2v": "org/fake"}):
             with self.assertRaises(FileNotFoundError):
                 generate_video("/nope/missing.png", "prompt", model_name="fake_i2v")
@@ -107,14 +114,18 @@ class TestVideoGenerator(unittest.TestCase):
 class TestVideoEngine(unittest.TestCase):
     def test_benchmark_runs_all_models(self):
         scene = {"scene_number": 1, "image_path": "x.png", "prompt": "p"}
-        with patch.object(video_engine, "animate_scene", return_value={"ok": True}) as m:
+        with patch.object(
+            video_engine, "animate_scene", return_value={"ok": True}
+        ) as m:
             results = video_engine.benchmark_scene_video(scene)
         self.assertEqual(set(results), set(AVAILABLE_VIDEO_MODELS))
         self.assertEqual(m.call_count, len(AVAILABLE_VIDEO_MODELS))
 
     def test_benchmark_tolerates_failures(self):
         scene = {"scene_number": 1, "image_path": "x.png", "prompt": "p"}
-        with patch.object(video_engine, "animate_scene", side_effect=RuntimeError("boom")):
+        with patch.object(
+            video_engine, "animate_scene", side_effect=RuntimeError("boom")
+        ):
             results = video_engine.benchmark_scene_video(scene)
         self.assertTrue(all(v is None for v in results.values()))
 
@@ -124,10 +135,13 @@ class TestVideoEngine(unittest.TestCase):
             {"scene_number": 1, "image_path": "a.png", "prompt": "p"},
             {"scene_number": 1, "image_path": "b.png", "prompt": "p"},
         ]
-        with patch.object(video_engine, "get_character", return_value=character), \
-             patch.object(video_engine, "generate_scene", side_effect=scenes) as gen, \
-             patch.object(video_engine, "verify_character_in_scene",
-                          side_effect=[False, True]):
+        with patch.object(
+            video_engine, "get_character", return_value=character
+        ), patch.object(
+            video_engine, "generate_scene", side_effect=scenes
+        ) as gen, patch.object(
+            video_engine, "verify_character_in_scene", side_effect=[False, True]
+        ):
             scene = video_engine.create_validated_scene("p", character_name="R")
         self.assertTrue(scene["character_verified"])
         self.assertEqual(gen.call_count, 2)
@@ -143,9 +157,13 @@ class TestVideoEngine(unittest.TestCase):
     def test_inconclusive_verification_accepts_scene(self):
         character = {"name": "R", "reference_image": "ref.png"}
         scene_result = {"scene_number": 2, "image_path": "a.png", "prompt": "p"}
-        with patch.object(video_engine, "get_character", return_value=character), \
-             patch.object(video_engine, "generate_scene", return_value=scene_result), \
-             patch.object(video_engine, "verify_character_in_scene", return_value=None):
+        with patch.object(
+            video_engine, "get_character", return_value=character
+        ), patch.object(
+            video_engine, "generate_scene", return_value=scene_result
+        ), patch.object(
+            video_engine, "verify_character_in_scene", return_value=None
+        ):
             scene = video_engine.create_validated_scene("p", character_name="R")
         self.assertIsNone(scene["character_verified"])
 
@@ -165,56 +183,70 @@ class TestMultiCharacterVerification(unittest.TestCase):
         chars = self._chars()
         scene_result = {"scene_number": 1, "image_path": "a.png", "prompt": "p"}
         # First attempt: Cristal missing; second attempt: both found
-        with patch.object(video_engine, "get_character",
-                          side_effect=lambda n, p=None: chars[n]), \
-             patch.object(video_engine, "generate_scene",
-                          return_value=scene_result) as gen, \
-             patch.object(video_engine, "verify_character_in_scene",
-                          side_effect=[True, False, True, True]):
+        with patch.object(
+            video_engine, "get_character", side_effect=lambda n, p=None: chars[n]
+        ), patch.object(
+            video_engine, "generate_scene", return_value=scene_result
+        ) as gen, patch.object(
+            video_engine,
+            "verify_character_in_scene",
+            side_effect=[True, False, True, True],
+        ):
             scene = video_engine.create_validated_scene(
-                "p", character_names=["Yamu", "Cristal"])
+                "p", character_names=["Yamu", "Cristal"]
+            )
         self.assertTrue(scene["character_verified"])
         self.assertEqual(gen.call_count, 2)
 
     def test_require_verification_raises_when_inconclusive(self):
         chars = self._chars()
         scene_result = {"scene_number": 1, "image_path": "a.png", "prompt": "p"}
-        with patch.object(video_engine, "get_character",
-                          side_effect=lambda n, p=None: chars[n]), \
-             patch.object(video_engine, "generate_scene",
-                          return_value=scene_result), \
-             patch.object(video_engine, "verify_character_in_scene",
-                          return_value=None):
+        with patch.object(
+            video_engine, "get_character", side_effect=lambda n, p=None: chars[n]
+        ), patch.object(
+            video_engine, "generate_scene", return_value=scene_result
+        ), patch.object(
+            video_engine, "verify_character_in_scene", return_value=None
+        ):
             with self.assertRaises(RuntimeError):
                 video_engine.create_validated_scene(
-                    "p", character_names=["Yamu"], require_verification=True)
+                    "p", character_names=["Yamu"], require_verification=True
+                )
 
     def test_require_verification_raises_after_max_attempts(self):
         chars = self._chars()
         scene_result = {"scene_number": 1, "image_path": "a.png", "prompt": "p"}
-        with patch.object(video_engine, "get_character",
-                          side_effect=lambda n, p=None: chars[n]), \
-             patch.object(video_engine, "generate_scene",
-                          return_value=scene_result), \
-             patch.object(video_engine, "verify_character_in_scene",
-                          return_value=False):
+        with patch.object(
+            video_engine, "get_character", side_effect=lambda n, p=None: chars[n]
+        ), patch.object(
+            video_engine, "generate_scene", return_value=scene_result
+        ), patch.object(
+            video_engine, "verify_character_in_scene", return_value=False
+        ):
             with self.assertRaises(RuntimeError):
                 video_engine.create_validated_scene(
-                    "p", character_names=["Yamu"], require_verification=True,
-                    max_attempts=2)
+                    "p",
+                    character_names=["Yamu"],
+                    require_verification=True,
+                    max_attempts=2,
+                )
 
 
 class TestFaceRecognitionAvailable(unittest.TestCase):
     def test_face_recognition_installed(self):
         from utils.face_check import is_face_check_available
-        self.assertTrue(is_face_check_available(),
-                        "face_recognition must be installed for benchmarks")
+
+        self.assertTrue(
+            is_face_check_available(),
+            "face_recognition must be installed for benchmarks",
+        )
 
 
 class TestFaceBenchmark(unittest.TestCase):
     def test_random_characters_unique_and_seeded(self):
         import random
         from generators.benchmark_face_recognition import build_random_characters
+
         chars_a = build_random_characters(random.Random(42), 8)
         chars_b = build_random_characters(random.Random(42), 8)
         self.assertEqual(chars_a, chars_b)  # reproducible
@@ -225,23 +257,50 @@ class TestFaceBenchmark(unittest.TestCase):
 
     def test_summary_and_report(self):
         from generators import benchmark_face_recognition as bfr
+
         results = {
             "characters": [
-                {"name": "A", "prompt": "p", "reference_image": "a.png",
-                 "scene_prompt": "s", "scene_image": "sa.png",
-                 "self_check": True, "scene_check": True},
-                {"name": "B", "prompt": "p", "reference_image": "b.png",
-                 "scene_prompt": "s", "scene_image": "sb.png",
-                 "self_check": True, "scene_check": False},
-                {"name": "C", "prompt": "p", "reference_image": "c.png",
-                 "scene_prompt": "s", "scene_image": "sc.png",
-                 "self_check": None, "scene_check": None},
+                {
+                    "name": "A",
+                    "prompt": "p",
+                    "reference_image": "a.png",
+                    "scene_prompt": "s",
+                    "scene_image": "sa.png",
+                    "self_check": True,
+                    "scene_check": True,
+                },
+                {
+                    "name": "B",
+                    "prompt": "p",
+                    "reference_image": "b.png",
+                    "scene_prompt": "s",
+                    "scene_image": "sb.png",
+                    "self_check": True,
+                    "scene_check": False,
+                },
+                {
+                    "name": "C",
+                    "prompt": "p",
+                    "reference_image": "c.png",
+                    "scene_prompt": "s",
+                    "scene_image": "sc.png",
+                    "self_check": None,
+                    "scene_check": None,
+                },
             ],
             "cross_checks": [
-                {"character": "A", "scene_of": "B", "scene_image": "sb.png",
-                 "match": True},
-                {"character": "B", "scene_of": "A", "scene_image": "sa.png",
-                 "match": False},
+                {
+                    "character": "A",
+                    "scene_of": "B",
+                    "scene_image": "sb.png",
+                    "match": True,
+                },
+                {
+                    "character": "B",
+                    "scene_of": "A",
+                    "scene_image": "sa.png",
+                    "match": False,
+                },
             ],
         }
         summary = bfr.summarize(results)
@@ -254,6 +313,7 @@ class TestFaceBenchmark(unittest.TestCase):
 
         import tempfile, shutil
         from utils import project_paths
+
         tmp = tempfile.mkdtemp()
         old_root = project_paths.OUTPUTS_ROOT
         project_paths.OUTPUTS_ROOT = project_paths.Path(tmp)

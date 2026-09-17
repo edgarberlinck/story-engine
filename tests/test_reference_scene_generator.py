@@ -78,8 +78,9 @@ class ReferenceGeneratorTest(unittest.TestCase):
         self.assertEqual(prepared[0].mode, "RGB")
 
     def test_load_reference_scene_pipeline_uses_kv_pipeline(self):
-        with patch("diffusers.Flux2KleinKVPipeline.from_pretrained") as mock_kv, \
-             patch("diffusers.Flux2KleinPipeline.from_pretrained") as mock_plain:
+        with patch("diffusers.Flux2KleinKVPipeline.from_pretrained") as mock_kv, patch(
+            "diffusers.Flux2KleinPipeline.from_pretrained"
+        ) as mock_plain:
             rsg.load_reference_scene_pipeline("local-model", "float16")
             mock_kv.assert_called_once()
             mock_plain.assert_not_called()
@@ -87,10 +88,15 @@ class ReferenceGeneratorTest(unittest.TestCase):
     def test_generate_passes_pil_reference_list_and_kwargs(self):
         ref = self._tmp_ref()
         fake = _FakePipe()
-        with patch.object(rsg, "load_reference_scene_pipeline", return_value=fake), \
-             patch.object(rsg, "get_model_config", return_value=("cpu", "float16")), \
-             patch.object(rsg, "cleanup_pipeline"), \
-             patch.object(rsg, "resolve_model_path", return_value="m"):
+        with patch.object(
+            rsg, "load_reference_scene_pipeline", return_value=fake
+        ), patch.object(
+            rsg, "get_model_config", return_value=("cpu", "float16")
+        ), patch.object(
+            rsg, "cleanup_pipeline"
+        ), patch.object(
+            rsg, "resolve_model_path", return_value="m"
+        ):
             out = rsg.generate_reference_conditioned_scene(
                 "A stage scene.", [ref], steps=4, task_name="test_scene"
             )
@@ -107,11 +113,18 @@ class ReferenceGeneratorTest(unittest.TestCase):
 
     def test_generate_returns_unique_paths_for_multiple_images(self):
         ref = self._tmp_ref()
-        fake = _FakePipe(images=[Image.new("RGB", (16, 16)), Image.new("RGB", (16, 16))])
-        with patch.object(rsg, "load_reference_scene_pipeline", return_value=fake), \
-             patch.object(rsg, "get_model_config", return_value=("cpu", "float16")), \
-             patch.object(rsg, "cleanup_pipeline"), \
-             patch.object(rsg, "resolve_model_path", return_value="m"):
+        fake = _FakePipe(
+            images=[Image.new("RGB", (16, 16)), Image.new("RGB", (16, 16))]
+        )
+        with patch.object(
+            rsg, "load_reference_scene_pipeline", return_value=fake
+        ), patch.object(
+            rsg, "get_model_config", return_value=("cpu", "float16")
+        ), patch.object(
+            rsg, "cleanup_pipeline"
+        ), patch.object(
+            rsg, "resolve_model_path", return_value="m"
+        ):
             out = rsg.generate_reference_conditioned_scene(
                 "prompt", [ref], num_images=2, task_name="multi"
             )

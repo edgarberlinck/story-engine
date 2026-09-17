@@ -22,7 +22,12 @@ class ProjectManager:
         Path(OUTPUTS_ROOT / name.replace(" ", "_")).mkdir(parents=True, exist_ok=True)
         return project_id
 
-    def update_project(self, project_id: str, name: Optional[str] = None, description: Optional[str] = None) -> bool:
+    def update_project(
+        self,
+        project_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> bool:
         return self.service.update_project(project_id, name, description)
 
     def delete_project(self, project_id: str) -> bool:

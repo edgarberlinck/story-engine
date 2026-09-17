@@ -40,8 +40,7 @@ class ManuscriptService:
 
     def _init_tables(self):
         conn = self._connect()
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS chapters (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL,
@@ -51,10 +50,8 @@ class ManuscriptService:
                 compiled_scenes_json TEXT NOT NULL DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            """
-        )
-        conn.execute(
-            """
+            """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS chapter_contents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 chapter_id INTEGER NOT NULL,
@@ -63,8 +60,7 @@ class ManuscriptService:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(chapter_id, locale)
             )
-            """
-        )
+            """)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_chapters_proj ON chapters(project, position)"
         )
@@ -146,9 +142,7 @@ class ManuscriptService:
 
     def delete_chapter(self, chapter_id: int) -> bool:
         conn = self._connect()
-        conn.execute(
-            "DELETE FROM chapter_contents WHERE chapter_id = ?", (chapter_id,)
-        )
+        conn.execute("DELETE FROM chapter_contents WHERE chapter_id = ?", (chapter_id,))
         cur = conn.execute("DELETE FROM chapters WHERE id = ?", (chapter_id,))
         conn.commit()
         ok = cur.rowcount > 0
@@ -168,13 +162,19 @@ class ManuscriptService:
             return False
         a, b = chapters[idx], chapters[other]
         conn = self._connect()
-        conn.execute("UPDATE chapters SET position = ? WHERE id = ?", (b["position"], a["id"]))
-        conn.execute("UPDATE chapters SET position = ? WHERE id = ?", (a["position"], b["id"]))
+        conn.execute(
+            "UPDATE chapters SET position = ? WHERE id = ?", (b["position"], a["id"])
+        )
+        conn.execute(
+            "UPDATE chapters SET position = ? WHERE id = ?", (a["position"], b["id"])
+        )
         conn.commit()
         conn.close()
         return True
 
-    def set_compiled_scenes(self, chapter_id: int, locale: str, scene_numbers: List[int]) -> None:
+    def set_compiled_scenes(
+        self, chapter_id: int, locale: str, scene_numbers: List[int]
+    ) -> None:
         """Remember which audio scenes a chapter+locale compiled into."""
         ch = self.get_chapter(chapter_id)
         if not ch:
@@ -228,13 +228,17 @@ class ManuscriptService:
     def delete_project_chapters(self, project: str) -> None:
         """Remove all chapters+contents for a project (cascade helper)."""
         conn = self._connect()
-        ids = [r[0] for r in conn.execute(
-            "SELECT id FROM chapters WHERE project = ?", (project,)
-        ).fetchall()]
+        ids = [
+            r[0]
+            for r in conn.execute(
+                "SELECT id FROM chapters WHERE project = ?", (project,)
+            ).fetchall()
+        ]
         if ids:
             placeholders = ",".join("?" for _ in ids)
             conn.execute(
-                f"DELETE FROM chapter_contents WHERE chapter_id IN ({placeholders})", ids
+                f"DELETE FROM chapter_contents WHERE chapter_id IN ({placeholders})",
+                ids,
             )
         conn.execute("DELETE FROM chapters WHERE project = ?", (project,))
         conn.commit()

@@ -18,7 +18,9 @@ import soundfile as sf
 
 from core import audiobook_exporter as ax
 from services.audio_scene_service import (
-    AudioSceneService, AudioSceneRepresentation, AudioSceneSegment,
+    AudioSceneService,
+    AudioSceneRepresentation,
+    AudioSceneSegment,
 )
 from services.database.manuscript_service import ManuscriptService
 
@@ -58,11 +60,17 @@ class TestAudiobookExporter(unittest.TestCase):
     def _make_chapter(self, title, scene_number, with_cue=False, music=False):
         ch = self.manuscripts.create_chapter("p", title)
         rep = AudioSceneRepresentation(
-            scene_id=f"s{scene_number}", title=title, timeline={},
+            scene_id=f"s{scene_number}",
+            title=title,
+            timeline={},
         )
         if with_cue:
-            rep.add_segment("music" if music else "sound_effect", "",
-                            "wind howling", sound_effects=["wind howling"])
+            rep.add_segment(
+                "music" if music else "sound_effect",
+                "",
+                "wind howling",
+                sound_effects=["wind howling"],
+            )
         rep.add_segment("narration", "narrator", "Once upon a time.")
         rep.add_segment("dialogue", "nikita", "Hello there.", emotion="warm")
         self.audio.save_representation("p", f"s{scene_number}", scene_number, rep)
@@ -70,21 +78,21 @@ class TestAudiobookExporter(unittest.TestCase):
         return ch
 
     def _fake_segment_audio(self, project, scene_number, seg_idx, segment, force=False):
-        return _tiny_wav(
-            Path(self.workdir.name) / f"seg_{scene_number}_{seg_idx}.wav"
-        )
+        return _tiny_wav(Path(self.workdir.name) / f"seg_{scene_number}_{seg_idx}.wav")
 
     def _fake_cue(self, project, prompt, seconds, force=False):
         return _tiny_wav(
             Path(self.workdir.name) / f"cue_{seconds:.0f}.wav",
-            seconds=min(seconds, 2.0), freq=110,
+            seconds=min(seconds, 2.0),
+            freq=110,
         )
 
     def test_export_single_chapter(self):
         ch = self._make_chapter("C1", 1)
         out = Path(self.workdir.name) / "book.wav"
-        with patch.object(ax, "generate_segment_audio", self._fake_segment_audio), \
-             patch.object(ax, "generate_cue", self._fake_cue):
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", self._fake_cue):
             result = ax.export_chapters("p", [ch], str(out))
         self.assertIsNone(result.error)
         self.assertTrue(out.exists())
@@ -98,8 +106,9 @@ class TestAudiobookExporter(unittest.TestCase):
         ch1 = self._make_chapter("C1", 1)
         ch2 = self._make_chapter("C2", 2)
         out = Path(self.workdir.name) / "book.m4a"
-        with patch.object(ax, "generate_segment_audio", self._fake_segment_audio), \
-             patch.object(ax, "generate_cue", self._fake_cue):
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", self._fake_cue):
             # Pass out of order; exporter must follow manuscript order.
             result = ax.export_chapters("p", [ch2, ch1], str(out))
         self.assertIsNone(result.error)
@@ -112,8 +121,9 @@ class TestAudiobookExporter(unittest.TestCase):
         ch_cue = self._make_chapter("Cue", 2, with_cue=True)
         out_plain = Path(self.workdir.name) / "plain.wav"
         out_cue = Path(self.workdir.name) / "cue.wav"
-        with patch.object(ax, "generate_segment_audio", self._fake_segment_audio), \
-             patch.object(ax, "generate_cue", self._fake_cue):
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", self._fake_cue):
             ax.export_chapters("p", [ch_plain], str(out_plain))
             result = ax.export_chapters("p", [ch_cue], str(out_cue))
         self.assertEqual(result.cues_rendered, 1)
@@ -133,8 +143,9 @@ class TestAudiobookExporter(unittest.TestCase):
             requested["seconds"] = seconds
             return self._fake_cue(project, prompt, seconds, force)
 
-        with patch.object(ax, "generate_segment_audio", self._fake_segment_audio), \
-             patch.object(ax, "generate_cue", spy_cue):
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", spy_cue):
             ax.export_chapters("p", [ch], str(out))
         # Music bed sized against the (short) scene, clamped to the minimum.
         self.assertEqual(requested["seconds"], ax.MUSIC_MIN_S)
@@ -142,8 +153,9 @@ class TestAudiobookExporter(unittest.TestCase):
     def test_cues_can_be_disabled(self):
         ch = self._make_chapter("C1", 1, with_cue=True)
         out = Path(self.workdir.name) / "no_cues.wav"
-        with patch.object(ax, "generate_segment_audio", self._fake_segment_audio), \
-             patch.object(ax, "generate_cue", self._fake_cue):
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", self._fake_cue):
             result = ax.export_chapters("p", [ch], str(out), include_cues=False)
         self.assertEqual(result.cues_rendered, 0)
         self.assertTrue(out.exists())
@@ -151,8 +163,9 @@ class TestAudiobookExporter(unittest.TestCase):
     def test_unavailable_cue_is_skipped_not_fatal(self):
         ch = self._make_chapter("C1", 1, with_cue=True)
         out = Path(self.workdir.name) / "book.wav"
-        with patch.object(ax, "generate_segment_audio", self._fake_segment_audio), \
-             patch.object(ax, "generate_cue", lambda *a, **k: None):
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", lambda *a, **k: None):
             result = ax.export_chapters("p", [ch], str(out))
         self.assertIsNone(result.error)
         self.assertTrue(any("cue skipped" in s for s in result.skipped))
@@ -173,8 +186,9 @@ class TestAudiobookExporter(unittest.TestCase):
         ch = self._make_chapter("C1", 1, with_cue=True)
         out = Path(self.workdir.name) / "book.wav"
         messages = []
-        with patch.object(ax, "generate_segment_audio", self._fake_segment_audio), \
-             patch.object(ax, "generate_cue", self._fake_cue):
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", self._fake_cue):
             ax.export_chapters("p", [ch], str(out), progress=messages.append)
         self.assertTrue(any("Chapter: C1" in m for m in messages))
         self.assertTrue(any("bed [" in m for m in messages))
@@ -195,11 +209,12 @@ class TestAudiobookExporter(unittest.TestCase):
         """Master loudness should land near the -16 LUFS audiobook target."""
         ch = self._make_chapter("C1", 1)
         out = Path(self.workdir.name) / "book.wav"
-        with patch.object(ax, "generate_segment_audio", self._fake_segment_audio), \
-             patch.object(ax, "generate_cue", self._fake_cue):
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", self._fake_cue):
             ax.export_chapters("p", [ch], str(out))
         data, sr = sf.read(str(out))
-        rms = np.sqrt(np.mean(data ** 2))
+        rms = np.sqrt(np.mean(data**2))
         # -16 LUFS integrated is roughly -16 dBFS RMS for a steady tone;
         # allow a generous window, we only assert it was leveled sanely.
         db = 20 * np.log10(max(rms, 1e-9))
@@ -210,6 +225,7 @@ class TestAudiobookExporter(unittest.TestCase):
 class TestSoundEngineCache(unittest.TestCase):
     def test_cache_key_stability(self):
         from generators import sound_engine as se
+
         a = se.cue_audio_path("p", "wind", 5.0)
         b = se.cue_audio_path("p", "wind", 5.0)
         c = se.cue_audio_path("p", "wind", 8.0)
@@ -220,6 +236,7 @@ class TestSoundEngineCache(unittest.TestCase):
 
     def test_generate_cue_skips_empty_prompt_and_missing_model(self):
         from generators import sound_engine as se
+
         self.assertIsNone(se.generate_cue("p", "   "))
         with patch.object(se.SoundEngine, "available", return_value=False):
             self.assertIsNone(se.generate_cue("p", "thunder"))

@@ -45,7 +45,9 @@ class TestProjectSettingsService(unittest.TestCase):
         self.assertIsNone(config["character"])
 
     def test_set_dedicated_narrator(self):
-        self.service.set_narrator("p", NARRATOR_MODE_DEDICATED, voice_prompt="Deep calm voice")
+        self.service.set_narrator(
+            "p", NARRATOR_MODE_DEDICATED, voice_prompt="Deep calm voice"
+        )
         config = self.service.get_narrator("p")
         self.assertEqual(config["mode"], NARRATOR_MODE_DEDICATED)
         self.assertEqual(config["voice_prompt"], "Deep calm voice")

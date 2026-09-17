@@ -58,14 +58,19 @@ def run_benchmark():
         character = get_character(name, PROJECT)
         if character is None:
             character = generate_character(
-                name, prompt, model=MODEL, project=PROJECT,
+                name,
+                prompt,
+                model=MODEL,
+                project=PROJECT,
                 seed=RANDOM_SEED + i,
             )
 
         # Scene featuring this character
         scene_prompt = rng.choice(SCENE_TEMPLATES).format(name=name)
         scene = generate_scene(
-            scene_prompt, project=PROJECT, model=MODEL,
+            scene_prompt,
+            project=PROJECT,
+            model=MODEL,
             seed=RANDOM_SEED + 100 + i,
         )
 
@@ -77,15 +82,17 @@ def run_benchmark():
         # 2. Scene check: character must be found in their own scene
         scene_check = character_appears_in_image(reference, scene["image_path"])
 
-        entries.append({
-            "name": name,
-            "prompt": prompt,
-            "reference_image": reference,
-            "scene_prompt": scene_prompt,
-            "scene_image": scene["image_path"],
-            "self_check": self_check,
-            "scene_check": scene_check,
-        })
+        entries.append(
+            {
+                "name": name,
+                "prompt": prompt,
+                "reference_image": reference,
+                "scene_prompt": scene_prompt,
+                "scene_image": scene["image_path"],
+                "self_check": self_check,
+                "scene_check": scene_check,
+            }
+        )
 
     # 3. Cross checks: character vs every OTHER character's scene
     cross_checks = []
@@ -93,15 +100,15 @@ def run_benchmark():
         for b in entries:
             if a["name"] == b["name"]:
                 continue
-            match = character_appears_in_image(
-                a["reference_image"], b["scene_image"]
+            match = character_appears_in_image(a["reference_image"], b["scene_image"])
+            cross_checks.append(
+                {
+                    "character": a["name"],
+                    "scene_of": b["name"],
+                    "scene_image": b["scene_image"],
+                    "match": match,
+                }
             )
-            cross_checks.append({
-                "character": a["name"],
-                "scene_of": b["name"],
-                "scene_image": b["scene_image"],
-                "match": match,
-            })
 
     return {"characters": entries, "cross_checks": cross_checks}
 
@@ -113,8 +120,11 @@ def write_report(results: dict, summary: dict) -> Path:
 
     json_path = report_dir / "report.json"
     with open(json_path, "w") as f:
-        json.dump({"model": MODEL, "project": PROJECT,
-                   "summary": summary, **results}, f, indent=2)
+        json.dump(
+            {"model": MODEL, "project": PROJECT, "summary": summary, **results},
+            f,
+            indent=2,
+        )
 
     def check(v):
         return {True: "PASS", False: "FAIL", None: "INCONCLUSIVE"}[v]
@@ -172,8 +182,7 @@ def write_report(results: dict, summary: dict) -> Path:
     false_positives = [c for c in results["cross_checks"] if c["match"]]
     lines += ["## False positives", ""]
     if false_positives:
-        lines += ["| Character | Wrongly found in scene of | Scene |",
-                  "|---|---|---|"]
+        lines += ["| Character | Wrongly found in scene of | Scene |", "|---|---|---|"]
         lines += [
             f"| {c['character']} | {c['scene_of']} | {c['scene_image']} |"
             for c in false_positives
@@ -198,12 +207,18 @@ def main():
         md_path = write_report(results, summary)
 
         print("\n=== Face Recognition Benchmark Summary (SDXL) ===")
-        print(f"  Self check:      "
-              f"{pct(summary['self_check_pass'], summary['self_check_total'])}")
-        print(f"  Scene check:     "
-              f"{pct(summary['scene_check_pass'], summary['scene_check_total'])}")
-        print(f"  False positives: "
-              f"{pct(summary['false_positives'], summary['cross_check_total'])}")
+        print(
+            f"  Self check:      "
+            f"{pct(summary['self_check_pass'], summary['self_check_total'])}"
+        )
+        print(
+            f"  Scene check:     "
+            f"{pct(summary['scene_check_pass'], summary['scene_check_total'])}"
+        )
+        print(
+            f"  False positives: "
+            f"{pct(summary['false_positives'], summary['cross_check_total'])}"
+        )
         print(f"\nReport for manual review: {md_path}")
     except Exception as e:
         print(f"Error during benchmark: {e}")

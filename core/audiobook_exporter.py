@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 24000
 SEGMENT_GAP_S = 0.5
-SPEAKER_CHANGE_GAP_S = 0.85   # slightly longer pause when the voice changes
+SPEAKER_CHANGE_GAP_S = 0.85  # slightly longer pause when the voice changes
 SCENE_GAP_S = 1.2
 CHAPTER_GAP_S = 2.0
 
@@ -47,11 +47,11 @@ CHAPTER_GAP_S = 2.0
 SPEECH_FADE_S = 0.06
 
 # Background bed mixing
-SFX_VOLUME = 0.45        # one-shot effects sit slightly above the music bed
-MUSIC_VOLUME = 0.30      # music stays a bed under the narration
+SFX_VOLUME = 0.45  # one-shot effects sit slightly above the music bed
+MUSIC_VOLUME = 0.30  # music stays a bed under the narration
 BED_FADE_IN_S = 0.8
 BED_FADE_OUT_S = 1.8
-MUSIC_MAX_S = 30.0       # longest generated music bed per cue
+MUSIC_MAX_S = 30.0  # longest generated music bed per cue
 MUSIC_MIN_S = 4.0
 
 # Ducking: compress the bed using the speech as side-chain key.
@@ -97,21 +97,42 @@ def _normalize(src: Path, dst: Path, fade: bool = False) -> Path:
             f",afade=t=in:d={SPEECH_FADE_S}"
             f",afade=t=out:st={fade_out_start:.3f}:d={SPEECH_FADE_S}"
         )
-    _run([
-        _ffmpeg(), "-y", "-i", str(src),
-        "-ac", "1", "-ar", str(SAMPLE_RATE),
-        "-af", af,
-        "-c:a", "pcm_s16le", str(dst),
-    ])
+    _run(
+        [
+            _ffmpeg(),
+            "-y",
+            "-i",
+            str(src),
+            "-ac",
+            "1",
+            "-ar",
+            str(SAMPLE_RATE),
+            "-af",
+            af,
+            "-c:a",
+            "pcm_s16le",
+            str(dst),
+        ]
+    )
     return dst
 
 
 def _silence(seconds: float, dst: Path) -> Path:
-    _run([
-        _ffmpeg(), "-y",
-        "-f", "lavfi", "-i", f"anullsrc=r={SAMPLE_RATE}:cl=mono",
-        "-t", f"{seconds:.3f}", "-c:a", "pcm_s16le", str(dst),
-    ])
+    _run(
+        [
+            _ffmpeg(),
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"anullsrc=r={SAMPLE_RATE}:cl=mono",
+            "-t",
+            f"{seconds:.3f}",
+            "-c:a",
+            "pcm_s16le",
+            str(dst),
+        ]
+    )
     return dst
 
 
@@ -125,10 +146,21 @@ def _concat(parts: List[Path], dst: Path) -> Path:
         "".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8"
     )
     try:
-        _run([
-            _ffmpeg(), "-y", "-f", "concat", "-safe", "0",
-            "-i", str(list_file), "-c", "copy", str(dst),
-        ])
+        _run(
+            [
+                _ffmpeg(),
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(list_file),
+                "-c",
+                "copy",
+                str(dst),
+            ]
+        )
     finally:
         list_file.unlink(missing_ok=True)
     return dst
@@ -137,7 +169,7 @@ def _concat(parts: List[Path], dst: Path) -> Path:
 @dataclass
 class _Cue:
     path: Path
-    offset_s: float       # where the bed starts on the scene timeline
+    offset_s: float  # where the bed starts on the scene timeline
     volume: float
     duration_s: float
 
@@ -187,14 +219,20 @@ def _mix_scene(
     # Duck the beds with the speech as side-chain key, then mix.
     filters.append("[0:a]asplit=2[voice][key]")
     filters.append(f"[beds][key]sidechaincompress={DUCK_ARGS}[ducked]")
-    filters.append(
-        "[voice][ducked]amix=inputs=2:duration=longest:normalize=0[mix]"
-    )
+    filters.append("[voice][ducked]amix=inputs=2:duration=longest:normalize=0[mix]")
 
     cmd += [
-        "-filter_complex", ";".join(filters),
-        "-map", "[mix]", "-ac", "1", "-ar", str(SAMPLE_RATE),
-        "-c:a", "pcm_s16le", str(dst),
+        "-filter_complex",
+        ";".join(filters),
+        "-map",
+        "[mix]",
+        "-ac",
+        "1",
+        "-ar",
+        str(SAMPLE_RATE),
+        "-c:a",
+        "pcm_s16le",
+        str(dst),
     ]
     _run(cmd)
     return dst
@@ -204,11 +242,13 @@ def _unload_generation_models() -> None:
     """Free the heavyweight generation models once rendering is done."""
     try:
         from core.voice_engine import voice_engine
+
         voice_engine.unload()
     except Exception:  # noqa: BLE001
         logger.debug("Voice engine unload skipped", exc_info=True)
     try:
         from generators.sound_engine import sound_engine
+
         sound_engine.unload()
     except Exception:  # noqa: BLE001
         logger.debug("Sound engine unload skipped", exc_info=True)
@@ -223,11 +263,22 @@ def _encode_master(src: Path, output_path: Path) -> None:
         codec = ["-c:a", "libmp3lame", "-q:a", "1"]
     else:  # .m4a and anything else -> AAC
         codec = ["-c:a", "aac", "-b:a", "192k"]
-    _run([
-        _ffmpeg(), "-y", "-i", str(src),
-        "-af", LOUDNORM, "-ar", str(SAMPLE_RATE), "-ac", "1",
-        *codec, str(output_path),
-    ])
+    _run(
+        [
+            _ffmpeg(),
+            "-y",
+            "-i",
+            str(src),
+            "-af",
+            LOUDNORM,
+            "-ar",
+            str(SAMPLE_RATE),
+            "-ac",
+            "1",
+            *codec,
+            str(output_path),
+        ]
+    )
 
 
 def _cue_seconds(segment, remaining_hint: Optional[float] = None) -> float:
@@ -255,6 +306,22 @@ def _render_scene(
     """Render one scene into a fully mixed WAV. Returns None if empty."""
     scene_tag = f"s{scene_number:04d}"
 
+    # Manual timeline overrides (dragged clips) switch the scene to WYSIWYG
+    # timeline mixing so the final audio matches the timeline view exactly.
+    if any(getattr(s, "start_offset", None) is not None for s in rep.segments):
+        if not any((s.text or "").strip() for s in rep.segments):
+            return None
+        from core.timeline_mixer import render_scene_with_offsets
+
+        report(f"    scene {scene_number}: mixing with manual clip offsets")
+        return render_scene_with_offsets(
+            project,
+            scene_number,
+            rep,
+            tmp_dir / f"{scene_tag}_mix.wav",
+            report=report,
+        )
+
     # Pass 1: lay the speech track out on a timeline.
     speech_parts: List[Path] = []
     cursor = 0.0
@@ -271,18 +338,15 @@ def _render_scene(
         if wav is None:
             continue
         voice_key = (
-            (segment.voice or segment.speaker or "narrator").strip().lower()
-            or "narrator"
-        )
+            segment.voice or segment.speaker or "narrator"
+        ).strip().lower() or "narrator"
         if speech_parts:
             # A change of voice (character or narrator hand-off) breathes a
             # little longer than a same-speaker pause, so the transition
             # between timbres/tones feels natural instead of abrupt.
             gap = SEGMENT_GAP_S if voice_key == prev_voice else SPEAKER_CHANGE_GAP_S
             n += 1
-            speech_parts.append(
-                _silence(gap, tmp_dir / f"{scene_tag}_gap{n}.wav")
-            )
+            speech_parts.append(_silence(gap, tmp_dir / f"{scene_tag}_gap{n}.wav"))
             cursor += gap
         prev_voice = voice_key
         n += 1
@@ -312,14 +376,16 @@ def _render_scene(
                 f"Scene {scene_number} cue skipped: {segment.text[:40]}"
             )
             continue
-        normalized = _normalize(
-            cue_wav, tmp_dir / f"{scene_tag}_cue{seg_idx}.wav"
-        )
+        normalized = _normalize(cue_wav, tmp_dir / f"{scene_tag}_cue{seg_idx}.wav")
         volume = MUSIC_VOLUME if segment.segment_type == "music" else SFX_VOLUME
-        cues.append(_Cue(
-            path=normalized, offset_s=offset,
-            volume=volume, duration_s=_duration(normalized),
-        ))
+        cues.append(
+            _Cue(
+                path=normalized,
+                offset_s=offset,
+                volume=volume,
+                duration_s=_duration(normalized),
+            )
+        )
         result.cues_rendered += 1
         report(f"    bed [{segment.segment_type}]: {segment.text[:40]}")
 
@@ -340,7 +406,9 @@ def export_chapters(
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    order = {c["id"]: i for i, c in enumerate(manuscript_service.list_chapters(project))}
+    order = {
+        c["id"]: i for i, c in enumerate(manuscript_service.list_chapters(project))
+    }
     unknown = [cid for cid in chapter_ids if cid not in order]
     if unknown:
         result.error = f"Unknown chapter id(s): {unknown}"
@@ -383,8 +451,13 @@ def export_chapters(
                     continue
                 report(f"  Scene {scene_number}: {rep.title}")
                 mixed = _render_scene(
-                    project, scene_number, rep, tmp_dir,
-                    include_cues, result, report,
+                    project,
+                    scene_number,
+                    rep,
+                    tmp_dir,
+                    include_cues,
+                    result,
+                    report,
                 )
                 if mixed is None:
                     continue

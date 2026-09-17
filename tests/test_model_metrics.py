@@ -28,8 +28,8 @@ class TestModelMetrics(unittest.TestCase):
         self._tmpdir = self._tmp.name
         self._orig_cwd = os.getcwd()
         os.chdir(self._tmpdir)
-         # save_metrics writes to a CWD-relative "outputs/..." path, so make
-         # sure the target subdir exists in the temp dir.
+        # save_metrics writes to a CWD-relative "outputs/..." path, so make
+        # sure the target subdir exists in the temp dir.
         os.makedirs("outputs", exist_ok=True)
         self.metrics = ModelMetrics()
         # start_timer records start_time/start_memory; end_timer derives the
@@ -83,9 +83,7 @@ class TestModelMetrics(unittest.TestCase):
             output_path="out.png",
         )
         filename = self.metrics.save_metrics("my_run", "flux_dev")
-        self.assertEqual(
-            filename, "outputs/my_run_flux_dev_benchmark_metrics.json"
-        )
+        self.assertEqual(filename, "outputs/my_run_flux_dev_benchmark_metrics.json")
         self.assertTrue(os.path.isfile(filename))
         with open(filename) as f:
             data = json.load(f)

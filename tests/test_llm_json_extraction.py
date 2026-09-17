@@ -43,9 +43,7 @@ class TestExtractJsonBlocks(unittest.TestCase):
 
     def test_array_inside_fences(self):
         raw = '```\n[{"name": "A"}, {"name": "B"}]\n```'
-        self.assertEqual(
-            _extract_json_blocks(raw), '[{"name": "A"}, {"name": "B"}]'
-        )
+        self.assertEqual(_extract_json_blocks(raw), '[{"name": "A"}, {"name": "B"}]')
 
     def test_empty_input(self):
         self.assertEqual(_extract_json_blocks(""), "")
@@ -67,6 +65,7 @@ class TestExtractJsonBlocks(unittest.TestCase):
             "```"
         )
         import json
+
         parsed = json.loads(_extract_json_blocks(raw))
         self.assertEqual([c["name"] for c in parsed], ["Nikita", "Roger"])
 
@@ -87,10 +86,16 @@ class TestGenerateTextWithLlm(unittest.TestCase):
         tokenizer.apply_chat_template.return_value = "<user>hi</user><assistant>"
         gen = self._pipeline_mock(tokenizer, '{"strategy": "asset_composition"}')
         # Avoid the finally-block cleanup touching real imports.
-        with patch("generators.text_generator.resolve_model_path", return_value="m"), \
-             patch("generators.text_generator.get_model_config", return_value=("cpu", "float32")), \
-             patch("generators.text_generator.hf_pipeline", return_value=gen), \
-             patch("generators.image_generator.cleanup_pipeline"):
+        with patch(
+            "generators.text_generator.resolve_model_path", return_value="m"
+        ), patch(
+            "generators.text_generator.get_model_config",
+            return_value=("cpu", "float32"),
+        ), patch(
+            "generators.text_generator.hf_pipeline", return_value=gen
+        ), patch(
+            "generators.image_generator.cleanup_pipeline"
+        ):
             out = tg.generate_text_with_llm(
                 "Return JSON only", model_name="phi3_mini", max_new_tokens=512
             )
@@ -107,10 +112,16 @@ class TestGenerateTextWithLlm(unittest.TestCase):
         tokenizer = MagicMock()
         tokenizer.chat_template = None  # e.g. a base (non-instruct) model
         gen = self._pipeline_mock(tokenizer, "some output")
-        with patch("generators.text_generator.resolve_model_path", return_value="m"), \
-             patch("generators.text_generator.get_model_config", return_value=("cpu", "float32")), \
-             patch("generators.text_generator.hf_pipeline", return_value=gen), \
-             patch("generators.image_generator.cleanup_pipeline"):
+        with patch(
+            "generators.text_generator.resolve_model_path", return_value="m"
+        ), patch(
+            "generators.text_generator.get_model_config",
+            return_value=("cpu", "float32"),
+        ), patch(
+            "generators.text_generator.hf_pipeline", return_value=gen
+        ), patch(
+            "generators.image_generator.cleanup_pipeline"
+        ):
             out = tg.generate_text_with_llm("raw prompt", model_name="phi3_mini")
         self.assertEqual(out, "some output")
         # Raw prompt forwarded unchanged.
@@ -120,8 +131,9 @@ class TestGenerateTextWithLlm(unittest.TestCase):
         def boom(*a, **k):
             raise RuntimeError("load failed")
 
-        with patch("generators.text_generator.resolve_model_path", side_effect=boom), \
-             patch("generators.image_generator.cleanup_pipeline"):
+        with patch(
+            "generators.text_generator.resolve_model_path", side_effect=boom
+        ), patch("generators.image_generator.cleanup_pipeline"):
             out = tg.generate_text_with_llm("anything", model_name="phi3_mini")
         self.assertIsNone(out)
 

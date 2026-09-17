@@ -87,6 +87,23 @@ class TestSceneFinalizer(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             scene_finalizer.finalize_scene("p", 1, rep)
 
+    def test_finalize_honors_manual_start_offsets(self):
+        """Segments with start_offset switch to WYSIWYG timeline mixing."""
+        rep = self._rep()
+        rep.segments[0].start_offset = 1.25
+        calls = {}
+
+        def fake_offset_render(project, scene_number, r, dst, report=None):
+            calls["args"] = (project, scene_number, r)
+            return _tiny_wav(Path(dst))
+
+        with patch(
+            "core.timeline_mixer.render_scene_with_offsets", fake_offset_render
+        ), patch.object(ax, "generate_segment_audio", self._fake_segment_audio):
+            out = scene_finalizer.finalize_scene("p", 1, rep)
+        self.assertTrue(out.exists())
+        self.assertEqual(calls["args"], ("p", 1, rep))
+
     def test_progress_callback_is_invoked(self):
         messages = []
         with patch.object(ax, "generate_segment_audio", self._fake_segment_audio):

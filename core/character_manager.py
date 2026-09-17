@@ -44,11 +44,15 @@ class CharacterManager:
             return char["voice_path"]
         return None
 
-    def generate_voice(self, project: str, name: str,
-                       char_type: str = "person",
-                       attributes: Optional[Dict] = None,
-                       instruct: Optional[str] = None,
-                       force: bool = False) -> str:
+    def generate_voice(
+        self,
+        project: str,
+        name: str,
+        char_type: str = "person",
+        attributes: Optional[Dict] = None,
+        instruct: Optional[str] = None,
+        force: bool = False,
+    ) -> str:
         """Generate the character's introduction voice (cached).
 
         Uses the local Qwen3-TTS engine and the character's attributes
@@ -69,7 +73,10 @@ class CharacterManager:
             force=force,
         )
         self.char_service.set_voice_path(
-            name, project, str(wav_path), voice_prompt=instruct_used or None,
+            name,
+            project,
+            str(wav_path),
+            voice_prompt=instruct_used or None,
         )
         return str(wav_path)
 
@@ -78,6 +85,7 @@ class CharacterManager:
         success = self.char_service.delete_character(name, project)
         # Remove version rows
         import sqlite3
+
         conn = sqlite3.connect(self.version_service.db_path)
         conn.execute(
             "DELETE FROM character_versions WHERE project = ? AND character_name = ?",
@@ -91,10 +99,16 @@ class CharacterManager:
             shutil.rmtree(char_path, ignore_errors=True)
         return success
 
-    def generate_versions(self, project: str, name: str, prompt: str,
-                          model: str = "flux_dev", num_versions: int = 3,
-                          seed_start: int = 42,
-                          attributes: Optional[Dict] = None) -> List[Dict]:
+    def generate_versions(
+        self,
+        project: str,
+        name: str,
+        prompt: str,
+        model: str = "flux_dev",
+        num_versions: int = 3,
+        seed_start: int = 42,
+        attributes: Optional[Dict] = None,
+    ) -> List[Dict]:
         """Generate multiple versions of a character. Prompts are always
         forced to full body (see ensure_full_body)."""
         prompt = ensure_full_body(prompt)
@@ -110,11 +124,12 @@ class CharacterManager:
             seed = seed_start + i * 1000
             # Generate image
             from generators.image_generator import generate_images
+
             files = generate_images(
                 prompt=prompt,
                 model_name=model,
                 seed=seed,
-                task_name=f"character_{slugify(name)}_v{i+1}"
+                task_name=f"character_{slugify(name)}_v{i+1}",
             )
             version_path = versions_dir / f"v_{i+1}.png"
             # Move generated file
@@ -131,7 +146,7 @@ class CharacterManager:
                 prompt=prompt,
                 seed=seed,
                 model=model,
-                image_path=str(version_path)
+                image_path=str(version_path),
             )
             versions.append(version)
 
@@ -143,9 +158,9 @@ class CharacterManager:
         manifest = {
             "name": name,
             "project": project,
-            "versions": [v["version"] for v in versions]
+            "versions": [v["version"] for v in versions],
         }
-        with open(manifest_path, 'w') as f:
+        with open(manifest_path, "w") as f:
             json.dump(manifest, f)
 
         # Update main character record to point to default
@@ -166,7 +181,9 @@ class CharacterManager:
     def list_versions(self, project: str, character_name: str) -> List[Dict]:
         return self.version_service.list_versions(project, character_name)
 
-    def set_default_version(self, project: str, character_name: str, version: int) -> bool:
+    def set_default_version(
+        self, project: str, character_name: str, version: int
+    ) -> bool:
         success = self.version_service.set_default(project, character_name, version)
         if success:
             # Update reference image symlink/copy
@@ -175,6 +192,7 @@ class CharacterManager:
                 ref_path = character_dir(character_name, project) / "reference.png"
                 # Copy file to reference location for compatibility
                 import shutil
+
                 shutil.copy2(default["image_path"], str(ref_path))
                 # Update character service record
                 self.char_service.save_character(
@@ -183,7 +201,7 @@ class CharacterManager:
                     seed=default["seed"],
                     model=default["model"],
                     reference_image=str(ref_path),
-                    project=project
+                    project=project,
                 )
         return success
 

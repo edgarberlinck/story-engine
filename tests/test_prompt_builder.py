@@ -20,59 +20,69 @@ from core.prompt_builder import (
     example_usage,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _nick():
     return CharacterIdentity(
-           gender="young woman",
-           age_range="25-35",
-           hair_color="red",
-           hairstyle="curly long",
-           skin_tone="fair",
-        )
+        gender="young woman",
+        age_range="25-35",
+        hair_color="red",
+        hairstyle="curly long",
+        skin_tone="fair",
+    )
 
 
 def _roger():
     return CharacterIdentity(
-           gender="muscular man",
-           skin_tone="dark",
-           hairstyle="short bald",
-        )
+        gender="muscular man",
+        skin_tone="dark",
+        hairstyle="short bald",
+    )
 
 
 def _make_spec(environment="", scene=None, chars=None, style="photorealistic"):
     if scene is None:
         scene = SceneComposition(
-                environment=environment,
-             camera_position="back of the bar",
-             shot_type="wide shot",
-             spatial_composition="audience in foreground",
-             lighting="dim",
-             atmosphere="moody",
-          )
+            environment=environment,
+            camera_position="back of the bar",
+            shot_type="wide shot",
+            spatial_composition="audience in foreground",
+            lighting="dim",
+            atmosphere="moody",
+        )
     if chars is None:
         chars = [
-             CharacterSceneData(
-                  "Nikita", _nick(), "left side of the stage",
-                  "black suit", "playing a black Gibson Explorer"),
-             CharacterSceneData(
-                  "Roger", _roger(), "right side of the stage",
-                  "dark formal outfit", "sitting behind a drum kit"),
-          ]
+            CharacterSceneData(
+                "Nikita",
+                _nick(),
+                "left side of the stage",
+                "black suit",
+                "playing a black Gibson Explorer",
+            ),
+            CharacterSceneData(
+                "Roger",
+                _roger(),
+                "right side of the stage",
+                "dark formal outfit",
+                "sitting behind a drum kit",
+            ),
+        ]
     return ScenePromptSpec(scene=scene, characters=chars, style=style)
 
 
 def _fake_extractor_class(returned_spec):
     """Return a replacement for LLMSceneSemanticExtractor producing a fixed spec."""
+
     class _FakeExtractor:
         def __init__(self, *a, **k):
             pass
 
-        def extract_semantic_spec(self, scene_description, character_records,
-                                   project_style="photorealistic"):
+        def extract_semantic_spec(
+            self, scene_description, character_records, project_style="photorealistic"
+        ):
             return returned_spec
 
     return _FakeExtractor
@@ -93,13 +103,13 @@ class TestBuildCompositionPrompt(unittest.TestCase):
 
     def test_minimal_scene_no_lighting_atmosphere(self):
         scene = SceneComposition(
-                environment="a field",
-             camera_position="front",
-             shot_type="close up",
-             spatial_composition="",
-             lighting=None,
-             atmosphere=None,
-           )
+            environment="a field",
+            camera_position="front",
+            shot_type="close up",
+            spatial_composition="",
+            lighting=None,
+            atmosphere=None,
+        )
         spec = ScenePromptSpec(scene=scene, characters=[])
         prompt = SemanticPromptBuilder.build_composition_prompt(spec)
         self.assertIn("a field", prompt)
@@ -109,14 +119,14 @@ class TestBuildCompositionPrompt(unittest.TestCase):
 
     def test_no_camera_position(self):
         scene = SceneComposition(
-                environment="here",
-             camera_position="",
-             shot_type="wide shot",
-             spatial_composition="",
-           )
+            environment="here",
+            camera_position="",
+            shot_type="wide shot",
+            spatial_composition="",
+        )
         spec = ScenePromptSpec(scene=scene, characters=[])
         prompt = SemanticPromptBuilder.build_composition_prompt(spec)
-           # No "from <empty>" fragment should appear.
+        # No "from <empty>" fragment should appear.
         self.assertNotIn("from   ", prompt)
         self.assertNotIn("from None", prompt)
 
@@ -128,13 +138,13 @@ class TestBuildCompositionPrompt(unittest.TestCase):
 
     def test_scene_present_without_environment(self):
         scene = SceneComposition(
-                environment="",
-             camera_position="low angle",
-             shot_type="medium shot",
-             spatial_composition="centered",
-             lighting="bright",
-             atmosphere="clear",
-           )
+            environment="",
+            camera_position="low angle",
+            shot_type="medium shot",
+            spatial_composition="centered",
+            lighting="bright",
+            atmosphere="clear",
+        )
         spec = ScenePromptSpec(scene=scene, characters=[])
         prompt = SemanticPromptBuilder.build_composition_prompt(spec)
         self.assertIn("medium shot", prompt)
@@ -145,15 +155,13 @@ class TestBuildCompositionPrompt(unittest.TestCase):
 class TestBuildCharacterIdentityPrompt(unittest.TestCase):
 
     def test_basic(self):
-        char = CharacterSceneData(
-                "Nikita", _nick(), "left", "suit", "playing guitar")
+        char = CharacterSceneData("Nikita", _nick(), "left", "suit", "playing guitar")
         prompt = SemanticPromptBuilder.build_character_identity_prompt(char)
         self.assertTrue(prompt.startswith("Nikita,"))
         self.assertIn("fair skin", prompt)
 
     def test_empty_identity(self):
-        char = CharacterSceneData(
-                "X", CharacterIdentity(), "left", "suit", "acting")
+        char = CharacterSceneData("X", CharacterIdentity(), "left", "suit", "acting")
         prompt = SemanticPromptBuilder.build_character_identity_prompt(char)
         # "X, " - identity description is empty, but name prefix retained.
         self.assertTrue(prompt.startswith("X,"))
@@ -163,33 +171,30 @@ class TestBuildSceneAppearanceActionPrompt(unittest.TestCase):
 
     def test_all_fields(self):
         char = CharacterSceneData(
-                "Nikita", _nick(), "left side", "black suit", "playing guitar")
+            "Nikita", _nick(), "left side", "black suit", "playing guitar"
+        )
         prompt = SemanticPromptBuilder.build_scene_appearance_action_prompt(char)
         self.assertIn("positioned left side", prompt)
         self.assertIn("wearing black suit", prompt)
         self.assertIn("playing guitar", prompt)
 
     def test_none_scene_appearance_action(self):
-        char = CharacterSceneData(
-                "X", CharacterIdentity(), "", "", "")
+        char = CharacterSceneData("X", CharacterIdentity(), "", "", "")
         prompt = SemanticPromptBuilder.build_scene_appearance_action_prompt(char)
         self.assertEqual(prompt, "")
 
     def test_only_action(self):
-        char = CharacterSceneData(
-                "X", CharacterIdentity(), "", "", "dancing")
+        char = CharacterSceneData("X", CharacterIdentity(), "", "", "dancing")
         prompt = SemanticPromptBuilder.build_scene_appearance_action_prompt(char)
         self.assertEqual(prompt, "dancing")
 
     def test_only_clothing(self):
-        char = CharacterSceneData(
-                "X", CharacterIdentity(), "", "gown", "")
+        char = CharacterSceneData("X", CharacterIdentity(), "", "gown", "")
         prompt = SemanticPromptBuilder.build_scene_appearance_action_prompt(char)
         self.assertEqual(prompt, "wearing gown")
 
     def test_only_position(self):
-        char = CharacterSceneData(
-                "X", CharacterIdentity(), "center", "", "")
+        char = CharacterSceneData("X", CharacterIdentity(), "center", "", "")
         prompt = SemanticPromptBuilder.build_scene_appearance_action_prompt(char)
         self.assertEqual(prompt, "positioned center")
 
@@ -203,36 +208,35 @@ class TestBuildExplicitIdentityPrompt(unittest.TestCase):
         self.assertIn("Nikita", prompt)
         self.assertIn("Roger", prompt)
         self.assertIn("style: photorealistic", prompt)
-          # Explicit association: "On <position>".
+        # Explicit association: "On <position>".
         self.assertIn("On left side of the stage", prompt)
 
     def test_clothing_and_action_verb_form(self):
         spec = _make_spec()
         prompt = SemanticPromptBuilder.build_explicit_identity_prompt(spec)
-         # "is wearing <clothing> and <action>"
-        self.assertIn("is wearing black suit and playing a black Gibson Explorer", prompt)
+        # "is wearing <clothing> and <action>"
+        self.assertIn(
+            "is wearing black suit and playing a black Gibson Explorer", prompt
+        )
 
     def test_only_action_no_clothing(self):
-        char = CharacterSceneData(
-                "Nikita", _nick(), "left", "", "playing guitar")
+        char = CharacterSceneData("Nikita", _nick(), "left", "", "playing guitar")
         spec = _make_spec(chars=[char])
         prompt = SemanticPromptBuilder.build_explicit_identity_prompt(spec)
         self.assertIn("is playing guitar", prompt)
         self.assertNotIn("is wearing", prompt)
 
     def test_neither_action_nor_clothing(self):
-        char = CharacterSceneData(
-                "Nikita", _nick(), "left", "", "")
+        char = CharacterSceneData("Nikita", _nick(), "left", "", "")
         spec = _make_spec(chars=[char])
         prompt = SemanticPromptBuilder.build_explicit_identity_prompt(spec)
-         # Falls back to "Nikita, <identity>".
+        # Falls back to "Nikita, <identity>".
         self.assertIn("Nikita, ", prompt)
         self.assertNotIn("is wearing", prompt)
         self.assertNotIn("is ", prompt)
 
     def test_missing_position_uses_in_the_scene(self):
-        char = CharacterSceneData(
-                "Nikita", _nick(), "", "suit", "playing guitar")
+        char = CharacterSceneData("Nikita", _nick(), "", "suit", "playing guitar")
         spec = _make_spec(chars=[char])
         prompt = SemanticPromptBuilder.build_explicit_identity_prompt(spec)
         self.assertIn("In the scene", prompt)
@@ -259,9 +263,9 @@ class TestBuildLayeredPrompts(unittest.TestCase):
         self.assertIn("appearances_actions", layers)
         self.assertIn("full_explicit", layers)
         self.assertIn("Nikita", layers["full_explicit"])
-         # identities are "Name, <identity_desc>" joined by " | ".
+        # identities are "Name, <identity_desc>" joined by " | ".
         self.assertIn("Nikita,", layers["identities"])
-         # appearances_actions are "Name: <appearance>".
+        # appearances_actions are "Name: <appearance>".
         self.assertIn("Nikita: ", layers["appearances_actions"])
         self.assertNotEqual(layers["composition"], layers["identities"])
 
@@ -279,7 +283,7 @@ class TestOptimizeForTokenBudget(unittest.TestCase):
         spec = _make_spec(environment="a bar")
         builder = SemanticPromptBuilder()
         result = builder.optimize_for_token_budget(spec, max_tokens=100000)
-         # Within budget -> the full explicit prompt.
+        # Within budget -> the full explicit prompt.
         full = builder.build_explicit_identity_prompt(spec)
         self.assertEqual(result, full)
 
@@ -287,11 +291,11 @@ class TestOptimizeForTokenBudget(unittest.TestCase):
         spec = _make_spec(environment="a very long old bar with many details")
         builder = SemanticPromptBuilder()
         result = builder.optimize_for_token_budget(spec, max_tokens=3)
-          # Over budget -> minimal version listing chars + environment.
+        # Over budget -> minimal version listing chars + environment.
         self.assertIn("Nikita", result)
         self.assertIn("Roger", result)
         self.assertIn("a very long old bar with many details", result)
-          # The minimal build does NOT contain the full explicit prompt.
+        # The minimal build does NOT contain the full explicit prompt.
         self.assertNotEqual(result, builder.build_explicit_identity_prompt(spec))
 
     def test_over_budget_no_environment(self):
@@ -306,28 +310,34 @@ class TestOptimizeForTokenBudget(unittest.TestCase):
 class TestCreateOptimizedScenePrompt(unittest.TestCase):
 
     def test_fits_budget_returns_full(self):
-         # Patch the LLM extractor (constructed inside the function) to return
+        # Patch the LLM extractor (constructed inside the function) to return
         # a small spec whose full prompt fits the budget.
         small_spec = _make_spec(environment="small bar")
-        with patch("core.scene_semantics.LLMSceneSemanticExtractor",
-                   _fake_extractor_class(small_spec)):
+        with patch(
+            "core.scene_semantics.LLMSceneSemanticExtractor",
+            _fake_extractor_class(small_spec),
+        ):
             result = create_optimized_scene_prompt(
-                  "scene desc",
-                  [{"name": "Nikita", "prompt": "..."}],
-                  project_style="photorealistic",
-                  max_tokens=100000)
+                "scene desc",
+                [{"name": "Nikita", "prompt": "..."}],
+                project_style="photorealistic",
+                max_tokens=100000,
+            )
             full = SemanticPromptBuilder().build_explicit_identity_prompt(small_spec)
             self.assertEqual(result, full)
 
     def test_exceeds_budget_optimizes(self):
         big_spec = _make_spec(environment="a very long bar with many things")
-        with patch("core.scene_semantics.LLMSceneSemanticExtractor",
-                   _fake_extractor_class(big_spec)):
+        with patch(
+            "core.scene_semantics.LLMSceneSemanticExtractor",
+            _fake_extractor_class(big_spec),
+        ):
             result = create_optimized_scene_prompt(
-                  "scene desc",
-                  [{"name": "Nikita", "prompt": "..."}],
-                  project_style="photorealistic",
-                  max_tokens=3)
+                "scene desc",
+                [{"name": "Nikita", "prompt": "..."}],
+                project_style="photorealistic",
+                max_tokens=3,
+            )
             self.assertIn("Nikita", result)
             self.assertIn("Roger", result)
 
@@ -335,9 +345,11 @@ class TestCreateOptimizedScenePrompt(unittest.TestCase):
 class TestExampleUsage(unittest.TestCase):
 
     def test_example_usage_returns_string(self):
-         # Mock the LLM extractor so example_usage does not hit a real model.
-        with patch("core.scene_semantics.LLMSceneSemanticExtractor",
-                   _fake_extractor_class(_make_spec(environment="an old bar"))):
+        # Mock the LLM extractor so example_usage does not hit a real model.
+        with patch(
+            "core.scene_semantics.LLMSceneSemanticExtractor",
+            _fake_extractor_class(_make_spec(environment="an old bar")),
+        ):
             prompt = example_usage()
         self.assertIsInstance(prompt, str)
         self.assertIn("Nikita", prompt)

@@ -36,7 +36,11 @@ from core.scene_planner import (
     STRATEGY_ASSET_COMPOSITION,
 )
 from core.character_asset_generator import generate_character_assets, CharacterAsset
-from core.scene_compositor import segment_character, compose_scene, default_canvas_layout
+from core.scene_compositor import (
+    segment_character,
+    compose_scene,
+    default_canvas_layout,
+)
 from generators.image_engine import generate_scene
 from utils.project_paths import scene_dir, DEFAULT_PROJECT
 from utils.scene_logger import scene_logging
@@ -47,11 +51,14 @@ def _select_strategy(num_characters: int) -> str:
     helper for the trivial cases. For >=2 characters this returns None so the
     caller delegates to Stage D (LLM) for the real decision."""
     from core.scene_planner import _pre_llm_strategy_gate
+
     gated = _pre_llm_strategy_gate(num_characters)
     return gated if gated is not None else STRATEGY_ASSET_COMPOSITION
 
 
-def _build_background_prompt(prompt: str, plan: ScenePlan, character_names: Optional[List[str]] = None) -> str:
+def _build_background_prompt(
+    prompt: str, plan: ScenePlan, character_names: Optional[List[str]] = None
+) -> str:
     """Prefer the LLM-planned base_environment layer (no characters) when
     available; otherwise deterministically strip character sentences from the
     raw scene prompt so the background contains only environment/camera/
@@ -61,12 +68,9 @@ def _build_background_prompt(prompt: str, plan: ScenePlan, character_names: Opti
             return layer.prompt
 
     import re
+
     names = [n.lower() for n in (character_names or [])]
-    sentences = [
-        s.strip()
-        for s in re.split(r"(?<=[.!?])\s+|\n+", prompt)
-        if s.strip()
-    ]
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", prompt) if s.strip()]
     env_sentences = []
     character_words = re.compile(
         r"\b(musicians?|performers?|characters?|both)\b", re.IGNORECASE
@@ -84,10 +88,14 @@ def _build_background_prompt(prompt: str, plan: ScenePlan, character_names: Opti
         env_sentences.append(s.rstrip("."))
     if not env_sentences:
         return f"{prompt}. The scene is empty, no characters visible yet."
-    return ". ".join(env_sentences) + ". The stage is empty, no performers on stage yet."
+    return (
+        ". ".join(env_sentences) + ". The stage is empty, no performers on stage yet."
+    )
 
 
-def _qa_scene(final_image_path: str, character_names: List[str], project: str) -> Dict[str, Any]:
+def _qa_scene(
+    final_image_path: str, character_names: List[str], project: str
+) -> Dict[str, Any]:
     """Best-effort automated QA using `utils/face_check.py`. Skips
     gracefully (inconclusive) if `face_recognition` isn't installed or a
     character has no reference image, matching the project's existing
@@ -138,13 +146,19 @@ def _collect_character_references(
 
     references: List[Dict[str, str]] = []
     for character in characters or []:
-        name = character.get("name") if isinstance(character, dict) else getattr(character, "name", None)
+        name = (
+            character.get("name")
+            if isinstance(character, dict)
+            else getattr(character, "name", None)
+        )
         if not name:
             continue
         try:
             record = get_character(name, project)
         except Exception as e:
-            print(f"[scene_pipeline] Could not resolve character '{name}' reference: {e}")
+            print(
+                f"[scene_pipeline] Could not resolve character '{name}' reference: {e}"
+            )
             continue
         if not record or not record.get("reference_image"):
             continue
@@ -152,7 +166,9 @@ def _collect_character_references(
         if path and Path(path).exists():
             references.append({"name": name, "path": path})
         else:
-            print(f"[scene_pipeline] Character '{name}' has no usable reference image at {path}")
+            print(
+                f"[scene_pipeline] Character '{name}' has no usable reference image at {path}"
+            )
     return references
 
 
@@ -183,7 +199,9 @@ def _build_reference_conditioned_prompt(
         detail = "; ".join(bits).strip("; ")
         suffix = f" ({detail})" if detail else ""
         parts.append(f"Reference image {idx} is {name}{suffix}.")
-    parts.append("Render all referenced individuals as themselves in one coherent wide cinematic shot.")
+    parts.append(
+        "Render all referenced individuals as themselves in one coherent wide cinematic shot."
+    )
     return "\n".join(parts)
 
 
@@ -199,13 +217,19 @@ def _run_reference_conditioned_scene(
     height: int = 1024,
 ) -> Dict[str, Any]:
     """Generate a complete scene in one reference-conditioned diffusion call."""
-    from generators.reference_scene_generator import generate_reference_conditioned_scene
+    from generators.reference_scene_generator import (
+        generate_reference_conditioned_scene,
+    )
 
     target_dir = scene_dir(scene_number, project)
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    reference_conditioned_prompt = _build_reference_conditioned_prompt(prompt, plan, references)
-    print(f"[scene_pipeline] Reference-conditioned scene prompt:\n{reference_conditioned_prompt}")
+    reference_conditioned_prompt = _build_reference_conditioned_prompt(
+        prompt, plan, references
+    )
+    print(
+        f"[scene_pipeline] Reference-conditioned scene prompt:\n{reference_conditioned_prompt}"
+    )
     print(f"[scene_pipeline] Reference images: {[r['name'] for r in references]}")
 
     files = generate_reference_conditioned_scene(
@@ -216,17 +240,20 @@ def _run_reference_conditioned_scene(
         width=width,
         height=height,
         task_name=f"scene_{scene_number}_reference",
-     )
+    )
 
     final_image_path = str(target_dir / "scene_reference_conditioned.png")
     import shutil
+
     shutil.copy(files[0], final_image_path)
 
     character_names = [rc.name for rc in plan.resolved_characters]
     qa = _qa_scene(final_image_path, character_names, project)
     warnings: List[str] = []
     if not qa["passed"]:
-        warnings.append("QA check failed for one or more characters (see qa.per_character).")
+        warnings.append(
+            "QA check failed for one or more characters (see qa.per_character)."
+        )
 
     return {
         "scene_number": scene_number,
@@ -236,7 +263,9 @@ def _run_reference_conditioned_scene(
         "seed": seed,
         "model": model,
         "strategy": "reference_conditioned_single_pass",
-        "reference_images": [{"name": r["name"], "path": r["path"]} for r in references],
+        "reference_images": [
+            {"name": r["name"], "path": r["path"]} for r in references
+        ],
         "refinement_applied": False,
         "qa": qa,
         "warnings": warnings,
@@ -250,10 +279,18 @@ def _build_refinement_prompt(prompt: str) -> str:
     import re
 
     style_keywords = [
-        "photorealistic", "cinematic", "wide shot", "wide cinematic shot",
-        "natural stage lighting", "stage lighting", "natural lighting",
-        "detailed environment", "dramatic lighting", "soft lighting",
-        "film grain", "depth of field",
+        "photorealistic",
+        "cinematic",
+        "wide shot",
+        "wide cinematic shot",
+        "natural stage lighting",
+        "stage lighting",
+        "natural lighting",
+        "detailed environment",
+        "dramatic lighting",
+        "soft lighting",
+        "film grain",
+        "depth of field",
     ]
     lower = prompt.lower()
     found = [kw for kw in style_keywords if kw in lower]
@@ -280,7 +317,9 @@ def _build_refinement_prompt(prompt: str) -> str:
     return ", ".join(unique[:10])
 
 
-def _canvas_layout_from_plan(plan: ScenePlan, character_names: List[str]) -> Dict[str, Any]:
+def _canvas_layout_from_plan(
+    plan: ScenePlan, character_names: List[str]
+) -> Dict[str, Any]:
     """Use the LLM-provided `canvas_layout` (design doc §2.3) when present,
     otherwise fall back to an evenly-spaced deterministic layout. This keeps
     placement explicit and inspectable rather than guessed from prompt text
@@ -316,6 +355,7 @@ def _run_asset_composition(
     bg_prompt = _build_background_prompt(prompt, plan, character_names)
     print(f"[scene_pipeline] Generating background: {bg_prompt}")
     from generators.image_engine import generate_images
+
     bg_files = generate_images(
         prompt=bg_prompt,
         model_name=model,
@@ -324,6 +364,7 @@ def _run_asset_composition(
     )
     background_path = str(assets_dir / "background.png")
     import shutil
+
     shutil.copy(bg_files[0], background_path)
 
     # Step 2: per-character asset generation (plain background).
@@ -367,17 +408,25 @@ def _run_asset_composition(
         if cutout_path is not None:
             check = validate_character_asset(cutout_path, name_hint=asset.name)
             if not check["valid"]:
-                print(f"[scene_pipeline] Asset validation failed for '{asset.name}': "
-                      f"{check['issues']}; retrying segmentation (aggressive).")
+                print(
+                    f"[scene_pipeline] Asset validation failed for '{asset.name}': "
+                    f"{check['issues']}; retrying segmentation (aggressive)."
+                )
                 mask_path, cutout_path, bbox, method = segment_character(
-                    asset.image_path, output_dir=assets_dir,
-                    name_hint=asset.name, retry=True,
+                    asset.image_path,
+                    output_dir=assets_dir,
+                    name_hint=asset.name,
+                    retry=True,
                 )
                 if cutout_path is not None:
                     check = validate_character_asset(cutout_path, name_hint=asset.name)
                 else:
-                    check = {"valid": False, "issues": ["retry segmentation returned nothing"],
-                             "metrics": {}, "name": asset.name}
+                    check = {
+                        "valid": False,
+                        "issues": ["retry segmentation returned nothing"],
+                        "metrics": {},
+                        "name": asset.name,
+                    }
 
         if not check.get("valid", True):
             warnings.append(
@@ -395,14 +444,18 @@ def _run_asset_composition(
         asset.bbox = bbox
         asset.segmentation_method = method
 
-        layout = canvas_placements.get(asset.name, {"anchor": [0.5, 0.85], "scale": 0.5, "z": 1})
-        placements_meta.append({
-            "name": asset.name,
-            "cutout_path": cutout_path,
-            "anchor": tuple(layout["anchor"]),
-            "scale": layout["scale"],
-            "z": layout["z"],
-        })
+        layout = canvas_placements.get(
+            asset.name, {"anchor": [0.5, 0.85], "scale": 0.5, "z": 1}
+        )
+        placements_meta.append(
+            {
+                "name": asset.name,
+                "cutout_path": cutout_path,
+                "anchor": tuple(layout["anchor"]),
+                "scale": layout["scale"],
+                "z": layout["z"],
+            }
+        )
 
     # Step 4: deterministic composition. Saved under a distinct filename so
     # it is never silently clobbered if a later fallback (progressive
@@ -427,9 +480,12 @@ def _run_asset_composition(
     if enable_refinement:
         try:
             from generators.img2img_engine import refine_composite
+
             refinement_prompt = _build_refinement_prompt(prompt)
-            print(f"[scene_pipeline] Refinement pass enabled "
-                  f"(model={refinement_model}, strength={refinement_strength})")
+            print(
+                f"[scene_pipeline] Refinement pass enabled "
+                f"(model={refinement_model}, strength={refinement_strength})"
+            )
             print(f"[scene_pipeline] Refinement prompt: {refinement_prompt}")
             refined_image_path = refine_composite(
                 composite_image_path=final_image_path,
@@ -439,13 +495,20 @@ def _run_asset_composition(
                 seed=seed,
                 output_path=str(target_dir / "scene_refined.png"),
             )
-            if refined_image_path != final_image_path and Path(refined_image_path).exists():
+            if (
+                refined_image_path != final_image_path
+                and Path(refined_image_path).exists()
+            ):
                 refinement_applied = True
                 result_image_path = refined_image_path
             else:
-                warnings.append("Refinement pass failed; keeping deterministic composite.")
+                warnings.append(
+                    "Refinement pass failed; keeping deterministic composite."
+                )
         except Exception as e:
-            warnings.append(f"Refinement pass errored ({e}); keeping deterministic composite.")
+            warnings.append(
+                f"Refinement pass errored ({e}); keeping deterministic composite."
+            )
             print(f"[scene_pipeline] Refinement pass errored: {e}")
     else:
         print("[scene_pipeline] Refinement pass disabled (enable_refinement=False).")
@@ -453,7 +516,9 @@ def _run_asset_composition(
     # Step 6: automated QA (on the image that will ship).
     qa = _qa_scene(result_image_path, character_names, project)
     if not qa["passed"]:
-        warnings.append("QA check failed for one or more characters (see qa.per_character).")
+        warnings.append(
+            "QA check failed for one or more characters (see qa.per_character)."
+        )
 
     return {
         "scene_number": scene_number,
@@ -538,7 +603,9 @@ def generate_scene_pipeline(
     # Trivial cases (0-1 characters) are decided by the deterministic gate.
     # Non-trivial (>=2) cases are decided by Stage D during LLM planning below.
     strategy = _select_strategy(len(characters))
-    print(f"[scene_pipeline] Selected strategy: {strategy} ({len(characters)} characters)")
+    print(
+        f"[scene_pipeline] Selected strategy: {strategy} ({len(characters)} characters)"
+    )
 
     if strategy == "single_pass":
         result = generate_scene(
@@ -578,17 +645,28 @@ def generate_scene_pipeline(
     if supports_reference_conditioning(model):
         references = _collect_character_references(characters, project)
         if references:
-            print(f"[scene_pipeline] Model '{model}' supports reference conditioning; "
-                  f"using holistic reference-conditioned generation "
-                  f"({len(references)} reference image(s)).")
+            print(
+                f"[scene_pipeline] Model '{model}' supports reference conditioning; "
+                f"using holistic reference-conditioned generation "
+                f"({len(references)} reference image(s))."
+            )
             try:
                 result = _run_reference_conditioned_scene(
-                    prompt, project, scene_number, plan, references, model, seed,
-                    width=width, height=height,
+                    prompt,
+                    project,
+                    scene_number,
+                    plan,
+                    references,
+                    model,
+                    seed,
+                    width=width,
+                    height=height,
                 )
                 if not result["qa"]["passed"]:
-                    print("[scene_pipeline] WARNING: QA check flagged one or more characters; "
-                          "keeping reference-conditioned result (see result['qa']).")
+                    print(
+                        "[scene_pipeline] WARNING: QA check flagged one or more characters; "
+                        "keeping reference-conditioned result (see result['qa'])."
+                    )
 
                 target_dir = scene_dir(scene_number, project)
                 target_dir.mkdir(parents=True, exist_ok=True)
@@ -603,6 +681,7 @@ def generate_scene_pipeline(
                 raw_path = Path(result["image_path"])
                 if raw_path.resolve() != canonical_path.resolve():
                     import shutil as _shutil
+
                     _shutil.copy(raw_path, canonical_path)
                     result["raw_image_path"] = str(raw_path)
                     result["image_path"] = str(canonical_path)
@@ -614,8 +693,10 @@ def generate_scene_pipeline(
                     print(f"Could not save pipeline metadata: {e}")
                 return result
             except Exception as e:
-                print(f"[scene_pipeline] Reference-conditioned generation failed ({e}); "
-                      f"falling back to {strategy} strategy.")
+                print(
+                    f"[scene_pipeline] Reference-conditioned generation failed ({e}); "
+                    f"falling back to {strategy} strategy."
+                )
                 result = None
                 reference_fallback = {
                     "fallback_from": "reference_conditioned_single_pass",
@@ -642,7 +723,9 @@ def generate_scene_pipeline(
         return result
 
     if strategy == "progressive":
-        result = _run_progressive(prompt, project, scene_number, characters, model, seed)
+        result = _run_progressive(
+            prompt, project, scene_number, characters, model, seed
+        )
         result["llm_plan_path"] = None
         result.setdefault("strategy", "progressive")
         if reference_fallback:
@@ -659,7 +742,12 @@ def generate_scene_pipeline(
 
     try:
         result = _run_asset_composition(
-            prompt, project, scene_number, plan, model, seed,
+            prompt,
+            project,
+            scene_number,
+            plan,
+            model,
+            seed,
             enable_refinement=enable_refinement,
             refinement_strength=refinement_strength,
             refinement_model=refinement_model,
@@ -670,12 +758,18 @@ def generate_scene_pipeline(
             # composed result away. QA is best-effort (face_recognition may
             # mismatch cross-model assets), so a failed check is a warning,
             # not grounds for regenerating the whole scene.
-            print("[scene_pipeline] WARNING: QA check flagged one or more characters; "
-                  "keeping asset-composition result (see result['qa']).")
+            print(
+                "[scene_pipeline] WARNING: QA check flagged one or more characters; "
+                "keeping asset-composition result (see result['qa'])."
+            )
 
     except Exception as e:
-        print(f"[scene_pipeline] Asset composition failed ({e}); falling back to progressive generation.")
-        result = _run_progressive(prompt, project, scene_number, characters, model, seed)
+        print(
+            f"[scene_pipeline] Asset composition failed ({e}); falling back to progressive generation."
+        )
+        result = _run_progressive(
+            prompt, project, scene_number, characters, model, seed
+        )
         result["fallback_from"] = "asset_composition"
         result["fallback_reason"] = str(e)
 
@@ -694,6 +788,7 @@ def generate_scene_pipeline(
     raw_path = Path(result["image_path"])
     if raw_path.resolve() != canonical_path.resolve():
         import shutil as _shutil
+
         _shutil.copy(raw_path, canonical_path)
         result["raw_image_path"] = str(raw_path)
         result["image_path"] = str(canonical_path)

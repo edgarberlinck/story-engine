@@ -16,65 +16,67 @@ sys.path.insert(0, str(project_root))
 from generators.image_generator import (
     setup_model_directories,
     generate_filename_from_prompt,
-    generate_image
+    generate_image,
 )
 from models import DIFFUSION_MODELS, MODEL_PATHS
 
 
 class TestImageGenerator(unittest.TestCase):
-    
+
     def setUp(self):
         """Set up test fixtures before each test method."""
         # Ensure outputs directory exists for testing
         os.makedirs("outputs", exist_ok=True)
-        
+
     def test_setup_model_directories(self):
         """Test that model directories are properly set up."""
         setup_model_directories()
-        
+
         # Check that directories exist
         expected_dirs = [
             "models/diffusion",
-            "models/segmentation", 
+            "models/segmentation",
             "models/text_generation",
-            "outputs"
+            "outputs",
         ]
-        
+
         for dir_path in expected_dirs:
-            self.assertTrue(os.path.exists(dir_path), f"Directory {dir_path} should exist")
-    
+            self.assertTrue(
+                os.path.exists(dir_path), f"Directory {dir_path} should exist"
+            )
+
     def test_generate_filename_from_prompt(self):
         """Test that filenames are generated correctly from prompts."""
         # Test basic prompt
         filename = generate_filename_from_prompt("Goku playing volleyball")
         self.assertIsInstance(filename, str)
         self.assertGreater(len(filename), 0)
-        self.assertTrue(filename.isalnum() or '_' in filename or '-' in filename)
-        
+        self.assertTrue(filename.isalnum() or "_" in filename or "-" in filename)
+
         # Test with special characters
         filename = generate_filename_from_prompt("Hello, World! This is a test.")
         self.assertIsInstance(filename, str)
         self.assertGreater(len(filename), 0)
-        
+
         # Test empty prompt
         filename = generate_filename_from_prompt("")
         self.assertIsInstance(filename, str)
         self.assertGreater(len(filename), 0)  # Should generate default
-        
+
     def test_model_constants_exist(self):
         """Test that model constants are properly defined."""
         self.assertIsNotNone(DIFFUSION_MODELS)
         self.assertIsNotNone(MODEL_PATHS)
-        
+
         # Check that required models exist (only SDXL and FLUX Dev now)
         self.assertIn("sdxl", DIFFUSION_MODELS)
         self.assertIn("flux_dev", DIFFUSION_MODELS)
-        
+
         # Check that model paths are defined
         self.assertIn("diffusion", MODEL_PATHS)
         self.assertIn("segmentation", MODEL_PATHS)
         self.assertIn("text_generation", MODEL_PATHS)
-        
+
     def test_generate_image_function_signature(self):
         """Test that generate_image function can be called with various parameters."""
         # This test just ensures the function can be called without error
@@ -94,9 +96,9 @@ class TestImageGenerator(unittest.TestCase):
         filename = generate_filename_from_prompt(long_prompt)
         self.assertIsInstance(filename, str)
         self.assertLessEqual(len(filename), 20)  # Should be truncated
-        
+
         # Test prompt with only special characters
-        filename = generate_filename_from_prompt("!@#$%^&*()")  
+        filename = generate_filename_from_prompt("!@#$%^&*()")
         self.assertIsInstance(filename, str)
         self.assertGreater(len(filename), 0)
 
@@ -105,5 +107,5 @@ class TestImageGenerator(unittest.TestCase):
         self.assertTrue(os.path.exists("outputs"))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

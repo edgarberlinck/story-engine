@@ -24,7 +24,6 @@ from pathlib import Path
 
 from utils.token_budget import TokenBudgetManager
 
-
 # Prompt fragments that make the background trivial to segment out.
 PLAIN_BACKGROUND_SUFFIX = (
     "plain gray background, studio lighting, centered subject, "
@@ -47,6 +46,7 @@ _FORBIDDEN_ARTIFACTS = [
 
 def _sanitize_fragment(text: str) -> str:
     import re
+
     cleaned = text
     for pattern in _FORBIDDEN_ARTIFACTS:
         cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
@@ -58,6 +58,7 @@ def _sanitize_fragment(text: str) -> str:
 @dataclass
 class CharacterAsset:
     """Result of generating one character's scene-specific asset."""
+
     name: str
     image_path: str
     prompt_used: str
@@ -164,6 +165,7 @@ def generate_character_asset(
 
     if output_dir is not None:
         import shutil
+
         output_dir.mkdir(parents=True, exist_ok=True)
         target = output_dir / f"asset_{name}.png"
         shutil.copy(image_path, target)

@@ -72,14 +72,25 @@ def main():
     benchmark_tasks = [
         ("char_base", f"Portrait of {character}, neutral expression"),
         ("char_smiling", f"Portrait of {character}, smiling warmly"),
-        ("scene_forest_morning", "A dense forest during the morning, soft "
-                                 "sunlight filtering through the trees, mist"),
-        ("scene_forest_night", "The same dense forest at night, moonlight, "
-                               "dark atmosphere, fireflies"),
-        ("objects_still_life", "A still life of simple objects on a wooden "
-                               "table: colorful balls, forks, spoons, a cup"),
-        ("char_interaction", f"{character} carefully brushing dust off an "
-                             "ancient artifact at an excavation site"),
+        (
+            "scene_forest_morning",
+            "A dense forest during the morning, soft "
+            "sunlight filtering through the trees, mist",
+        ),
+        (
+            "scene_forest_night",
+            "The same dense forest at night, moonlight, " "dark atmosphere, fireflies",
+        ),
+        (
+            "objects_still_life",
+            "A still life of simple objects on a wooden "
+            "table: colorful balls, forks, spoons, a cup",
+        ),
+        (
+            "char_interaction",
+            f"{character} carefully brushing dust off an "
+            "ancient artifact at an excavation site",
+        ),
     ]
 
     all_results = {}
@@ -103,8 +114,10 @@ def main():
                 print(f"  {model_name}: {len(files)} image(s) generated")
 
         print("\nBenchmark suite completed successfully!")
-        print("Compare outputs/<task>_<model>_benchmark.png and the matching "
-              "*_benchmark_metrics.json files to pick the best model per task.")
+        print(
+            "Compare outputs/<task>_<model>_benchmark.png and the matching "
+            "*_benchmark_metrics.json files to pick the best model per task."
+        )
 
     except Exception as e:
         print(f"Error during generation: {e}")

@@ -11,8 +11,8 @@ from typing import Optional, Dict, Any
 
 # Narrator configuration keys/modes
 NARRATOR_KEY = "narrator"
-NARRATOR_MODE_DEDICATED = "dedicated"   # designed voice from a prompt
-NARRATOR_MODE_CHARACTER = "character"   # reuse an existing character's voice
+NARRATOR_MODE_DEDICATED = "dedicated"  # designed voice from a prompt
+NARRATOR_MODE_CHARACTER = "character"  # reuse an existing character's voice
 
 DEFAULT_NARRATOR = {
     "mode": NARRATOR_MODE_DEDICATED,
@@ -31,8 +31,7 @@ class ProjectSettingsService:
 
     def _init_table(self):
         conn = self._connect()
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS project_settings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL,
@@ -40,8 +39,7 @@ class ProjectSettingsService:
                 value_json TEXT NOT NULL,
                 UNIQUE(project, key)
             )
-            """
-        )
+            """)
         conn.commit()
         conn.close()
 

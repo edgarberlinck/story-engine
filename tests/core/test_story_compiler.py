@@ -64,7 +64,8 @@ class TestStoryCompiler(unittest.TestCase):
         ch = self._chapter("<scene>[Narrator] one</scene>")
         first = story_compiler.compile_chapter("p", ch)
         self.manuscripts.save_content(
-            ch, "en",
+            ch,
+            "en",
             "<scene>[Narrator] one</scene><scene>[Narrator] two</scene>",
         )
         second = story_compiler.compile_chapter("p", ch)

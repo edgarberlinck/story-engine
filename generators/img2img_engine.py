@@ -59,27 +59,37 @@ def refine_composite(
             prompt = DEFAULT_REFINEMENT_PROMPT
 
         if strength > MAX_SAFE_STRENGTH and not allow_high_strength:
-            print(f"[img2img_engine] strength {strength} exceeds safe max "
-                  f"{MAX_SAFE_STRENGTH}; clamping (pass allow_high_strength=True to override).")
+            print(
+                f"[img2img_engine] strength {strength} exceeds safe max "
+                f"{MAX_SAFE_STRENGTH}; clamping (pass allow_high_strength=True to override)."
+            )
             strength = MAX_SAFE_STRENGTH
 
         if model_name not in DIFFUSION_MODELS:
             raise ValueError(f"Unsupported img2img model: {model_name}")
 
-        model_path = resolve_model_path("diffusion", model_name, DIFFUSION_MODELS[model_name])
+        model_path = resolve_model_path(
+            "diffusion", model_name, DIFFUSION_MODELS[model_name]
+        )
         device, torch_dtype = get_model_config("diffusion")
 
-        print(f"[img2img_engine] Refinement pass: model={model_name}, "
-              f"strength={strength}, seed={seed}, steps={steps}")
+        print(
+            f"[img2img_engine] Refinement pass: model={model_name}, "
+            f"strength={strength}, seed={seed}, steps={steps}"
+        )
         print(f"[img2img_engine] Refinement prompt: {prompt}")
 
         init_image = Image.open(composite_image_path).convert("RGB")
 
         if model_name == "flux_dev":
             from diffusers import FluxImg2ImgPipeline
-            pipe = FluxImg2ImgPipeline.from_pretrained(model_path, torch_dtype=torch_dtype)
+
+            pipe = FluxImg2ImgPipeline.from_pretrained(
+                model_path, torch_dtype=torch_dtype
+            )
         else:
             from diffusers import StableDiffusionXLImg2ImgPipeline
+
             pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                 model_path, torch_dtype=torch_dtype, safety_checker=None
             )
@@ -109,7 +119,9 @@ def refine_composite(
         return output_path
 
     except Exception as e:
-        print(f"[img2img_engine] Refinement failed ({e}); returning original composite.")
+        print(
+            f"[img2img_engine] Refinement failed ({e}); returning original composite."
+        )
         return composite_image_path
     finally:
         cleanup_pipeline(pipe)

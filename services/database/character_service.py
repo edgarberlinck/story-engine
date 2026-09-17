@@ -18,8 +18,7 @@ class CharacterService:
 
     def _init_table(self):
         conn = self._connect()
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS characters (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL DEFAULT 'test_project',
@@ -33,8 +32,7 @@ class CharacterService:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project, name)
             )
-            """
-        )
+            """)
         # Add voice_path / voice_prompt to pre-existing databases (columns
         # were added after the first release of the characters table).
         cols = {row[1] for row in conn.execute("PRAGMA table_info(characters)")}
@@ -46,8 +44,7 @@ class CharacterService:
         # get_character (stored attributes for style-aware scene generation).
         # Created here so the CharacterService is self-contained (matches the
         # schema defined in services/database/migrations.py).
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS character_attributes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL,
@@ -57,8 +54,7 @@ class CharacterService:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project, character_name)
             )
-            """
-        )
+            """)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_char_attrs_proj_name "
             "ON character_attributes(project, character_name)"
@@ -79,7 +75,7 @@ class CharacterService:
         voice_prompt: Optional[str] = None,
     ) -> int:
         """Insert or update a character reference. Returns the row id.
-        
+
         If attributes is provided, it will be stored in character_attributes table
         for use in scene generation with style-aware prompt separation.
         """
@@ -97,30 +93,53 @@ class CharacterService:
                 voice_path = COALESCE(excluded.voice_path, characters.voice_path),
                 voice_prompt = COALESCE(excluded.voice_prompt, characters.voice_prompt)
             """,
-            (project, name, prompt, seed, model, reference_image, voice_path, voice_prompt, datetime.now()),
+            (
+                project,
+                name,
+                prompt,
+                seed,
+                model,
+                reference_image,
+                voice_path,
+                voice_prompt,
+                datetime.now(),
+            ),
         )
-        
+
         # Store attributes if provided
         if attributes is not None:
             self._save_character_attributes(conn, project, name, attributes)
-        
+
         conn.commit()
         row_id = cursor.lastrowid
         conn.close()
         return row_id
-    
-    def _save_character_attributes(self, conn: sqlite3.Connection, project: str, 
-                                    character_name: str, attributes: Dict[str, Any]) -> None:
+
+    def _save_character_attributes(
+        self,
+        conn: sqlite3.Connection,
+        project: str,
+        character_name: str,
+        attributes: Dict[str, Any],
+    ) -> None:
         """Save character attributes to character_attributes table."""
         json_str = json.dumps(attributes)
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO character_attributes
             (project, character_name, attributes_json, updated_at)
             VALUES (?, ?, ?, ?)
-        """, (project, character_name, json_str, datetime.now()))
+        """,
+            (project, character_name, json_str, datetime.now()),
+        )
 
-    def set_voice_path(self, name: str, project: str, voice_path: str,
-                       voice_prompt: Optional[str] = None) -> bool:
+    def set_voice_path(
+        self,
+        name: str,
+        project: str,
+        voice_path: str,
+        voice_prompt: Optional[str] = None,
+    ) -> bool:
         """Persist the character's generated voice WAV path (and the prompt
         that produced it, if any)."""
         conn = self._connect()
@@ -149,21 +168,24 @@ class CharacterService:
             "SELECT * FROM characters WHERE project = ? AND name = ?",
             (project, name),
         ).fetchone()
-        
+
         if row:
             character = dict(row)
             # Load attributes if available
-            attr_row = conn.execute("""
+            attr_row = conn.execute(
+                """
                 SELECT attributes_json FROM character_attributes
                 WHERE project = ? AND character_name = ?
-            """, (project, name)).fetchone()
-            
+            """,
+                (project, name),
+            ).fetchone()
+
             if attr_row and attr_row["attributes_json"]:
                 try:
                     character["attributes"] = json.loads(attr_row["attributes_json"])
                 except json.JSONDecodeError:
                     pass
-        
+
         conn.close()
         return character if row else None
 
@@ -192,17 +214,18 @@ class CharacterService:
     ) -> List[Dict[str, Any]]:
         """Return all known characters whose name appears in the given text."""
         import re
+
         found = []
         text_lower = text.lower()
-        
+
         for c in self.list_characters(project):
             name_lower = c["name"].lower()
             # Use word boundaries to avoid false positives
             # e.g., "Al" shouldn't match "also", "Roger" shouldn't match "Rogers"
-            pattern = r'\b' + re.escape(name_lower) + r'\b'
+            pattern = r"\b" + re.escape(name_lower) + r"\b"
             if re.search(pattern, text_lower):
                 found.append(c)
-        
+
         return found
 
 

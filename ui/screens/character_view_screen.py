@@ -5,8 +5,16 @@ Character detail view with versions gallery and voice player.
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QGridLayout, QFrame, QMessageBox, QInputDialog,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QGridLayout,
+    QFrame,
+    QMessageBox,
+    QInputDialog,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QUrl
 from PySide6.QtGui import QPixmap
@@ -30,7 +38,9 @@ class _GenerateThread(QThread):
     def run(self):
         try:
             character_manager.generate_versions(
-                self.project, self.name, self.prompt,
+                self.project,
+                self.name,
+                self.prompt,
                 num_versions=self.num_versions,
             )
             self.finished_ok.emit()
@@ -53,7 +63,8 @@ class _VoiceThread(QThread):
     def run(self):
         try:
             path = character_manager.generate_voice(
-                self.project, self.name,
+                self.project,
+                self.name,
                 attributes=self.attributes,
                 instruct=self.instruct,
                 force=self.force,
@@ -88,14 +99,21 @@ class VersionThumb(QFrame):
         path = version.get("image_path")
         pix = QPixmap(path) if path and Path(path).is_file() else QPixmap()
         if not pix.isNull():
-            img.setPixmap(pix.scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            img.setPixmap(
+                pix.scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
         else:
             img.setText("No image")
             img.setStyleSheet("background: #eee; color: #999;")
 
-        caption = QLabel(f"v{version['version']}" + ("  \u2605 default" if is_default else ""))
+        caption = QLabel(
+            f"v{version['version']}" + ("  \u2605 default" if is_default else "")
+        )
         caption.setAlignment(Qt.AlignCenter)
-        caption.setStyleSheet("font-size: 11px;" + (" color: #4CAF50; font-weight: bold;" if is_default else ""))
+        caption.setStyleSheet(
+            "font-size: 11px;"
+            + (" color: #4CAF50; font-weight: bold;" if is_default else "")
+        )
 
         layout.addWidget(img)
         layout.addWidget(caption)
@@ -107,6 +125,7 @@ class VersionThumb(QFrame):
 
     def contextMenuEvent(self, event):
         from PySide6.QtWidgets import QMenu
+
         menu = QMenu(self)
         export_action = menu.addAction("Export Image\u2026")
         if menu.exec(event.globalPos()) == export_action:
@@ -141,7 +160,9 @@ class CharacterViewScreen(QWidget):
         back_btn = QPushButton("\u2190 Back")
         back_btn.setProperty("flat", True)
         back_btn.clicked.connect(self.on_back)
-        breadcrumb = QLabel(f"Home  \u203a  {self.project['name']}  \u203a  {character_name}")
+        breadcrumb = QLabel(
+            f"Home  \u203a  {self.project['name']}  \u203a  {character_name}"
+        )
         breadcrumb.setStyleSheet("font-size: 12px; color: #666;")
         crumb_row.addWidget(back_btn)
         crumb_row.addWidget(breadcrumb)
@@ -160,7 +181,9 @@ class CharacterViewScreen(QWidget):
         self.img_label = QLabel()
         self.img_label.setFixedSize(360, 360)
         self.img_label.setAlignment(Qt.AlignCenter)
-        self.img_label.setStyleSheet("background-color: #eee; border: 1px solid #ddd; border-radius: 6px;")
+        self.img_label.setStyleSheet(
+            "background-color: #eee; border: 1px solid #ddd; border-radius: 6px;"
+        )
         left.addWidget(self.img_label)
 
         self.details_label = QLabel()
@@ -185,7 +208,7 @@ class CharacterViewScreen(QWidget):
         voice_layout = QVBoxLayout(voice_box)
         voice_layout.setContentsMargins(10, 10, 10, 10)
 
-        voice_title = QLabel("\U0001F3A4 Character Voice")
+        voice_title = QLabel("\U0001f3a4 Character Voice")
         voice_title.setStyleSheet("font-weight: bold;")
         voice_layout.addWidget(voice_title)
 
@@ -203,12 +226,12 @@ class CharacterViewScreen(QWidget):
         self.btn_regenerate_voice.clicked.connect(self.regenerate_voice)
         voice_controls.addWidget(self.btn_regenerate_voice)
 
-        self.btn_play_voice = QPushButton("\u25B6 Play")
+        self.btn_play_voice = QPushButton("\u25b6 Play")
         self.btn_play_voice.setEnabled(False)
         self.btn_play_voice.clicked.connect(self.play_voice)
         voice_controls.addWidget(self.btn_play_voice)
 
-        self.btn_stop_voice = QPushButton("\u25A0 Stop")
+        self.btn_stop_voice = QPushButton("\u25a0 Stop")
         self.btn_stop_voice.setEnabled(False)
         self.btn_stop_voice.clicked.connect(self.stop_voice)
         voice_controls.addWidget(self.btn_stop_voice)
@@ -216,7 +239,9 @@ class CharacterViewScreen(QWidget):
         voice_layout.addLayout(voice_controls)
 
         self.voice_status_label = QLabel("")
-        self.voice_status_label.setStyleSheet("color: #4CAF50; font-style: italic; font-size: 11px;")
+        self.voice_status_label.setStyleSheet(
+            "color: #4CAF50; font-style: italic; font-size: 11px;"
+        )
         voice_layout.addWidget(self.voice_status_label)
 
         self.voice_prompt_label = QLabel("")
@@ -233,7 +258,9 @@ class CharacterViewScreen(QWidget):
 
         # Right: versions gallery
         right = QVBoxLayout()
-        versions_label = QLabel("Versions  (click to set default \u00b7 right-click to export)")
+        versions_label = QLabel(
+            "Versions  (click to set default \u00b7 right-click to export)"
+        )
         versions_label.setStyleSheet("font-weight: bold;")
         right.addWidget(versions_label)
 
@@ -253,13 +280,18 @@ class CharacterViewScreen(QWidget):
         self.refresh()
 
     def refresh(self):
-        character = character_manager.get_character(self.project_slug, self.character_name) or {}
+        character = (
+            character_manager.get_character(self.project_slug, self.character_name)
+            or {}
+        )
 
         # Reference image
         ref = character.get("reference_image")
         pix = QPixmap(ref) if ref and Path(ref).is_file() else QPixmap()
         if not pix.isNull():
-            self.img_label.setPixmap(pix.scaled(360, 360, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.img_label.setPixmap(
+                pix.scaled(360, 360, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
         else:
             self.img_label.setText("No reference image")
 
@@ -278,10 +310,12 @@ class CharacterViewScreen(QWidget):
         voice_prompt = character.get("voice_prompt") or ""
         if self._voice_path and Path(self._voice_path).is_file():
             self.btn_play_voice.setEnabled(True)
-            self.voice_status_label.setText("Voice ready \u2014 click \u25B6 Play.")
+            self.voice_status_label.setText("Voice ready \u2014 click \u25b6 Play.")
         else:
             self.btn_play_voice.setEnabled(False)
-            self.voice_status_label.setText("No voice yet. Click \u201cGenerate Voice\u201d.")
+            self.voice_status_label.setText(
+                "No voice yet. Click \u201cGenerate Voice\u201d."
+            )
         if voice_prompt:
             self.voice_prompt_label.setText(f"Voice prompt: {voice_prompt}")
         else:
@@ -294,7 +328,9 @@ class CharacterViewScreen(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        versions = character_manager.list_versions(self.project_slug, self.character_name)
+        versions = character_manager.list_versions(
+            self.project_slug, self.character_name
+        )
         if not versions and not self._pending_ghosts:
             empty = QLabel("No versions yet.")
             empty.setStyleSheet("color: #999; padding: 20px;")
@@ -303,6 +339,7 @@ class CharacterViewScreen(QWidget):
         cells = []
         if self._pending_ghosts:
             from ui.components.ghost_card import GhostCard
+
             cells.extend(GhostCard(160, 180) for _ in range(self._pending_ghosts))
         for version in versions:
             thumb = VersionThumb(version)
@@ -313,26 +350,41 @@ class CharacterViewScreen(QWidget):
             self.gallery.addWidget(widget, idx // 3, idx % 3)
 
     def set_default_version(self, version):
-        character_manager.set_default_version(self.project_slug, self.character_name, version["version"])
+        character_manager.set_default_version(
+            self.project_slug, self.character_name, version["version"]
+        )
         self.refresh()
 
     def export_reference(self):
         from ui.helpers import export_image
         from utils.project_paths import slugify
-        character = character_manager.get_character(self.project_slug, self.character_name) or {}
-        export_image(self, character.get("reference_image"), slugify(self.character_name))
+
+        character = (
+            character_manager.get_character(self.project_slug, self.character_name)
+            or {}
+        )
+        export_image(
+            self, character.get("reference_image"), slugify(self.character_name)
+        )
 
     def export_version(self, version):
         from ui.helpers import export_image
         from utils.project_paths import slugify
-        export_image(self, version.get("image_path"),
-                     f"{slugify(self.character_name)}_v{version['version']}")
+
+        export_image(
+            self,
+            version.get("image_path"),
+            f"{slugify(self.character_name)}_v{version['version']}",
+        )
 
     # -- Voice -----------------------------------------------------------------
 
     def _update_voice_line(self):
         from core.voice_engine import build_voice_line
-        line = build_voice_line(self.character_name, attributes=self._character_attributes)
+
+        line = build_voice_line(
+            self.character_name, attributes=self._character_attributes
+        )
         self.voice_line_label.setText(f"Line: \u201c{line}\u201d")
 
     def generate_voice(self):
@@ -355,7 +407,7 @@ class CharacterViewScreen(QWidget):
             "Describe the voice you want (timbre, style, emotion, pace).\n"
             "The local VoiceDesign model creates the voice from this\n"
             "description. Example:\n"
-            "\"a calm, warm grandmotherly voice, speaking slowly\"",
+            '"a calm, warm grandmotherly voice, speaking slowly"',
             "",
         )
         if not ok or not text.strip():
@@ -368,12 +420,16 @@ class CharacterViewScreen(QWidget):
         self.btn_generate_voice.setEnabled(False)
         self.btn_regenerate_voice.setEnabled(False)
         self.voice_status_label.setText(
-            "Regenerating voice with prompt\u2026" if force
+            "Regenerating voice with prompt\u2026"
+            if force
             else "Generating voice\u2026 this may take a while."
         )
         self._voice_thread = _VoiceThread(
-            self.project_slug, self.character_name, self._character_attributes,
-            instruct=instruct, force=force,
+            self.project_slug,
+            self.character_name,
+            self._character_attributes,
+            instruct=instruct,
+            force=force,
         )
         self._voice_thread.finished_ok.connect(self._on_voice_generated)
         self._voice_thread.failed.connect(self._on_voice_failed)
@@ -382,7 +438,7 @@ class CharacterViewScreen(QWidget):
     def _on_voice_generated(self, path):
         self.btn_generate_voice.setEnabled(True)
         self.btn_regenerate_voice.setEnabled(True)
-        self.voice_status_label.setText("Voice ready \u2014 click \u25B6 Play.")
+        self.voice_status_label.setText("Voice ready \u2014 click \u25b6 Play.")
         self._voice_path = path
         self.btn_play_voice.setEnabled(True)
         self.refresh()
@@ -406,7 +462,7 @@ class CharacterViewScreen(QWidget):
         self.player.stop()
         self.btn_play_voice.setEnabled(True)
         self.btn_stop_voice.setEnabled(False)
-        self.voice_status_label.setText("Voice ready \u2014 click \u25B6 Play.")
+        self.voice_status_label.setText("Voice ready \u2014 click \u25b6 Play.")
 
     def _on_media_status(self, status):
         if status == QMediaPlayer.EndOfMedia:
@@ -417,14 +473,18 @@ class CharacterViewScreen(QWidget):
         super().closeEvent(event)
 
     def generate_versions(self):
-        num, ok = QInputDialog.getInt(self, "Generate Versions", "Number of new versions:", 3, 1, 10)
+        num, ok = QInputDialog.getInt(
+            self, "Generate Versions", "Number of new versions:", 3, 1, 10
+        )
         if not ok:
             return
         self.btn_generate.setEnabled(False)
         self.status_label.setText("Generating\u2026 this may take a while.")
         self._pending_ghosts = num
         self.refresh()
-        self._gen_thread = _GenerateThread(self.project_slug, self.character_name, self._prompt, num)
+        self._gen_thread = _GenerateThread(
+            self.project_slug, self.character_name, self._prompt, num
+        )
         self._gen_thread.finished_ok.connect(self._on_generated)
         self._gen_thread.failed.connect(self._on_generation_failed)
         self._gen_thread.start()

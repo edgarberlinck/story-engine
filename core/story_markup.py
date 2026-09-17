@@ -67,7 +67,8 @@ _BRACKET_RE = re.compile(r"\[([^\[\]]+)\]")
 @dataclass
 class MarkupSegment:
     """One parsed segment, notation-agnostic."""
-    segment_type: str = "narration"     # narration | dialogue | sound_effect | music
+
+    segment_type: str = "narration"  # narration | dialogue | sound_effect | music
     speaker: str = "narrator"
     text: str = ""
     emotion: Optional[str] = None
@@ -83,6 +84,7 @@ class MarkupSegment:
 @dataclass
 class MarkupScene:
     """One parsed scene: an ordered list of segments."""
+
     title: Optional[str] = None
     segments: List[MarkupSegment] = field(default_factory=list)
 
@@ -90,6 +92,7 @@ class MarkupScene:
 @dataclass
 class ParseIssue:
     """A non-fatal problem found while parsing (shown to the author)."""
+
     message: str
     position: int = 0
 
@@ -129,8 +132,9 @@ class _State:
 def _parse_attrs(raw: str) -> Dict[str, str]:
     return {
         k.lower(): (v1 if v1 is not None else v2)
-        for k, (v1, v2) in ((m.group(1), (m.group(2), m.group(3)))
-                            for m in _ATTR_RE.finditer(raw or ""))
+        for k, (v1, v2) in (
+            (m.group(1), (m.group(2), m.group(3))) for m in _ATTR_RE.finditer(raw or "")
+        )
     }
 
 
@@ -138,7 +142,9 @@ def _parse_intensity(value: str, issues: List[ParseIssue], pos: int) -> Optional
     try:
         return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
-        issues.append(ParseIssue(f"Invalid intensity '{value}' (expected 0.0-1.0)", pos))
+        issues.append(
+            ParseIssue(f"Invalid intensity '{value}' (expected 0.0-1.0)", pos)
+        )
         return None
 
 
@@ -151,8 +157,13 @@ def _parse_speed(value: str, issues: List[ParseIssue], pos: int) -> Optional[flo
         return None
 
 
-def _emit_text(text: str, state: _State, segments: List[MarkupSegment],
-               issues: List[ParseIssue], offset: int = 0) -> None:
+def _emit_text(
+    text: str,
+    state: _State,
+    segments: List[MarkupSegment],
+    issues: List[ParseIssue],
+    offset: int = 0,
+) -> None:
     """Emit plain text, honoring bracket shorthand tokens inside it.
 
     Bracket tokens either switch speaker ([Nikita], [Narrator]) or change a
@@ -161,7 +172,7 @@ def _emit_text(text: str, state: _State, segments: List[MarkupSegment],
     """
     cursor = 0
     for m in _BRACKET_RE.finditer(text):
-        chunk = text[cursor:m.start()]
+        chunk = text[cursor : m.start()]
         if chunk.strip():
             segments.append(state.make_segment(chunk.strip()))
         cursor = m.end()
@@ -179,19 +190,30 @@ def _emit_text(text: str, state: _State, segments: List[MarkupSegment],
             elif attr:
                 setattr(state, attr, value or None)
             elif key in ("sound", "sfx"):
-                segments.append(MarkupSegment(
-                    segment_type="sound_effect", speaker="", text=value,
-                    sound_effects=[value],
-                ))
+                segments.append(
+                    MarkupSegment(
+                        segment_type="sound_effect",
+                        speaker="",
+                        text=value,
+                        sound_effects=[value],
+                    )
+                )
             elif key == "music":
-                segments.append(MarkupSegment(
-                    segment_type="music", speaker="", text=value, music=True,
-                ))
+                segments.append(
+                    MarkupSegment(
+                        segment_type="music",
+                        speaker="",
+                        text=value,
+                        music=True,
+                    )
+                )
             else:
-                issues.append(ParseIssue(
-                    f"Unknown bracket attribute '[{token}]' ignored",
-                    offset + m.start(),
-                ))
+                issues.append(
+                    ParseIssue(
+                        f"Unknown bracket attribute '[{token}]' ignored",
+                        offset + m.start(),
+                    )
+                )
         else:
             # Bare token: speaker switch. Reset performance state — a new
             # speaker starts with a clean delivery.
@@ -245,13 +267,16 @@ def parse_story_markup(text: str):
     cursor = 0
     for m in _TAG_RE.finditer(text):
         # Text before this tag.
-        chunk = text[cursor:m.start()]
+        chunk = text[cursor : m.start()]
         if chunk.strip():
             _emit_text(chunk, state, scene().segments, issues, cursor)
         cursor = m.end()
 
         closing, tag, raw_attrs, self_closing = (
-            m.group(1) == "/", m.group(2).lower(), m.group(3), m.group(4) == "/",
+            m.group(1) == "/",
+            m.group(2).lower(),
+            m.group(3),
+            m.group(4) == "/",
         )
         attrs = _parse_attrs(raw_attrs)
 
@@ -266,9 +291,11 @@ def parse_story_markup(text: str):
                 if tag == "scene":
                     close_scene()
                 else:
-                    issues.append(ParseIssue(
-                        f"Closing </{tag}> without matching opening tag", m.start()
-                    ))
+                    issues.append(
+                        ParseIssue(
+                            f"Closing </{tag}> without matching opening tag", m.start()
+                        )
+                    )
                 continue
             while len(stack) > matched:
                 popped_tag, _, saved_state = stack.pop()
@@ -300,15 +327,20 @@ def parse_story_markup(text: str):
             state.delivery = attrs.get("delivery")
             state.voice = attrs.get("voice")
             if "intensity" in attrs:
-                state.intensity = _parse_intensity(attrs["intensity"], issues, m.start())
+                state.intensity = _parse_intensity(
+                    attrs["intensity"], issues, m.start()
+                )
             if "speed" in attrs or "pace" in attrs:
                 state.speed = _parse_speed(
                     attrs.get("speed") or attrs.get("pace"), issues, m.start()
                 )
             if self_closing:
-                issues.append(ParseIssue(
-                    "<character /> is self-closing and has no text; ignored", m.start()
-                ))
+                issues.append(
+                    ParseIssue(
+                        "<character /> is self-closing and has no text; ignored",
+                        m.start(),
+                    )
+                )
                 state = saved
             else:
                 stack.append((tag, attrs, saved))
@@ -317,22 +349,33 @@ def parse_story_markup(text: str):
         if tag in ("sound", "sfx"):
             label = attrs.get("prompt") or attrs.get("preset") or ""
             if not label:
-                issues.append(ParseIssue(
-                    "<sound> needs a 'preset' or 'prompt' attribute", m.start()
-                ))
-            scene().segments.append(MarkupSegment(
-                segment_type="sound_effect", speaker="", text=label,
-                sound_effects=[label] if label else [],
-            ))
+                issues.append(
+                    ParseIssue(
+                        "<sound> needs a 'preset' or 'prompt' attribute", m.start()
+                    )
+                )
+            scene().segments.append(
+                MarkupSegment(
+                    segment_type="sound_effect",
+                    speaker="",
+                    text=label,
+                    sound_effects=[label] if label else [],
+                )
+            )
             if not self_closing:
                 stack.append((tag, attrs, None))
             continue
 
         if tag == "music":
             label = attrs.get("prompt") or attrs.get("preset") or ""
-            scene().segments.append(MarkupSegment(
-                segment_type="music", speaker="", text=label, music=True,
-            ))
+            scene().segments.append(
+                MarkupSegment(
+                    segment_type="music",
+                    speaker="",
+                    text=label,
+                    music=True,
+                )
+            )
             if not self_closing:
                 stack.append((tag, attrs, None))
             continue

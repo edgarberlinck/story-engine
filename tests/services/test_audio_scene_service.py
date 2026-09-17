@@ -44,6 +44,7 @@ class TestAcceptedFieldsRoundTrip(unittest.TestCase):
         seg = AudioSceneSegment.from_dict(old)
         self.assertFalse(seg.accepted)
         self.assertEqual(seg.accepted_hash, "")
+        self.assertIsNone(seg.start_offset)
 
     def test_none_accepted_hash_normalized(self):
         seg = AudioSceneSegment.from_dict(
@@ -57,6 +58,18 @@ class TestAcceptedFieldsRoundTrip(unittest.TestCase):
         )
         self.assertFalse(seg.accepted)
         self.assertEqual(seg.accepted_hash, "")
+
+    def test_start_offset_round_trip(self):
+        seg = AudioSceneSegment("dialogue", "nikita", "Hi.", start_offset=2.75)
+        data = seg.to_dict()
+        self.assertEqual(data["start_offset"], 2.75)
+        restored = AudioSceneSegment.from_dict(data)
+        self.assertEqual(restored.start_offset, 2.75)
+
+    def test_start_offset_defaults_to_none(self):
+        seg = AudioSceneSegment("dialogue", "nikita", "Hi.")
+        self.assertIsNone(seg.start_offset)
+        self.assertIsNone(AudioSceneSegment.from_dict(seg.to_dict()).start_offset)
 
 
 if __name__ == "__main__":

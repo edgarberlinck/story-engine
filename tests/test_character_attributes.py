@@ -36,8 +36,15 @@ class TestCharacterStyles(unittest.TestCase):
         self.assertEqual(DEFAULT_STYLE, "ultra_realistic")
 
     def test_known_styles_exist(self):
-        for sid in ("ultra_realistic", "cinematic", "anime", "manga",
-                    "comic_book", "cyberpunk", "sketch"):
+        for sid in (
+            "ultra_realistic",
+            "cinematic",
+            "anime",
+            "manga",
+            "comic_book",
+            "cyberpunk",
+            "sketch",
+        ):
             self.assertIn(sid, CHARACTER_STYLES)
 
 
@@ -67,11 +74,11 @@ class TestCharacterTypes(unittest.TestCase):
         # Every style id also has a family mapping.
         for sid in CHARACTER_STYLES:
             self.assertIn(sid, STYLE_FAMILIES)
-         # Incompatible pairs are frozensets of 2 families.
+        # Incompatible pairs are frozensets of 2 families.
         for pair in INCOMPATIBLE_FAMILY_PAIRS:
             self.assertEqual(len(pair), 2)
             self.assertIsInstance(pair, frozenset)
-         # Bridges are frozensets of 2 families too.
+        # Bridges are frozensets of 2 families too.
         for bridge in FAMILY_BRIDGES:
             self.assertEqual(len(bridge), 2)
             self.assertIsInstance(bridge, frozenset)
@@ -143,8 +150,9 @@ class TestBuildSubject(unittest.TestCase):
         self.assertIn("20", sub)
 
     def test_animal_species_and_gender(self):
-        sub = _build_subject("animal", {
-            "age": "Adult", "species": "Dog", "gender": "Male"})
+        sub = _build_subject(
+            "animal", {"age": "Adult", "species": "Dog", "gender": "Male"}
+        )
         self.assertIn("adult", sub)
         self.assertIn("male", sub)
         self.assertIn("dog", sub)
@@ -169,55 +177,60 @@ class TestBuildCharacterPrompt(unittest.TestCase):
         self.assertIn(CHARACTER_STYLES[DEFAULT_STYLE]["modifiers"], prompt)
 
     def test_style_prefix_and_modifiers_present(self):
-        prompt = build_character_prompt("man", "ultra_realistic", {
-            "age": "30", "ethnicity": "European"})
+        prompt = build_character_prompt(
+            "man", "ultra_realistic", {"age": "30", "ethnicity": "European"}
+        )
         self.assertIn("ultra realistic", prompt)
         self.assertIn("highly detailed skin texture", prompt)
 
     def test_skip_values_excluded(self):
         # "None" freckles must be omitted (it is a skip value).
-        prompt = build_character_prompt("man", "ultra_realistic", {
-            "freckles": "None"})
+        prompt = build_character_prompt("man", "ultra_realistic", {"freckles": "None"})
         self.assertNotIn("none freckles", prompt.lower())
 
     def test_non_skip_value_included(self):
-        prompt = build_character_prompt("man", "ultra_realistic", {
-            "freckles": "Light"})
+        prompt = build_character_prompt("man", "ultra_realistic", {"freckles": "Light"})
         self.assertIn("light freckles", prompt)
 
     def test_custom_description_appended(self):
         prompt = build_character_prompt(
-            "man", "ultra_realistic", {}, custom_description="  mysterious aura  ")
+            "man", "ultra_realistic", {}, custom_description="  mysterious aura  "
+        )
         self.assertIn("mysterious aura", prompt)
         self.assertNotIn("  mysterious aura  ", prompt)  # stripped
 
     def test_empty_custom_description_ignored(self):
-        prompt = build_character_prompt("man", "ultra_realistic", {},
-                                       custom_description="   ")
+        prompt = build_character_prompt(
+            "man", "ultra_realistic", {}, custom_description="   "
+        )
         # No leftover empty fragment / double commas.
         self.assertNotIn(", ,", prompt)
 
     def test_subject_keys_used_once_in_subject_only(self):
         # age/ethnicity should appear via the subject line, not as a separate
         # generic phrase.
-        prompt = build_character_prompt("man", "ultra_realistic", {
-            "age": "Adult", "ethnicity": "African"})
+        prompt = build_character_prompt(
+            "man", "ultra_realistic", {"age": "Adult", "ethnicity": "African"}
+        )
         # They are not emitted with a "{} ..." template as a generic attribute.
         self.assertNotIn("adult age", prompt.lower())
         self.assertIn("african", prompt.lower())
 
     def test_style_attribute_not_duplicated(self):
         # Providing a style *attribute* value must not add a second style phrase.
-        prompt = build_character_prompt("man", "anime", {
-            "style": "Anime", "age": "25"})
+        prompt = build_character_prompt("man", "anime", {"style": "Anime", "age": "25"})
         # The prefix appears, but the style attribute is skipped (no extra).
-        self.assertEqual(prompt.lower().count("anime style"),
-                         prompt.lower().count("anime style"))
+        self.assertEqual(
+            prompt.lower().count("anime style"), prompt.lower().count("anime style")
+        )
         self.assertIn("anime style", prompt)
 
     def test_animal_prompt(self):
-        prompt = build_character_prompt("animal", "fantasy_art", {
-            "species": "Dragon", "gender": "Female", "age": "Young"})
+        prompt = build_character_prompt(
+            "animal",
+            "fantasy_art",
+            {"species": "Dragon", "gender": "Female", "age": "Young"},
+        )
         self.assertIn("fantasy", prompt)
         self.assertIn("dragon", prompt)
 

@@ -35,12 +35,20 @@ class SceneCard(QFrame):
         thumb.setFixedSize(220, 130)
         thumb.setAlignment(Qt.AlignCenter)
         image_path = scene.get("image_path")
-        pix = QPixmap(image_path) if image_path and Path(image_path).is_file() else QPixmap()
+        pix = (
+            QPixmap(image_path)
+            if image_path and Path(image_path).is_file()
+            else QPixmap()
+        )
         if not pix.isNull():
-            thumb.setPixmap(pix.scaled(220, 130, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            thumb.setPixmap(
+                pix.scaled(220, 130, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
         else:
             thumb.setText("No image")
-            thumb.setStyleSheet("background-color: #eee; color: #999; border-radius: 4px;")
+            thumb.setStyleSheet(
+                "background-color: #eee; color: #999; border-radius: 4px;"
+            )
 
         title = QLabel(f"Scene {scene.get('scene_number', '?')}")
         title.setStyleSheet("font-weight: bold; font-size: 12px;")

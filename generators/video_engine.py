@@ -135,7 +135,7 @@ def animate_scene(
     seed: int = 42,
     enhance: bool = True,
     enhancement: Optional[Dict[str, Any]] = None,
-      **overrides: Any,
+    **overrides: Any,
 ) -> Dict[str, Any]:
     """Generate a video for a scene using a single i2v model (default: ltx).
 
@@ -154,8 +154,8 @@ def animate_scene(
         output_dir=str(out_dir),
         output_basename=f"scene_{scene['scene_number']}_{model_name}",
         seed=seed,
-          **overrides,
-      )
+        **overrides,
+    )
 
     # Optional post-generation enhancement. It only depends on
     # numpy/scipy/imageio so it never downloads anything. Failures degrade
@@ -163,6 +163,7 @@ def animate_scene(
     if enhance:
         try:
             from generators.video_enhancer import enhance_video
+
             raw_stem = f"scene_{scene['scene_number']}_{model_name}"
             enhanced = enhance_video(
                 result["video_path"],
@@ -175,12 +176,16 @@ def animate_scene(
             result["enhanced_metrics_path"] = enhanced["metrics_path"]
             result["enhanced_metrics"] = enhanced["metrics"]
         except Exception as e:
-          # Enhancement is a quality nicety; never let it break generation.
-            print(f"[video_engine] Enhancement skipped/failed ({e}); "
-                "returning the raw clip.")
+            # Enhancement is a quality nicety; never let it break generation.
+            print(
+                f"[video_engine] Enhancement skipped/failed ({e}); "
+                "returning the raw clip."
+            )
             result["enhanced_video_path"] = result["video_path"]
 
     return result
+
+
 def benchmark_scene_video(
     scene: Dict[str, Any],
     project: str = DEFAULT_PROJECT,
@@ -232,8 +237,10 @@ def main():
     for model_name, result in results.items():
         if result:
             m = result["metrics"]
-            print(f"  {model_name}: {result['video_path']} "
-                  f"({m['duration_ms']} ms, {m['peak_memory_mb']} MB)")
+            print(
+                f"  {model_name}: {result['video_path']} "
+                f"({m['duration_ms']} ms, {m['peak_memory_mb']} MB)"
+            )
         else:
             print(f"  {model_name}: FAILED")
 

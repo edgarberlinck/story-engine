@@ -5,8 +5,16 @@ Project view screen with breadcrumb and tabs for Characters, Objects, Locations 
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QGridLayout, QScrollArea, QMessageBox, QTabWidget, QDialog,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QGridLayout,
+    QScrollArea,
+    QMessageBox,
+    QTabWidget,
+    QDialog,
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QPixmap
@@ -49,7 +57,10 @@ class ProjectViewScreen(QWidget):
         self._scene_thread = None
         self._pending_scene_ghost = False
 
-        self.project = project_manager.get_project(project_id) or {"name": "Unknown", "description": ""}
+        self.project = project_manager.get_project(project_id) or {
+            "name": "Unknown",
+            "description": "",
+        }
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
 
@@ -122,6 +133,7 @@ class ProjectViewScreen(QWidget):
 
     def configure_narrator(self):
         from ui.dialogs.narrator_config_dialog import NarratorConfigDialog
+
         chars = character_manager.list_characters(self.project_slug)
         dialog = NarratorConfigDialog(self, project=self.project_slug, characters=chars)
         dialog.exec()
@@ -130,6 +142,7 @@ class ProjectViewScreen(QWidget):
 
     def _build_writing_tab(self):
         from ui.components.writing_tab import WritingTab
+
         self.writing_tab = WritingTab(
             self.project_slug, on_compiled=self._on_chapter_compiled
         )
@@ -161,7 +174,9 @@ class ProjectViewScreen(QWidget):
         toolbar.addWidget(btn_new_char)
         layout.addLayout(toolbar)
 
-        self.char_empty_label = QLabel("No characters yet. Click \"+ New Character\" to create one.")
+        self.char_empty_label = QLabel(
+            'No characters yet. Click "+ New Character" to create one.'
+        )
         self.char_empty_label.setStyleSheet("color: #999; padding: 20px;")
         self.char_empty_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.char_empty_label)
@@ -217,7 +232,9 @@ class ProjectViewScreen(QWidget):
         toolbar.addWidget(btn_new_obj)
         layout.addLayout(toolbar)
 
-        self.obj_empty_label = QLabel("No objects yet. Click \"+ New Object\" to create one.")
+        self.obj_empty_label = QLabel(
+            'No objects yet. Click "+ New Object" to create one.'
+        )
         self.obj_empty_label.setStyleSheet("color: #999; padding: 20px;")
         self.obj_empty_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.obj_empty_label)
@@ -252,18 +269,25 @@ class ProjectViewScreen(QWidget):
 
     def create_object(self):
         from PySide6.QtWidgets import QInputDialog
+
         name, ok = QInputDialog.getText(self, "New Object", "Object name:")
         if not ok or not name.strip():
             return
-        obj_type, ok = QInputDialog.getText(self, "New Object", "Object type (e.g. weapon, artifact):", text="artifact")
+        obj_type, ok = QInputDialog.getText(
+            self, "New Object", "Object type (e.g. weapon, artifact):", text="artifact"
+        )
         if not ok:
             return
-        description, ok = QInputDialog.getMultiLineText(self, "New Object", "Description:")
+        description, ok = QInputDialog.getMultiLineText(
+            self, "New Object", "Description:"
+        )
         if not ok:
             return
         object_manager.create_object(
-            self.project_slug, name.strip(),
-            obj_type.strip() or "artifact", description.strip(),
+            self.project_slug,
+            name.strip(),
+            obj_type.strip() or "artifact",
+            description.strip(),
         )
         self.load_objects()
 
@@ -293,7 +317,9 @@ class ProjectViewScreen(QWidget):
         toolbar.addWidget(btn_new_loc)
         layout.addLayout(toolbar)
 
-        self.loc_empty_label = QLabel("No locations yet. Click \"+ New Location\" to create one.")
+        self.loc_empty_label = QLabel(
+            'No locations yet. Click "+ New Location" to create one.'
+        )
         self.loc_empty_label.setStyleSheet("color: #999; padding: 20px;")
         self.loc_empty_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.loc_empty_label)
@@ -328,28 +354,42 @@ class ProjectViewScreen(QWidget):
 
     def create_location(self):
         from PySide6.QtWidgets import QInputDialog
+
         name, ok = QInputDialog.getText(self, "New Location", "Location name:")
         if not ok or not name.strip():
             return
-        loc_type, ok = QInputDialog.getText(self, "New Location", "Location type (e.g. city, room):", text="place")
+        loc_type, ok = QInputDialog.getText(
+            self, "New Location", "Location type (e.g. city, room):", text="place"
+        )
         if not ok:
             return
-        description, ok = QInputDialog.getMultiLineText(self, "New Location", "Description:")
+        description, ok = QInputDialog.getMultiLineText(
+            self, "New Location", "Description:"
+        )
         if not ok:
             return
-        existing = [l["name"] for l in location_manager.list_locations(self.project_slug)]
+        existing = [
+            l["name"] for l in location_manager.list_locations(self.project_slug)
+        ]
         parent = None
         if existing:
             from PySide6.QtWidgets import QInputDialog as _QID
+
             parent_choice, ok = _QID.getItem(
-                self, "New Location", "Parent location (optional):",
-                ["<none>"] + existing, 0, False,
+                self,
+                "New Location",
+                "Parent location (optional):",
+                ["<none>"] + existing,
+                0,
+                False,
             )
             if ok and parent_choice != "<none>":
                 parent = parent_choice
         location_manager.create_location(
-            self.project_slug, name.strip(),
-            loc_type.strip() or "place", description.strip(),
+            self.project_slug,
+            name.strip(),
+            loc_type.strip() or "place",
+            description.strip(),
             parent_location=parent,
         )
         self.load_locations()
@@ -370,6 +410,7 @@ class ProjectViewScreen(QWidget):
 
     def _build_scenes_tab(self):
         from PySide6.QtWidgets import QListWidget, QSplitter, QGroupBox
+
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(15, 15, 15, 15)
@@ -410,7 +451,9 @@ class ProjectViewScreen(QWidget):
         toolbar.addWidget(self.btn_new_scene)
         image_layout.addLayout(toolbar)
 
-        self.scene_empty_label = QLabel("No image scenes yet. Click \"+ New Scene\" to generate one.")
+        self.scene_empty_label = QLabel(
+            'No image scenes yet. Click "+ New Scene" to generate one.'
+        )
         self.scene_empty_label.setStyleSheet("color: #999; padding: 20px;")
         self.scene_empty_label.setAlignment(Qt.AlignCenter)
         image_layout.addWidget(self.scene_empty_label)
@@ -431,33 +474,47 @@ class ProjectViewScreen(QWidget):
         return tab
 
     def load_audio_scenes(self):
-        """List the compiled audio scene representations."""
+        """List the compiled audio scene representations with review status."""
         import json
         from PySide6.QtWidgets import QListWidgetItem
-        from services.audio_scene_service import audio_scene_service
+        from services.audio_scene_service import (
+            audio_scene_service,
+            AudioSceneRepresentation,
+        )
+        from core.scene_status import scene_status
 
         self.audio_scene_list.clear()
         entries = audio_scene_service.list_representations(self.project_slug)
         entries.sort(key=lambda e: e["scene_number"])
         for e in entries:
+            status_txt = ""
             try:
                 data = json.loads(e["representation_json"])
                 title = data.get("title") or f"Scene {e['scene_number']}"
                 n_segments = len(data.get("segments", []))
                 speakers = ", ".join(data.get("characters_present", [])[:4])
+                rep = AudioSceneRepresentation.from_dict(data)
+                status = scene_status(self.project_slug, e["scene_number"], rep)
+                status_txt = status.label
             except (ValueError, KeyError):
                 title, n_segments, speakers = f"Scene {e['scene_number']}", 0, ""
-            label = f"Scene {e['scene_number']:>3} \u2014 {title}  ({n_segments} segments)"
+            except Exception:  # noqa: BLE001 (status must never break the list)
+                status_txt = ""
+            label = (
+                f"Scene {e['scene_number']:>3} \u2014 {title}  ({n_segments} segments)"
+            )
+            if status_txt:
+                label = f"{status_txt}  {label}"
             if speakers:
                 label += f"  [{speakers}]"
             item = QListWidgetItem(label)
             item.setData(Qt.UserRole, e)
             self.audio_scene_list.addItem(item)
         self.audio_scene_hint.setText(
-            f"{len(entries)} audio scene(s). Double-click to edit segments, "
-            "voices and preview audio."
-            if entries else
-            "No audio scenes yet. Write a chapter in the Writing tab and "
+            f"{len(entries)} audio scene(s). Double-click to review on the "
+            "timeline: listen, edit and accept fragments."
+            if entries
+            else "No audio scenes yet. Write a chapter in the Writing tab and "
             "click \u266a Compile to Audio Scenes."
         )
 
@@ -469,6 +526,7 @@ class ProjectViewScreen(QWidget):
     def _edit_audio_scene_row(self, item):
         entry = item.data(Qt.UserRole)
         from ui.dialogs.scene_editor_dialog import SceneEditorDialog
+
         dialog = SceneEditorDialog(
             self,
             project=self.project_slug,
@@ -490,6 +548,7 @@ class ProjectViewScreen(QWidget):
         cells = []
         if self._pending_scene_ghost:
             from ui.components.ghost_card import GhostCard
+
             cells.append(GhostCard(240, 220, "Generating scene\u2026"))
         for scene in scenes:
             card = SceneCard(scene)
@@ -509,7 +568,9 @@ class ProjectViewScreen(QWidget):
         path = scene.get("image_path")
         pix = QPixmap(path) if path and Path(path).is_file() else QPixmap()
         if not pix.isNull():
-            img.setPixmap(pix.scaled(800, 600, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            img.setPixmap(
+                pix.scaled(800, 600, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
         else:
             img.setText("No image")
             img.setStyleSheet("background: #eee; color: #999; padding: 60px;")
@@ -519,20 +580,18 @@ class ProjectViewScreen(QWidget):
         prompt_label.setWordWrap(True)
         layout.addWidget(prompt_label)
 
-        meta = QLabel(f"Seed: {scene.get('seed', '\u2014')}   Model: {scene.get('model', '\u2014')}   "
-                      f"Created: {str(scene.get('created_at', ''))[:19]}")
+        meta = QLabel(
+            f"Seed: {scene.get('seed', '\u2014')}   Model: {scene.get('model', '\u2014')}   "
+            f"Created: {str(scene.get('created_at', ''))[:19]}"
+        )
         meta.setStyleSheet("color: #999; font-size: 11px;")
         layout.addWidget(meta)
 
         btn_row = QHBoxLayout()
         btn_audio = QPushButton("Edit Audio Scene\u2026")
-        btn_audio.clicked.connect(
-            lambda: self._edit_audio_scene(scene)
-        )
+        btn_audio.clicked.connect(lambda: self._edit_audio_scene(scene))
         btn_export = QPushButton("Export Image\u2026")
-        btn_export.clicked.connect(
-            lambda: self._export_scene(dialog, scene)
-        )
+        btn_export.clicked.connect(lambda: self._export_scene(dialog, scene))
         btn_close = QPushButton("Close")
         btn_close.setProperty("flat", True)
         btn_close.clicked.connect(dialog.accept)
@@ -547,6 +606,7 @@ class ProjectViewScreen(QWidget):
     def _edit_audio_scene(self, scene):
         """Open the audio-scene representation editor for this scene."""
         from ui.dialogs.scene_editor_dialog import SceneEditorDialog
+
         dialog = SceneEditorDialog(
             self,
             project=self.project_slug,
@@ -557,11 +617,16 @@ class ProjectViewScreen(QWidget):
 
     def _export_scene(self, parent, scene):
         from ui.helpers import export_image
-        export_image(parent, scene.get("image_path"),
-                     f"{self.project_slug}_scene_{scene.get('scene_number', 'x')}")
+
+        export_image(
+            parent,
+            scene.get("image_path"),
+            f"{self.project_slug}_scene_{scene.get('scene_number', 'x')}",
+        )
 
     def create_scene(self):
         from ui.dialogs.scene_dialog import SceneDialog
+
         dialog = SceneDialog(self, project=self.project_slug)
         if not dialog.exec():
             return

@@ -18,8 +18,7 @@ class ObjectService:
 
     def _init_table(self):
         conn = self._connect()
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS objects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL DEFAULT 'test_project',
@@ -32,8 +31,7 @@ class ObjectService:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project, name)
             )
-            """
-        )
+            """)
         conn.commit()
         conn.close()
 
@@ -62,14 +60,25 @@ class ObjectService:
                 visual_identity = COALESCE(excluded.visual_identity, objects.visual_identity),
                 properties_json = COALESCE(excluded.properties_json, objects.properties_json)
             """,
-            (project, name, obj_type, description, owner, visual_identity, props, datetime.now()),
+            (
+                project,
+                name,
+                obj_type,
+                description,
+                owner,
+                visual_identity,
+                props,
+                datetime.now(),
+            ),
         )
         conn.commit()
         row_id = cursor.lastrowid
         conn.close()
         return row_id
 
-    def get_object(self, name: str, project: str = "test_project") -> Optional[Dict[str, Any]]:
+    def get_object(
+        self, name: str, project: str = "test_project"
+    ) -> Optional[Dict[str, Any]]:
         conn = self._connect()
         conn.row_factory = sqlite3.Row
         row = conn.execute(
@@ -112,11 +121,12 @@ class ObjectService:
     ) -> List[Dict[str, Any]]:
         """Return all known objects whose name appears in the given text."""
         import re
+
         found = []
         text_lower = text.lower()
         for o in self.list_objects(project):
             name_lower = o["name"].lower()
-            pattern = r'\b' + re.escape(name_lower) + r'\b'
+            pattern = r"\b" + re.escape(name_lower) + r"\b"
             if re.search(pattern, text_lower):
                 found.append(o)
         return found

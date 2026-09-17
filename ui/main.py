@@ -97,21 +97,26 @@ class App(QApplication):
 
     def show_project_view(self, project_id):
         from ui.screens.project_view_screen import ProjectViewScreen
+
         view = ProjectViewScreen(
             project_id,
             on_back=self._pop_to_root,
-            on_character_selected=lambda char, pid=project_id: self.show_character_view(pid, char["name"]),
+            on_character_selected=lambda char, pid=project_id: self.show_character_view(
+                pid, char["name"]
+            ),
             on_new_character=lambda pid=project_id: self.show_character_builder(pid),
         )
         self._push(view)
 
     def show_character_view(self, project_id, character_name):
         from ui.screens.character_view_screen import CharacterViewScreen
+
         view = CharacterViewScreen(project_id, character_name, on_back=self._pop)
         self._push(view)
 
     def show_character_builder(self, project_id):
         from ui.screens.character_builder_screen import CharacterBuilderScreen
+
         view = CharacterBuilderScreen(
             project_id,
             on_back=self._pop,

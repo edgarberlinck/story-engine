@@ -21,7 +21,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from PIL import Image, ImageDraw
 
-
 PROJECT = "Test_ui"
 SCENE_PROMPT = (
     "There's a stage, very small with red curtains. The stage is made of "
@@ -61,9 +60,13 @@ def _fake_background_image() -> Path:
 _call_count = {"n": 0}
 
 
-def fake_generate_images(prompt, model_name="flux_dev", seed=42, task_name=None, **kwargs):
+def fake_generate_images(
+    prompt, model_name="flux_dev", seed=42, task_name=None, **kwargs
+):
     _call_count["n"] += 1
-    print(f"[mock generate_images] task={task_name} seed={seed} prompt[:60]={prompt[:60]!r}")
+    print(
+        f"[mock generate_images] task={task_name} seed={seed} prompt[:60]={prompt[:60]!r}"
+    )
     if task_name and "background" in task_name:
         return [str(_fake_background_image())]
     if task_name and "Nikita" in task_name:
@@ -77,60 +80,68 @@ def fake_generate_text_with_llm(llm_prompt: str, model_name="phi3_mini", **kwarg
     """Return canned JSON responses depending on which stage is calling."""
     if "You resolve character descriptions" in llm_prompt:
         # Stage A: context resolution
-        return json.dumps([
-            {
-                "name": "Nikita",
-                "identity": ["young woman", "long curly red hair", "fair skin"],
-                "default_presentation": ["fantasy clothing"],
-                "presentation_decision": "REPLACE",
-                "scene_presentation": ["black suit"],
-                "dropped": ["fantasy clothing"],
-                "dropped_reason": "scene specifies black suit"
-            },
-            {
-                "name": "Roger",
-                "identity": ["muscular man", "dark skin", "short bald hair"],
-                "default_presentation": ["formal clothing"],
-                "presentation_decision": "KEEP",
-                "scene_presentation": ["dark formal outfit"],
-                "dropped": [],
-                "dropped_reason": ""
-            }
-        ])
+        return json.dumps(
+            [
+                {
+                    "name": "Nikita",
+                    "identity": ["young woman", "long curly red hair", "fair skin"],
+                    "default_presentation": ["fantasy clothing"],
+                    "presentation_decision": "REPLACE",
+                    "scene_presentation": ["black suit"],
+                    "dropped": ["fantasy clothing"],
+                    "dropped_reason": "scene specifies black suit",
+                },
+                {
+                    "name": "Roger",
+                    "identity": ["muscular man", "dark skin", "short bald hair"],
+                    "default_presentation": ["formal clothing"],
+                    "presentation_decision": "KEEP",
+                    "scene_presentation": ["dark formal outfit"],
+                    "dropped": [],
+                    "dropped_reason": "",
+                },
+            ]
+        )
     if "Produce JSON with layers" in llm_prompt:
         # Stage B: decomposition
-        return json.dumps({
-            "camera": "wide shot from back of bar",
-            "layers": [
-                {
-                    "name": "base_environment",
-                    "prompt": "small stage with red curtains, cracked wood floor, tables with people, empty stage",
-                    "must_include": ["stage", "curtains"],
-                    "region_hint": "full frame"
-                },
-                {
-                    "name": "character_Nikita",
-                    "prompt": "Nikita, young woman, long curly red hair, fair skin, black suit, playing guitar",
-                    "must_include": ["red hair"],
-                    "region_hint": "left"
-                },
-                {
-                    "name": "character_Roger",
-                    "prompt": "Roger, muscular man, dark skin, short bald hair, dark formal outfit, playing drums",
-                    "must_include": ["bald"],
-                    "region_hint": "right"
-                }
-            ],
-            "single_pass_feasible": False,
-            "rationale": "two characters with distinct positions and identity constraints"
-        })
+        return json.dumps(
+            {
+                "camera": "wide shot from back of bar",
+                "layers": [
+                    {
+                        "name": "base_environment",
+                        "prompt": "small stage with red curtains, cracked wood floor, tables with people, empty stage",
+                        "must_include": ["stage", "curtains"],
+                        "region_hint": "full frame",
+                    },
+                    {
+                        "name": "character_Nikita",
+                        "prompt": "Nikita, young woman, long curly red hair, fair skin, black suit, playing guitar",
+                        "must_include": ["red hair"],
+                        "region_hint": "left",
+                    },
+                    {
+                        "name": "character_Roger",
+                        "prompt": "Roger, muscular man, dark skin, short bald hair, dark formal outfit, playing drums",
+                        "must_include": ["bald"],
+                        "region_hint": "right",
+                    },
+                ],
+                "single_pass_feasible": False,
+                "rationale": "two characters with distinct positions and identity constraints",
+            }
+        )
     # Stage C: compression fallback (should rarely trigger given short canned prompts)
     return llm_prompt
 
 
 def main():
-    with patch("generators.image_engine.generate_images", side_effect=fake_generate_images), \
-         patch("core.scene_planner.generate_text_with_llm", side_effect=fake_generate_text_with_llm):
+    with patch(
+        "generators.image_engine.generate_images", side_effect=fake_generate_images
+    ), patch(
+        "core.scene_planner.generate_text_with_llm",
+        side_effect=fake_generate_text_with_llm,
+    ):
 
         from core.scene_pipeline import generate_scene_pipeline
 
@@ -142,7 +153,11 @@ def main():
         )
 
     print("\n=== RESULT ===")
-    print(json.dumps({k: v for k, v in result.items() if k != "assets"}, indent=2, default=str))
+    print(
+        json.dumps(
+            {k: v for k, v in result.items() if k != "assets"}, indent=2, default=str
+        )
+    )
     print(f"\nGenerated image at: {result.get('image_path')}")
     assert Path(result["image_path"]).is_file(), "final composed image missing"
     print(f"\nMock generate_images call count: {_call_count['n']}")

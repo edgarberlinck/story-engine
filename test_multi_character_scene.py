@@ -5,7 +5,10 @@ Uses the new progressive asset-composition pipeline.
 """
 
 from core.scene_planner import LLMScenePlanner
-from core.character_asset_generator import generate_character_assets, build_character_asset_prompt
+from core.character_asset_generator import (
+    generate_character_assets,
+    build_character_asset_prompt,
+)
 from services.database.character_service import character_service
 
 project = "Test_ui"
@@ -48,6 +51,7 @@ for rc in resolved:
 
 # Build asset prompts
 from core.character_asset_generator import build_character_asset_prompt
+
 print("\n--- Asset Prompts ---")
 for rc in resolved:
     prompt = build_character_asset_prompt(rc, "photorealistic")

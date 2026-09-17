@@ -59,7 +59,7 @@ class TestDatabaseService(unittest.TestCase):
 
     def test_update_project_partial_keeps_existing(self):
         pid = self.db.create_project("Keep Name", "Keep Desc")
-         # Only update the name; description should be preserved.
+        # Only update the name; description should be preserved.
         ok = self.db.update_project(pid, name="Renamed")
         self.assertTrue(ok)
         fetched = self.db.get_project(pid)
@@ -85,7 +85,7 @@ class TestDatabaseService(unittest.TestCase):
         projects = self.db.list_projects()
         self.assertEqual(len(projects), 3)
         names = [p["name"] for p in projects]
-          # Newest first -> "Third" should appear before "First".
+        # Newest first -> "Third" should appear before "First".
         self.assertLess(names.index("Third"), names.index("First"))
         self.assertEqual(names[0], "Third")
 
@@ -121,9 +121,10 @@ class TestDatabaseService(unittest.TestCase):
         self.assertFalse(ok)
 
     def test_delete_project_cascades_related_data(self):
-         # Create a project plus related character_version + scene rows that
+        # Create a project plus related character_version + scene rows that
         # share the same project id, then delete and confirm cascade.
         import sqlite3
+
         pid = self.db.create_project("Cascade", "desc")
 
         conn = sqlite3.connect(self.db_path)
@@ -132,13 +133,13 @@ class TestDatabaseService(unittest.TestCase):
             "(project, character_name, version, prompt, model, image_path) "
             "VALUES (?, ?, 1, ?, ?, ?)",
             (pid, "char", "prompt", "flux", "/img.png"),
-         )
+        )
         conn.execute(
             "INSERT INTO scenes "
             "(project, scene_number, prompt, image_path) "
             "VALUES (?, 1, ?, ?)",
             (pid, "scene", "/scene.png"),
-         )
+        )
         conn.commit()
 
         self.assertTrue(self.db.delete_project(pid))
@@ -146,7 +147,7 @@ class TestDatabaseService(unittest.TestCase):
         conn = sqlite3.connect(self.db_path)
         cv = conn.execute(
             "SELECT COUNT(*) FROM character_versions WHERE project = ?",
-             (pid,),
+            (pid,),
         ).fetchone()[0]
         sc = conn.execute(
             "SELECT COUNT(*) FROM scenes WHERE project = ?", (pid,)

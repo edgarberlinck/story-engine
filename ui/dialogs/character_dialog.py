@@ -2,7 +2,15 @@
 Dialog for creating characters with multiple variants.
 """
 
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QSpinBox
+from PySide6.QtWidgets import (
+    QDialog,
+    QVBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QHBoxLayout,
+    QSpinBox,
+)
 
 
 class CharacterDialog(QDialog):
@@ -39,5 +47,5 @@ class CharacterDialog(QDialog):
         return {
             "name": self.name_edit.text(),
             "prompt": self.prompt_edit.text(),
-            "variants": self.variant_spin.value()
+            "variants": self.variant_spin.value(),
         }

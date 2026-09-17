@@ -130,7 +130,9 @@ def ensure_character(name: str, project: str = BENCHMARK_PROJECT):
         print(f"Character '{name}' already exists; reusing reference.")
 
 
-def generate_benchmark_videos(scene: dict, video_prompt: str, project: str = BENCHMARK_PROJECT) -> dict:
+def generate_benchmark_videos(
+    scene: dict, video_prompt: str, project: str = BENCHMARK_PROJECT
+) -> dict:
     """Animate a validated scene with every i2v model, then enhance each clip.
 
     Model-specific generation parameters (resolution, frame count, fps,
@@ -160,6 +162,7 @@ def generate_benchmark_videos(scene: dict, video_prompt: str, project: str = BEN
             # (numpy/scipy/imageio); failures degrade to the raw clip.
             try:
                 from generators.video_enhancer import enhance_video
+
                 r = results[model_name]
                 enhanced = enhance_video(
                     r["video_path"],
@@ -175,6 +178,8 @@ def generate_benchmark_videos(scene: dict, video_prompt: str, project: str = BEN
             print(f"Failed to generate video with {model_name}: {e}")
             results[model_name] = None
     return results
+
+
 def run_cafe_conversation_benchmark(project: str = BENCHMARK_PROJECT) -> dict:
     """The definitive benchmark: Nikita and Roger talking in a café."""
     print("\n########## Benchmark: Café conversation (Nikita & Roger) ##########")
@@ -213,9 +218,11 @@ def print_summary(all_results: dict):
             if result:
                 m = result["metrics"]
                 seconds = m["num_frames"] / m["fps"]
-                print(f"  {model_name}: {result['video_path']} "
-                      f"({m['width']}x{m['height']}, {seconds:.1f}s, "
-                      f"{m['duration_ms']} ms, {m['peak_memory_mb']} MB)")
+                print(
+                    f"  {model_name}: {result['video_path']} "
+                    f"({m['width']}x{m['height']}, {seconds:.1f}s, "
+                    f"{m['duration_ms']} ms, {m['peak_memory_mb']} MB)"
+                )
             else:
                 print(f"  {model_name}: FAILED")
 
@@ -223,16 +230,22 @@ def print_summary(all_results: dict):
 def main():
     """Run the image-to-video benchmark across all i2v models."""
     print("=== Image-to-Video Generation Benchmark Suite ===")
-    print(f"Models: {', '.join(AVAILABLE_VIDEO_MODELS)} (default: {DEFAULT_VIDEO_MODEL})")
+    print(
+        f"Models: {', '.join(AVAILABLE_VIDEO_MODELS)} (default: {DEFAULT_VIDEO_MODEL})"
+    )
 
     all_results = {}
     try:
-        all_results["Café conversation (Nikita & Roger)"] = run_cafe_conversation_benchmark()
+        all_results["Café conversation (Nikita & Roger)"] = (
+            run_cafe_conversation_benchmark()
+        )
 
         print_summary(all_results)
         print("\nBenchmark suite completed!")
-        print("Compare scene_*/out/benchmark_<model>.mp4 and the matching "
-              "*_benchmark_metrics.json files to pick the winning i2v model.")
+        print(
+            "Compare scene_*/out/benchmark_<model>.mp4 and the matching "
+            "*_benchmark_metrics.json files to pick the winning i2v model."
+        )
     except Exception as e:
         print(f"Error during benchmark: {e}")
         if all_results:

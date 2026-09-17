@@ -27,7 +27,9 @@ class TestBracketShorthand(unittest.TestCase):
         self.assertEqual(issues, [])
 
     def test_feeling_changes_split_segments(self):
-        text = "[Narrator] calm start [Feeling=Angry] angry middle [Feeling=calm] calm end"
+        text = (
+            "[Narrator] calm start [Feeling=Angry] angry middle [Feeling=calm] calm end"
+        )
         scenes, _ = parse_story_markup(text)
         segs = scenes[0].segments
         self.assertEqual([s.emotion for s in segs], [None, "Angry", "calm"])
@@ -42,8 +44,10 @@ class TestBracketShorthand(unittest.TestCase):
         self.assertEqual(segs[2].speaker, "Roger")
 
     def test_all_bracket_attributes(self):
-        text = ("[Nikita] [Tone=cold] [Delivery=slow] [Intensity=0.8] "
-                "[Voice=roger] line here")
+        text = (
+            "[Nikita] [Tone=cold] [Delivery=slow] [Intensity=0.8] "
+            "[Voice=roger] line here"
+        )
         scenes, issues = parse_story_markup(text)
         seg = scenes[0].segments[0]
         self.assertEqual(seg.tone, "cold")
@@ -104,16 +108,20 @@ class TestXmlMarkup(unittest.TestCase):
         self.assertTrue(any("auto-closed" in i.message for i in issues))
 
     def test_multiple_scenes(self):
-        text = ("<scene title='One'><character name='a'>x</character></scene>"
-                "<scene title='Two'><character name='b'>y</character></scene>")
+        text = (
+            "<scene title='One'><character name='a'>x</character></scene>"
+            "<scene title='Two'><character name='b'>y</character></scene>"
+        )
         scenes, _ = parse_story_markup(text)
         self.assertEqual([s.title for s in scenes], ["One", "Two"])
         self.assertEqual(scenes[0].segments[0].speaker, "a")
         self.assertEqual(scenes[1].segments[0].speaker, "b")
 
     def test_character_attributes(self):
-        text = ("<character name='nikita' emotion='warm' tone='friendly' "
-                "intensity='0.3' delivery='calm' voice='custom'>Good morning.</character>")
+        text = (
+            "<character name='nikita' emotion='warm' tone='friendly' "
+            "intensity='0.3' delivery='calm' voice='custom'>Good morning.</character>"
+        )
         scenes, _ = parse_story_markup(text)
         seg = scenes[0].segments[0]
         self.assertEqual(
@@ -122,9 +130,11 @@ class TestXmlMarkup(unittest.TestCase):
         )
 
     def test_state_restored_after_character_block(self):
-        text = ("[Narrator] before "
-                "<character name='nikita' emotion='angry'>line</character>"
-                " after")
+        text = (
+            "[Narrator] before "
+            "<character name='nikita' emotion='angry'>line</character>"
+            " after"
+        )
         scenes, _ = parse_story_markup(text)
         segs = scenes[0].segments
         self.assertEqual(segs[0].speaker, "narrator")
@@ -139,8 +149,9 @@ class TestXmlMarkup(unittest.TestCase):
         self.assertEqual(scenes[0].segments[-1].text, "hi")
 
     def test_bracket_tokens_inside_character_text(self):
-        text = ("<character name='nikita'>calm... [Feeling=Angry] furious!"
-                "</character>")
+        text = (
+            "<character name='nikita'>calm... [Feeling=Angry] furious!" "</character>"
+        )
         scenes, _ = parse_story_markup(text)
         segs = scenes[0].segments
         self.assertIsNone(segs[0].emotion)
@@ -158,10 +169,12 @@ class TestXmlMarkup(unittest.TestCase):
 
 class TestConversion(unittest.TestCase):
     def test_scenes_to_representations(self):
-        text = ("<scene title='Morning'>"
-                "<character name='nikita' emotion='warm'>Good morning.</character>"
-                "<character name='roger'>Morning!</character>"
-                "</scene>")
+        text = (
+            "<scene title='Morning'>"
+            "<character name='nikita' emotion='warm'>Good morning.</character>"
+            "<character name='roger'>Morning!</character>"
+            "</scene>"
+        )
         scenes, _ = parse_story_markup(text)
         reps = scenes_to_representations(scenes, scene_id_prefix="ch1_en")
         self.assertEqual(len(reps), 1)
@@ -180,10 +193,13 @@ class TestConversion(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
 class TestSceneStateReset(unittest.TestCase):
     def test_performance_state_resets_at_scene_boundary(self):
-        text = ("<scene>[Narrator] one [Feeling=worried] uneasy</scene>"
-                "<scene>[Narrator] fresh start</scene>")
+        text = (
+            "<scene>[Narrator] one [Feeling=worried] uneasy</scene>"
+            "<scene>[Narrator] fresh start</scene>"
+        )
         scenes, _ = parse_story_markup(text)
         self.assertEqual(scenes[0].segments[1].emotion, "worried")
         self.assertIsNone(scenes[1].segments[0].emotion)

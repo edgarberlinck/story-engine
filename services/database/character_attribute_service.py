@@ -15,25 +15,35 @@ class CharacterAttributeService:
     def _connect(self):
         return sqlite3.connect(self.db_path)
 
-    def save_attributes(self, project: str, character_name: str, attributes: Dict[str, Any]) -> bool:
+    def save_attributes(
+        self, project: str, character_name: str, attributes: Dict[str, Any]
+    ) -> bool:
         conn = self._connect()
         json_str = json.dumps(attributes)
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO character_attributes
             (project, character_name, attributes_json, updated_at)
             VALUES (?, ?, ?, ?)
-        """, (project, character_name, json_str, datetime.now()))
+        """,
+            (project, character_name, json_str, datetime.now()),
+        )
         conn.commit()
         conn.close()
         return True
 
-    def get_attributes(self, project: str, character_name: str) -> Optional[Dict[str, Any]]:
+    def get_attributes(
+        self, project: str, character_name: str
+    ) -> Optional[Dict[str, Any]]:
         conn = self._connect()
         conn.row_factory = sqlite3.Row
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT attributes_json FROM character_attributes
             WHERE project = ? AND character_name = ?
-        """, (project, character_name)).fetchone()
+        """,
+            (project, character_name),
+        ).fetchone()
         conn.close()
         if row:
             return json.loads(row["attributes_json"])

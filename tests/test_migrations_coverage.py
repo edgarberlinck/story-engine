@@ -60,7 +60,7 @@ class TestMigrateDatabaseCoverage(unittest.TestCase):
         conn.close()
 
     def test_is_idempotent(self):
-         # Second call must not raise (all DDL uses IF NOT EXISTS).
+        # Second call must not raise (all DDL uses IF NOT EXISTS).
         migrate_database(self.db_path)
         migrate_database(self.db_path)
         conn = _connect(self.db_path)
@@ -74,7 +74,7 @@ class TestMigrateDatabaseCoverage(unittest.TestCase):
         self.assertIn("scenes", tables)
 
     def test_foreign_keys_pragma_does_not_break_fresh_db(self):
-         # A fresh db with foreign keys enabled should migrate cleanly.
+        # A fresh db with foreign keys enabled should migrate cleanly.
         migrate_database(self.db_path)
         conn = _connect(self.db_path)
         val = conn.execute("PRAGMA foreign_keys").fetchone()[0]
@@ -94,8 +94,7 @@ class TestSeedCharacterVersionsCoverage(unittest.TestCase):
 
     def _make_character_versions(self):
         conn = _connect(self.db_path)
-        conn.execute(
-             """
+        conn.execute("""
             CREATE TABLE character_versions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL,
@@ -109,21 +108,20 @@ class TestSeedCharacterVersionsCoverage(unittest.TestCase):
                 is_default INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(project, character_name, version)
             )
-            """
-        )
+            """)
         conn.commit()
         conn.close()
 
     def test_early_return_when_already_seeded(self):
-         # character_versions already populated -> seed must no-op (return early
-         # without touching a characters table).
+        # character_versions already populated -> seed must no-op (return early
+        # without touching a characters table).
         self._make_character_versions()
         conn = _connect(self.db_path)
         conn.execute(
-             "INSERT INTO character_versions "
-             "(project, character_name, version, prompt, model, image_path) "
-             "VALUES ('p', 'c', 1, 'pr', 'flux', '/img')"
-          )
+            "INSERT INTO character_versions "
+            "(project, character_name, version, prompt, model, image_path) "
+            "VALUES ('p', 'c', 1, 'pr', 'flux', '/img')"
+        )
         conn.commit()
         conn.close()
 
@@ -131,19 +129,16 @@ class TestSeedCharacterVersionsCoverage(unittest.TestCase):
         seed_character_versions_from_existing(self.db_path)
 
         conn = _connect(self.db_path)
-        count = conn.execute(
-             "SELECT COUNT(*) FROM character_versions"
-          ).fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM character_versions").fetchone()[0]
         conn.close()
         self.assertEqual(count, 1)
 
     def test_empty_rows_no_exception(self):
-         # character_versions exists but empty, characters empty -> seed runs
-         # its select/loop without doing any inserts (loop body never executes).
+        # character_versions exists but empty, characters empty -> seed runs
+        # its select/loop without doing any inserts (loop body never executes).
         self._make_character_versions()
         conn = _connect(self.db_path)
-        conn.execute(
-             """
+        conn.execute("""
             CREATE TABLE characters (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL,
@@ -154,17 +149,14 @@ class TestSeedCharacterVersionsCoverage(unittest.TestCase):
                 reference_image TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            """
-        )
+            """)
         conn.commit()
         conn.close()
 
         seed_character_versions_from_existing(self.db_path)
 
         conn = _connect(self.db_path)
-        count = conn.execute(
-             "SELECT COUNT(*) FROM character_versions"
-          ).fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM character_versions").fetchone()[0]
         conn.close()
         self.assertEqual(count, 0)
 

@@ -17,8 +17,7 @@ class SceneService:
 
     def _init_table(self):
         conn = self._connect()
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS scenes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project TEXT NOT NULL,
@@ -30,28 +29,40 @@ class SceneService:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(project, scene_number)
             )
-            """
-        )
+            """)
         conn.commit()
         conn.close()
 
     def list_scenes(self, project: str) -> List[Dict[str, Any]]:
         conn = self._connect()
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT * FROM scenes WHERE project = ? ORDER BY scene_number DESC
-        """, (project,)).fetchall()
+        """,
+            (project,),
+        ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
 
-    def save_scene(self, project: str, scene_number: int, prompt: str,
-                   image_path: str, seed: Optional[int] = None, model: Optional[str] = None) -> Dict[str, Any]:
+    def save_scene(
+        self,
+        project: str,
+        scene_number: int,
+        prompt: str,
+        image_path: str,
+        seed: Optional[int] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
         conn = self._connect()
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO scenes
             (project, scene_number, prompt, image_path, seed, model, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (project, scene_number, prompt, image_path, seed, model, datetime.now()))
+        """,
+            (project, scene_number, prompt, image_path, seed, model, datetime.now()),
+        )
         conn.commit()
         conn.close()
         return self.get_scene(project, scene_number)
@@ -59,9 +70,12 @@ class SceneService:
     def get_scene(self, project: str, scene_number: int) -> Optional[Dict[str, Any]]:
         conn = self._connect()
         conn.row_factory = sqlite3.Row
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT * FROM scenes WHERE project = ? AND scene_number = ?
-        """, (project, scene_number)).fetchone()
+        """,
+            (project, scene_number),
+        ).fetchone()
         conn.close()
         return dict(row) if row else None
 

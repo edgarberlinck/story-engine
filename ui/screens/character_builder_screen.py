@@ -3,8 +3,18 @@ Character creation builder with attributes.
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QSpinBox, QLineEdit, QFormLayout, QTextEdit, QMessageBox, QScrollArea,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QComboBox,
+    QSpinBox,
+    QLineEdit,
+    QFormLayout,
+    QTextEdit,
+    QMessageBox,
+    QScrollArea,
 )
 from PySide6.QtCore import Qt, QThread, Signal
 
@@ -22,7 +32,7 @@ def get_diffusion_models():
             # Prefer the display name if available, otherwise use the model ID
             display_name = metadata.get("name", model_id)
             diffusion_models.append((display_name, model_id))
-    
+
     # Sort by display name for consistent ordering
     diffusion_models.sort(key=lambda x: x[0])
     return diffusion_models
@@ -44,7 +54,9 @@ class _GenerateThread(QThread):
     def run(self):
         try:
             character_manager.generate_versions(
-                self.project, self.name, self.prompt,
+                self.project,
+                self.name,
+                self.prompt,
                 num_versions=self.num_versions,
                 model=self.model_id,
                 attributes=self.attributes,
@@ -107,42 +119,79 @@ class CharacterBuilderScreen(QWidget):
         self.age_combo = combo(["Child", "Teen", "20-30", "30-40", "40-50", "50+"])
         form.addRow("Age Range:", self.age_combo)
 
-        self.body_combo = combo(["Slender", "Athletic", "Curvy", "Muscular", "Plus Size"])
+        self.body_combo = combo(
+            ["Slender", "Athletic", "Curvy", "Muscular", "Plus Size"]
+        )
         form.addRow("Body Type:", self.body_combo)
 
         self.hair_type_combo = combo(["Straight", "Wavy", "Curly", "Coily", "Bald"])
         form.addRow("Hair Type:", self.hair_type_combo)
 
-        self.hair_color_combo = combo(["Black", "Brown", "Blonde", "Red", "Gray", "White"])
+        self.hair_color_combo = combo(
+            ["Black", "Brown", "Blonde", "Red", "Gray", "White"]
+        )
         form.addRow("Hair Color:", self.hair_color_combo)
 
         self.hair_length_combo = combo(["Short", "Medium", "Long"])
         form.addRow("Hair Length:", self.hair_length_combo)
 
-        self.skin_combo = combo(["Very Light", "Light", "Medium", "Tan", "Dark", "Very Dark"])
+        self.skin_combo = combo(
+            ["Very Light", "Light", "Medium", "Tan", "Dark", "Very Dark"]
+        )
         form.addRow("Skin Tone:", self.skin_combo)
 
         self.eye_combo = combo(["Blue", "Green", "Brown", "Hazel", "Gray"])
         form.addRow("Eye Color:", self.eye_combo)
 
-        self.clothing_combo = combo(["Casual", "Formal", "Fantasy", "Sci-fi", "Historical", "Sporty"])
+        self.clothing_combo = combo(
+            ["Casual", "Formal", "Fantasy", "Sci-fi", "Historical", "Sporty"]
+        )
         form.addRow("Clothing Style:", self.clothing_combo)
 
-        self.mood_combo = combo(["Neutral", "Happy", "Serious", "Mysterious", "Confident", "Melancholic"])
+        self.mood_combo = combo(
+            ["Neutral", "Happy", "Serious", "Mysterious", "Confident", "Melancholic"]
+        )
         form.addRow("Mood/Expression:", self.mood_combo)
-        
+
         # Add Style attribute
-        self.style_combo = combo([
-            "Ultra Realistic", "Cinematic", "Photorealistic", "Realistic",
-            "Anime", "Manga", "Comic Book", "Cartoon",
-            "Animation", "3D Animation", "3D Render", "Pixar-like",
-            "Disney-like", "Stylized", "Semi-Realistic", "Fantasy Art",
-            "Dark Fantasy", "Cyberpunk", "Sci-Fi", "Steampunk",
-            "Medieval Art", "Concept Art", "Digital Painting", "Oil Painting",
-            "Watercolor", "Pencil Drawing", "Sketch", "Ink Drawing",
-            "Pixel Art", "Low Poly", "Game Asset", "Clay Render",
-            "Minimalist", "Abstract"
-        ])
+        self.style_combo = combo(
+            [
+                "Ultra Realistic",
+                "Cinematic",
+                "Photorealistic",
+                "Realistic",
+                "Anime",
+                "Manga",
+                "Comic Book",
+                "Cartoon",
+                "Animation",
+                "3D Animation",
+                "3D Render",
+                "Pixar-like",
+                "Disney-like",
+                "Stylized",
+                "Semi-Realistic",
+                "Fantasy Art",
+                "Dark Fantasy",
+                "Cyberpunk",
+                "Sci-Fi",
+                "Steampunk",
+                "Medieval Art",
+                "Concept Art",
+                "Digital Painting",
+                "Oil Painting",
+                "Watercolor",
+                "Pencil Drawing",
+                "Sketch",
+                "Ink Drawing",
+                "Pixel Art",
+                "Low Poly",
+                "Game Asset",
+                "Clay Render",
+                "Minimalist",
+                "Abstract",
+            ]
+        )
         form.addRow("Visual Style:", self.style_combo)
 
         # Add Model selector - dynamically loaded from models.py
@@ -150,9 +199,11 @@ class CharacterBuilderScreen(QWidget):
         model_display_names = [model[0] for model in diffusion_models]
         self.model_combo = combo(model_display_names)
         form.addRow("Generation Model:", self.model_combo)
-        
+
         # Store mapping from display names to actual model IDs
-        self.model_id_mapping = {display_name: model_id for display_name, model_id in diffusion_models}
+        self.model_id_mapping = {
+            display_name: model_id for display_name, model_id in diffusion_models
+        }
 
         self.variant_spin = QSpinBox()
         self.variant_spin.setRange(1, 10)
@@ -160,7 +211,9 @@ class CharacterBuilderScreen(QWidget):
         form.addRow("Variants to generate:", self.variant_spin)
 
         self.prompt_preview = QTextEdit()
-        self.prompt_preview.setPlaceholderText("Prompt preview \u2014 click \u201cPreview Prompt\u201d to generate, then edit freely.")
+        self.prompt_preview.setPlaceholderText(
+            "Prompt preview \u2014 click \u201cPreview Prompt\u201d to generate, then edit freely."
+        )
         self.prompt_preview.setMaximumHeight(120)
         form.addRow("Prompt:", self.prompt_preview)
 
@@ -202,12 +255,12 @@ class CharacterBuilderScreen(QWidget):
             "eye_color": self.eye_combo.currentText(),
             "clothing": self.clothing_combo.currentText(),
             "mood": self.mood_combo.currentText(),
-            "style": self.style_combo.currentText()
+            "style": self.style_combo.currentText(),
         }
 
     def build_prompt(self):
         a = {k: v.lower() for k, v in self.get_attributes().items()}
-        
+
         # Build a character using the character attributes system
         # but maintain compatibility with the existing simple format
         if a["gender"] == "male":
@@ -216,7 +269,7 @@ class CharacterBuilderScreen(QWidget):
             char_type = "woman"
         else:
             char_type = "animal"  # Fallback for non-binary or other
-        
+
         # For now we'll use the simpler approach, but the system supports style
         base_prompt = (
             f"Full body photo of a {a['body_type']} {a['gender']} character, "
@@ -224,11 +277,11 @@ class CharacterBuilderScreen(QWidget):
             f"{a['skin_tone']} skin tone and {a['eye_color']} eyes, wearing {a['clothing']} clothing, "
             f"{a['mood']} expression, photorealistic, detailed face, high detail, good lighting"
         )
-        
+
         # Append style if selected (but since this is a simpler UI, just indicate it's included)
         if a["style"] and a["style"] != "Default":
             base_prompt = f"{a['style'].lower()} {base_prompt}"
-            
+
         return base_prompt
 
     def preview_prompt(self):
@@ -243,29 +296,44 @@ class CharacterBuilderScreen(QWidget):
             return
 
         if character_manager.get_character(self.project_slug, name):
-            QMessageBox.warning(self, "Duplicate", f"Character \u201c{name}\u201d already exists in this project.")
+            QMessageBox.warning(
+                self,
+                "Duplicate",
+                f"Character \u201c{name}\u201d already exists in this project.",
+            )
             return
 
         prompt = self.prompt_preview.toPlainText().strip() or self.build_prompt()
 
         # Get selected model ID
         selected_model_display = self.model_combo.currentText()
-        model_id = self.model_id_mapping.get(selected_model_display, "flux_dev")  # fallback to flux_dev if not found
+        model_id = self.model_id_mapping.get(
+            selected_model_display, "flux_dev"
+        )  # fallback to flux_dev if not found
 
         self.btn_generate.setEnabled(False)
         self.status_label.setText("Generating\u2026 this may take a while.")
         self._show_ghosts(self.variant_spin.value())
-        
+
         # For a more complete integration we could build full attribute dict
         full_attributes = self.get_attributes()
         if "style" in full_attributes:
             style_id = full_attributes["style"].lower().replace(" ", "_")
-            if style_id in ["ultra_realistic", "cinematic", "photorealistic", "realistic"]:
+            if style_id in [
+                "ultra_realistic",
+                "cinematic",
+                "photorealistic",
+                "realistic",
+            ]:
                 # This would be passed to our more complete prompt building function...
                 pass
 
         self._gen_thread = _GenerateThread(
-            self.project_slug, name, prompt, self.variant_spin.value(), model_id,
+            self.project_slug,
+            name,
+            prompt,
+            self.variant_spin.value(),
+            model_id,
             attributes=full_attributes,
         )
         self._gen_thread.finished_ok.connect(self._on_generated)
@@ -274,6 +342,7 @@ class CharacterBuilderScreen(QWidget):
 
     def _show_ghosts(self, count):
         from ui.components.ghost_card import GhostCard
+
         self._clear_ghosts()
         for _ in range(count):
             self.ghost_row.addWidget(GhostCard(110, 130))

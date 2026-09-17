@@ -3,8 +3,14 @@ Project list screen - initial screen with clickable project panels.
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGridLayout,
-    QLabel, QScrollArea, QMessageBox,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QGridLayout,
+    QLabel,
+    QScrollArea,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -31,7 +37,9 @@ class ProjectListScreen(QWidget):
         header.addWidget(btn_new)
         layout.addLayout(header)
 
-        self.empty_label = QLabel("No projects yet. Click \u201c+ New Project\u201d to get started.")
+        self.empty_label = QLabel(
+            "No projects yet. Click \u201c+ New Project\u201d to get started."
+        )
         self.empty_label.setStyleSheet("color: #999; font-size: 14px; padding: 30px;")
         self.empty_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.empty_label)
@@ -70,6 +78,7 @@ class ProjectListScreen(QWidget):
 
     def create_project(self):
         from ui.dialogs.project_dialog import ProjectDialog
+
         dialog = ProjectDialog(self)
         if dialog.exec():
             data = dialog.get_data()
@@ -81,13 +90,16 @@ class ProjectListScreen(QWidget):
 
     def edit_project(self, project):
         from ui.dialogs.project_dialog import ProjectDialog
+
         dialog = ProjectDialog(self, project=project)
         if dialog.exec():
             data = dialog.get_data()
             if not data["name"].strip():
                 QMessageBox.warning(self, "Invalid name", "Project name is required.")
                 return
-            project_manager.update_project(project["id"], data["name"].strip(), data["description"])
+            project_manager.update_project(
+                project["id"], data["name"].strip(), data["description"]
+            )
             self.load_projects()
 
     def delete_project(self, project):

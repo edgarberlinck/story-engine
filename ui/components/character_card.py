@@ -10,7 +10,7 @@ from PySide6.QtGui import QPixmap
 
 
 class CharacterCard(QFrame):
-    clicked = Signal(dict)          # character dict
+    clicked = Signal(dict)  # character dict
     delete_requested = Signal(dict)
 
     def __init__(self, character):
@@ -39,12 +39,16 @@ class CharacterCard(QFrame):
         if image_path and Path(image_path).is_file():
             pix = QPixmap(image_path)
             if not pix.isNull():
-                thumb.setPixmap(pix.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                thumb.setPixmap(
+                    pix.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                )
             else:
                 thumb.setText("No image")
         else:
             thumb.setText("No image")
-            thumb.setStyleSheet("background-color: #eee; color: #999; border-radius: 4px;")
+            thumb.setStyleSheet(
+                "background-color: #eee; color: #999; border-radius: 4px;"
+            )
 
         name_label = QLabel(character["name"])
         name_label.setAlignment(Qt.AlignCenter)
@@ -62,6 +66,7 @@ class CharacterCard(QFrame):
 
     def contextMenuEvent(self, event):
         from PySide6.QtWidgets import QMenu
+
         menu = QMenu(self)
         delete_action = menu.addAction("Delete Character")
         if menu.exec(event.globalPos()) == delete_action:

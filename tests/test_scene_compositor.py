@@ -30,7 +30,9 @@ def _make_gradient_bg_asset() -> Image.Image:
     corner-threshold chroma-key."""
     h, w = 256, 256
     # Vertical gradient background (dark top -> lighter bottom).
-    bg = np.linspace(60, 160, h, dtype=np.float32)[:, None] * np.ones((1, w), dtype=np.float32)
+    bg = np.linspace(60, 160, h, dtype=np.float32)[:, None] * np.ones(
+        (1, w), dtype=np.float32
+    )
     arr = np.stack([bg, bg, bg], axis=2).astype(np.uint8)
     # Character blob (distinct colour) in the centre, not touching borders.
     img = Image.fromarray(arr).convert("RGB")
@@ -38,10 +40,13 @@ def _make_gradient_bg_asset() -> Image.Image:
     # Paint a filled ellipse for the "character".
     arr[:, :, :] = arr[:, :, :]
     xx, yy = np.meshgrid(np.arange(w), np.arange(h))
-    blob = ((xx - w // 2) ** 2 / (0.18 * w) ** 2
-            + (yy - h // 2) ** 2 / (0.35 * h) ** 2) <= 1
+    blob = (
+        (xx - w // 2) ** 2 / (0.18 * w) ** 2 + (yy - h // 2) ** 2 / (0.35 * h) ** 2
+    ) <= 1
     # A red character on the gradient background.
-    return Image.fromarray(np.where(blob[..., None], (200, 40, 40), arr).astype(np.uint8))
+    return Image.fromarray(
+        np.where(blob[..., None], (200, 40, 40), arr).astype(np.uint8)
+    )
 
 
 class TestMaskCoverage(unittest.TestCase):
@@ -75,7 +80,9 @@ class TestSegmentCharacterValidation(unittest.TestCase):
 
             # DETR returns a full-frame mask (the classic failure).
             full = np.ones((256, 256), dtype=bool)
-            with patch.object(sc, "_segment_with_detr", return_value=(full, "detr_panoptic")):
+            with patch.object(
+                sc, "_segment_with_detr", return_value=(full, "detr_panoptic")
+            ):
                 mask_path, cutout_path, bbox, method = sc.segment_character(
                     src, output_dir=Path(d), name_hint="t"
                 )
@@ -94,7 +101,9 @@ class TestSegmentCharacterValidation(unittest.TestCase):
             src = os.path.join(d, "asset.png")
             asset.save(src)
             empty = np.zeros((256, 256), dtype=bool)
-            with patch.object(sc, "_segment_with_detr", return_value=(empty, "detr_panoptic")):
+            with patch.object(
+                sc, "_segment_with_detr", return_value=(empty, "detr_panoptic")
+            ):
                 mask_path, cutout_path, bbox, method = sc.segment_character(
                     src, output_dir=Path(d), name_hint="t"
                 )
@@ -136,7 +145,9 @@ class TestValidateCutout(unittest.TestCase):
             img.save(p)
             res = sc.validate_cutout(p)
         self.assertFalse(res["valid"])
-        self.assertTrue(any("transparency" in i or "opaque" in i for i in res["issues"]))
+        self.assertTrue(
+            any("transparency" in i or "opaque" in i for i in res["issues"])
+        )
 
     def test_clean_cutout_passes(self):
         # RGBA with a central character and transparent borders.

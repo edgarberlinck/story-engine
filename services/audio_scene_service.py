@@ -36,6 +36,7 @@ class AudioSceneSegment:
         speed: Optional[float] = None,
         accepted: bool = False,
         accepted_hash: str = "",
+        start_offset: Optional[float] = None,
     ):
         self.segment_type = segment_type
         self.speaker = speaker
@@ -51,6 +52,8 @@ class AudioSceneSegment:
         self.speed = speed
         self.accepted = bool(accepted)
         self.accepted_hash = accepted_hash or ""
+        # Manual timeline position override (seconds); None = auto layout.
+        self.start_offset = start_offset
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -68,6 +71,7 @@ class AudioSceneSegment:
             "speed": self.speed,
             "accepted": self.accepted,
             "accepted_hash": self.accepted_hash,
+            "start_offset": self.start_offset,
         }
 
     @staticmethod
@@ -88,6 +92,7 @@ class AudioSceneSegment:
             # Backward compatible with old blobs lacking these fields.
             accepted=bool(data.get("accepted", False)),
             accepted_hash=data.get("accepted_hash", "") or "",
+            start_offset=data.get("start_offset"),
         )
         return seg
 

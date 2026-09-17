@@ -27,15 +27,23 @@ from core.scene_planner import ScenePlan, ResolvedCharacter
 def _make_plan(strategy="asset_composition", names=("Nikita", "Roger")) -> ScenePlan:
     resolved = [
         ResolvedCharacter(
-            name=name, identity=["identity"], default_presentation=[],
-            presentation_decision="KEEP", scene_presentation=[], dropped=[],
+            name=name,
+            identity=["identity"],
+            default_presentation=[],
+            presentation_decision="KEEP",
+            scene_presentation=[],
+            dropped=[],
             dropped_reason="",
         )
         for name in names
     ]
     return ScenePlan(
-        camera="wide shot", layers=[], single_pass_feasible=True,
-        rationale="x", resolved_characters=resolved, strategy=strategy,
+        camera="wide shot",
+        layers=[],
+        single_pass_feasible=True,
+        rationale="x",
+        resolved_characters=resolved,
+        strategy=strategy,
     )
 
 
@@ -61,8 +69,10 @@ class CollectCharacterReferencesTest(unittest.TestCase):
             "Nikita": {"name": "Nikita", "reference_image": ref_a},
             "Roger": {"name": "Roger", "reference_image": ref_b},
         }
+
         def fake_get(name, project):
             return records.get(name)
+
         with patch("generators.image_engine.get_character", side_effect=fake_get):
             out = sp._collect_character_references(
                 [{"name": "Nikita"}, {"name": "Roger"}], "p"
@@ -77,8 +87,10 @@ class CollectCharacterReferencesTest(unittest.TestCase):
             "B": {"name": "B", "reference_image": None},
             "C": {"name": "C", "reference_image": "/nonexistent.png"},
         }
+
         def fake_get(name, project):
             return records.get(name)
+
         with patch("generators.image_engine.get_character", side_effect=fake_get):
             out = sp._collect_character_references(
                 [{"name": "A"}, {"name": "B"}, {"name": "C"}], "p"
@@ -90,8 +102,11 @@ class CollectCharacterReferencesTest(unittest.TestCase):
             if name == "Bad":
                 raise RuntimeError("boom")
             return {"name": name, "reference_image": _make_ref_file()}
+
         with patch("generators.image_engine.get_character", side_effect=fake_get):
-            out = sp._collect_character_references([{"name": "Bad"}, {"name": "Good"}], "p")
+            out = sp._collect_character_references(
+                [{"name": "Bad"}, {"name": "Good"}], "p"
+            )
         self.assertEqual([r["name"] for r in out], ["Good"])
 
 
@@ -99,7 +114,9 @@ def _run_pipeline(**overrides):
     """Run generate_scene_pipeline with the planner/reference backend mocked."""
     plan = _make_plan()
     ref_file = _make_ref_file()
-    ref_result_path = os.path.join(tempfile.mkdtemp(), "scene_reference_conditioned.png")
+    ref_result_path = os.path.join(
+        tempfile.mkdtemp(), "scene_reference_conditioned.png"
+    )
     Image.new("RGB", (64, 64)).save(ref_result_path)
     ref_result = {
         "scene_number": 1,
@@ -117,8 +134,10 @@ def _run_pipeline(**overrides):
     default_patches = {
         "core.scene_pipeline.LLMScenePlanner": patch(
             "core.scene_pipeline.LLMScenePlanner",
-            **{"return_value.plan_scene": lambda self, *a, **k: plan,
-               "return_value.save_plan": lambda *a, **k: None},
+            **{
+                "return_value.plan_scene": lambda self, *a, **k: plan,
+                "return_value.save_plan": lambda *a, **k: None,
+            },
         ),
         "core.scene_pipeline._collect_character_references": patch(
             "core.scene_pipeline._collect_character_references",
@@ -130,9 +149,12 @@ def _run_pipeline(**overrides):
         ),
     }
     defaults = {
-        "prompt": "p", "project": "Test", "scene_number": 1,
+        "prompt": "p",
+        "project": "Test",
+        "scene_number": 1,
         "characters": [{"name": "Nikita"}, {"name": "Roger"}],
-        "model": "flux_klein", "seed": 42,
+        "model": "flux_klein",
+        "seed": 42,
     }
     defaults.update(overrides.get("kwargs", {}))
     patches = dict(default_patches)
@@ -145,10 +167,12 @@ def _run_pipeline(**overrides):
         for p in patches.values():
             p.stop()
 
+
 class ReferenceRoutingTest(unittest.TestCase):
     def test_flux_klein_with_references_routes_to_holistic_backend(self):
-        with patch("core.scene_pipeline._run_asset_composition") as mock_asset, \
-             patch("core.scene_pipeline._run_progressive") as mock_prog:
+        with patch("core.scene_pipeline._run_asset_composition") as mock_asset, patch(
+            "core.scene_pipeline._run_progressive"
+        ) as mock_prog:
             result = _run_pipeline()
         self.assertEqual(result["strategy"], "reference_conditioned_single_pass")
         mock_asset.assert_not_called()
@@ -158,22 +182,32 @@ class ReferenceRoutingTest(unittest.TestCase):
         self.assertTrue(result["image_path"].endswith("scene.png"))
 
     def test_sdxl_does_not_route_to_reference_backend(self):
-        with patch("core.scene_pipeline._run_reference_conditioned_scene") as mock_ref, \
-             patch("core.scene_pipeline._run_asset_composition") as mock_asset:
+        with patch(
+            "core.scene_pipeline._run_reference_conditioned_scene"
+        ) as mock_ref, patch(
+            "core.scene_pipeline._run_asset_composition"
+        ) as mock_asset:
             mock_asset.return_value = {
-                "scene_number": 1, "image_path": _make_ref_file(),
-                "qa": {"per_character": {}, "passed": True}, "warnings": [],
+                "scene_number": 1,
+                "image_path": _make_ref_file(),
+                "qa": {"per_character": {}, "passed": True},
+                "warnings": [],
             }
             _run_pipeline(kwargs={"model": "sdxl"})
         mock_ref.assert_not_called()
         mock_asset.assert_called()
 
     def test_flux_dev_does_not_route_to_reference_backend(self):
-        with patch("core.scene_pipeline._run_reference_conditioned_scene") as mock_ref, \
-             patch("core.scene_pipeline._run_asset_composition") as mock_asset:
+        with patch(
+            "core.scene_pipeline._run_reference_conditioned_scene"
+        ) as mock_ref, patch(
+            "core.scene_pipeline._run_asset_composition"
+        ) as mock_asset:
             mock_asset.return_value = {
-                "scene_number": 1, "image_path": _make_ref_file(),
-                "qa": {"per_character": {}, "passed": True}, "warnings": [],
+                "scene_number": 1,
+                "image_path": _make_ref_file(),
+                "qa": {"per_character": {}, "passed": True},
+                "warnings": [],
             }
             _run_pipeline(kwargs={"model": "flux_dev"})
         mock_ref.assert_not_called()
@@ -181,36 +215,46 @@ class ReferenceRoutingTest(unittest.TestCase):
 
     def test_flux_klein_without_references_uses_existing_strategy(self):
         asset_result = {
-            "scene_number": 1, "image_path": _make_ref_file(),
-            "qa": {"per_character": {}, "passed": True}, "warnings": [],
+            "scene_number": 1,
+            "image_path": _make_ref_file(),
+            "qa": {"per_character": {}, "passed": True},
+            "warnings": [],
         }
-        with patch("core.scene_pipeline._run_asset_composition",
-                   return_value=asset_result) as mock_asset:
-            result = _run_pipeline(patches={
-                "core.scene_pipeline._collect_character_references": patch(
-                    "core.scene_pipeline._collect_character_references",
-                    return_value=[],
-                ),
-                "core.scene_pipeline._run_reference_conditioned_scene": patch(
-                    "core.scene_pipeline._run_reference_conditioned_scene",
-                ),
-            })
+        with patch(
+            "core.scene_pipeline._run_asset_composition", return_value=asset_result
+        ) as mock_asset:
+            result = _run_pipeline(
+                patches={
+                    "core.scene_pipeline._collect_character_references": patch(
+                        "core.scene_pipeline._collect_character_references",
+                        return_value=[],
+                    ),
+                    "core.scene_pipeline._run_reference_conditioned_scene": patch(
+                        "core.scene_pipeline._run_reference_conditioned_scene",
+                    ),
+                }
+            )
         self.assertEqual(result["strategy"], "asset_composition")
         mock_asset.assert_called()
 
     def test_reference_backend_failure_records_fallback(self):
         asset_result = {
-            "scene_number": 1, "image_path": _make_ref_file(),
-            "qa": {"per_character": {}, "passed": True}, "warnings": [],
+            "scene_number": 1,
+            "image_path": _make_ref_file(),
+            "qa": {"per_character": {}, "passed": True},
+            "warnings": [],
         }
-        with patch("core.scene_pipeline._run_asset_composition",
-                   return_value=asset_result) as mock_asset:
-            result = _run_pipeline(patches={
-                "core.scene_pipeline._run_reference_conditioned_scene": patch(
-                    "core.scene_pipeline._run_reference_conditioned_scene",
-                    side_effect=RuntimeError("model load failed"),
-                ),
-            })
+        with patch(
+            "core.scene_pipeline._run_asset_composition", return_value=asset_result
+        ) as mock_asset:
+            result = _run_pipeline(
+                patches={
+                    "core.scene_pipeline._run_reference_conditioned_scene": patch(
+                        "core.scene_pipeline._run_reference_conditioned_scene",
+                        side_effect=RuntimeError("model load failed"),
+                    ),
+                }
+            )
         self.assertEqual(result["fallback_from"], "reference_conditioned_single_pass")
         self.assertEqual(result["fallback_reason"], "model load failed")
         mock_asset.assert_called()
@@ -219,16 +263,27 @@ class ReferenceRoutingTest(unittest.TestCase):
 class ReferenceHolisticBehaviorTest(unittest.TestCase):
     def test_holistic_path_skips_img2img_refinement(self):
         ref = _make_ref_file()
-        result_path = os.path.join(tempfile.mkdtemp(), "scene_reference_conditioned.png")
+        result_path = os.path.join(
+            tempfile.mkdtemp(), "scene_reference_conditioned.png"
+        )
         Image.new("RGB", (64, 64)).save(result_path)
-        with patch("generators.reference_scene_generator.generate_reference_conditioned_scene",
-                   return_value=[result_path]) as mock_gen, \
-             patch("core.scene_pipeline._qa_scene",
-                   return_value={"per_character": {}, "passed": True}) as mock_qa, \
-             patch("generators.img2img_engine.refine_composite") as mock_refine:
+        with patch(
+            "generators.reference_scene_generator.generate_reference_conditioned_scene",
+            return_value=[result_path],
+        ) as mock_gen, patch(
+            "core.scene_pipeline._qa_scene",
+            return_value={"per_character": {}, "passed": True},
+        ) as mock_qa, patch(
+            "generators.img2img_engine.refine_composite"
+        ) as mock_refine:
             result = sp._run_reference_conditioned_scene(
-                "p", "Test", 1, _make_plan(), [{"name": "Nikita", "path": ref}],
-                "flux_klein", 42,
+                "p",
+                "Test",
+                1,
+                _make_plan(),
+                [{"name": "Nikita", "path": ref}],
+                "flux_klein",
+                42,
             )
         mock_refine.assert_not_called()
         mock_qa.assert_called()

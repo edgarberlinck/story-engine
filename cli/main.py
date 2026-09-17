@@ -40,7 +40,9 @@ def list_characters(project: str = typer.Option("test_project", "--project", "-p
 
 @app.command()
 def generate_character(project: str, name: str, prompt: str, variants: int = 3):
-    versions = character_manager.generate_versions(project, name, prompt, num_versions=variants)
+    versions = character_manager.generate_versions(
+        project, name, prompt, num_versions=variants
+    )
     typer.echo(f"Generated {len(versions)} versions for {name}")
 
 

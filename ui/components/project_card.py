@@ -7,7 +7,7 @@ from PySide6.QtCore import Signal, Qt
 
 
 class ProjectCard(QFrame):
-    clicked = Signal(str)          # project_id
+    clicked = Signal(str)  # project_id
     edit_requested = Signal(dict)  # project dict
     delete_requested = Signal(dict)
 
@@ -60,6 +60,7 @@ class ProjectCard(QFrame):
 
     def contextMenuEvent(self, event):
         from PySide6.QtWidgets import QMenu
+
         menu = QMenu(self)
         edit_action = menu.addAction("Edit Project")
         delete_action = menu.addAction("Delete Project")

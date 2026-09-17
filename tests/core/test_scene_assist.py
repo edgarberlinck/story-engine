@@ -19,10 +19,22 @@ def _make_representation():
         characters_present=["nikita", "roger"],
         location="central_square",
     )
-    rep.add_segment("narration", "narrator", "Nikita entered the kitchen.",
-                    emotion="neutral", tone="descriptive")
-    rep.add_segment("dialogue", "nikita", "Good morning, Roger.",
-                    emotion="warm", tone="friendly", intensity=0.3, delivery="calm")
+    rep.add_segment(
+        "narration",
+        "narrator",
+        "Nikita entered the kitchen.",
+        emotion="neutral",
+        tone="descriptive",
+    )
+    rep.add_segment(
+        "dialogue",
+        "nikita",
+        "Good morning, Roger.",
+        emotion="warm",
+        tone="friendly",
+        intensity=0.3,
+        delivery="calm",
+    )
     return rep
 
 
@@ -37,9 +49,12 @@ class TestSceneAssist(unittest.TestCase):
         modified = rep.to_dict()
         modified["segments"][1]["emotion"] = "angry"
         modified["segments"][1]["intensity"] = 0.8
-        with patch.object(scene_assist, "LLM_AVAILABLE", True), \
-             patch.object(scene_assist, "generate_text_with_llm",
-                          return_value=json.dumps(modified), create=True):
+        with patch.object(scene_assist, "LLM_AVAILABLE", True), patch.object(
+            scene_assist,
+            "generate_text_with_llm",
+            return_value=json.dumps(modified),
+            create=True,
+        ):
             proposal = scene_assist.assist_scene(rep, "Make Nikita sound angry")
         self.assertIsNotNone(proposal)
         self.assertEqual(proposal.segments[1].emotion, "angry")
@@ -50,11 +65,14 @@ class TestSceneAssist(unittest.TestCase):
     def test_preserves_identity_fields_against_llm_drift(self):
         rep = _make_representation()
         modified = rep.to_dict()
-        modified["scene_id"] = "totally_wrong"     # LLM must not change this
-        del modified["characters_present"]          # LLM must not lose this
-        with patch.object(scene_assist, "LLM_AVAILABLE", True), \
-             patch.object(scene_assist, "generate_text_with_llm",
-                          return_value=json.dumps(modified), create=True):
+        modified["scene_id"] = "totally_wrong"  # LLM must not change this
+        del modified["characters_present"]  # LLM must not lose this
+        with patch.object(scene_assist, "LLM_AVAILABLE", True), patch.object(
+            scene_assist,
+            "generate_text_with_llm",
+            return_value=json.dumps(modified),
+            create=True,
+        ):
             proposal = scene_assist.assist_scene(rep, "anything")
         self.assertEqual(proposal.scene_id, "scene_001")
         self.assertEqual(proposal.characters_present, ["nikita", "roger"])
@@ -63,26 +81,35 @@ class TestSceneAssist(unittest.TestCase):
         rep = _make_representation()
         modified = rep.to_dict()
         modified["segments"][0]["hallucinated_field"] = "x"
-        with patch.object(scene_assist, "LLM_AVAILABLE", True), \
-             patch.object(scene_assist, "generate_text_with_llm",
-                          return_value=json.dumps(modified), create=True):
+        with patch.object(scene_assist, "LLM_AVAILABLE", True), patch.object(
+            scene_assist,
+            "generate_text_with_llm",
+            return_value=json.dumps(modified),
+            create=True,
+        ):
             proposal = scene_assist.assist_scene(rep, "anything")
         self.assertNotIn("hallucinated_field", proposal.segments[0].to_dict())
 
     def test_rejects_garbage_output(self):
         rep = _make_representation()
-        for bad in [None, "", "not json", json.dumps([1, 2]), json.dumps({"no": "segments"})]:
-            with patch.object(scene_assist, "LLM_AVAILABLE", True), \
-                 patch.object(scene_assist, "generate_text_with_llm",
-                              return_value=bad, create=True):
+        for bad in [
+            None,
+            "",
+            "not json",
+            json.dumps([1, 2]),
+            json.dumps({"no": "segments"}),
+        ]:
+            with patch.object(scene_assist, "LLM_AVAILABLE", True), patch.object(
+                scene_assist, "generate_text_with_llm", return_value=bad, create=True
+            ):
                 self.assertIsNone(scene_assist.assist_scene(rep, "x"))
 
     def test_handles_fenced_json(self):
         rep = _make_representation()
         fenced = "Here you go:\n```json\n" + json.dumps(rep.to_dict()) + "\n```"
-        with patch.object(scene_assist, "LLM_AVAILABLE", True), \
-             patch.object(scene_assist, "generate_text_with_llm",
-                          return_value=fenced, create=True):
+        with patch.object(scene_assist, "LLM_AVAILABLE", True), patch.object(
+            scene_assist, "generate_text_with_llm", return_value=fenced, create=True
+        ):
             proposal = scene_assist.assist_scene(rep, "x")
         self.assertIsNotNone(proposal)
         self.assertEqual(len(proposal.segments), 2)

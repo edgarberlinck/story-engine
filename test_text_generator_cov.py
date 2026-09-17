@@ -8,7 +8,9 @@ class TextFilenameCoverageTest(unittest.TestCase):
         self.assertEqual(tg.generate_filename_from_prompt(None), "generated_image")
         self.assertEqual(tg.generate_filename_from_prompt("A!"), "a")
         self.assertEqual(tg.generate_filename_from_prompt("@@@"), "generated_image")
-        self.assertEqual(tg.generate_filename_from_prompt("red dragon flying"), "red_dragon")
+        self.assertEqual(
+            tg.generate_filename_from_prompt("red dragon flying"), "red_dragon"
+        )
         self.assertLessEqual(len(tg.generate_filename_from_prompt("x" * 50)), 20)
 
 

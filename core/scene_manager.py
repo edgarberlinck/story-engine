@@ -50,16 +50,20 @@ class SceneManager:
                 image_path=str(image),
             )
 
-    def create_scene(self, project: str, prompt: str,
-                     scene_number: Optional[int] = None,
-                     model: str = DEFAULT_SCENE_MODEL,
-                     seed: int = 42) -> Dict:
+    def create_scene(
+        self,
+        project: str,
+        prompt: str,
+        scene_number: Optional[int] = None,
+        model: str = DEFAULT_SCENE_MODEL,
+        seed: int = 42,
+    ) -> Dict:
         result = generate_scene(
             prompt=prompt,
             project=project,
             scene_number=scene_number,
             model=model,
-            seed=seed
+            seed=seed,
         )
         # Save metadata
         saved = self.service.save_scene(
@@ -68,7 +72,7 @@ class SceneManager:
             prompt=result["prompt"],
             image_path=result["image_path"],
             seed=seed,
-            model=model
+            model=model,
         )
         return saved
 

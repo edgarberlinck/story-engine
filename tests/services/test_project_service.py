@@ -22,11 +22,12 @@ class TestProjectService(unittest.TestCase):
         self.tmpdb.close()
 
         from services.database import database_service
+
         self._module = database_service
         self._singleton = database_service.db_service
         self._original_path = self._singleton.db_path
         self._singleton.db_path = self.db_path
-         # Build the schema against the patched temp DB.
+        # Build the schema against the patched temp DB.
         self._singleton.init_database()
 
         # A fresh ProjectService bound to the patched db singleton.

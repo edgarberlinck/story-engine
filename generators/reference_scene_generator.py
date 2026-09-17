@@ -125,7 +125,9 @@ def generate_reference_conditioned_scene(
         ValueError: If no reference images are provided.
     """
     if not reference_image_paths:
-        raise ValueError("reference_image_paths must be non-empty for reference-conditioned generation")
+        raise ValueError(
+            "reference_image_paths must be non-empty for reference-conditioned generation"
+        )
 
     references = _prepare_references(reference_image_paths)
     if not references:
@@ -133,7 +135,9 @@ def generate_reference_conditioned_scene(
 
     if model_name not in DIFFUSION_MODELS:
         raise ValueError(f"Unsupported diffusion model: {model_name}")
-    model_path = resolve_model_path("diffusion", model_name, DIFFUSION_MODELS[model_name])
+    model_path = resolve_model_path(
+        "diffusion", model_name, DIFFUSION_MODELS[model_name]
+    )
     print(f"Using reference-conditioned diffusion model: {model_name}")
     print(f"Model path: {model_path}")
 
