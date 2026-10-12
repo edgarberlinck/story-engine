@@ -96,8 +96,8 @@ class TestGenerateSegmentAudio(unittest.TestCase):
         cue.write_bytes(b"")
         calls = []
 
-        def fake_cue(project, prompt, seconds, force=False):
-            calls.append((project, prompt, seconds, force))
+        def fake_cue(project, prompt, seconds, force=False, cue_type="sound_effect"):
+            calls.append((project, prompt, seconds, force, cue_type))
             return cue
 
         with patch("generators.sound_engine.generate_cue", fake_cue):
@@ -117,6 +117,8 @@ class TestGenerateSegmentAudio(unittest.TestCase):
         self.assertEqual(calls[0][2], audio_preview.PREVIEW_CUE_SECONDS)
         self.assertFalse(calls[0][3])
         self.assertTrue(calls[1][3])  # force propagated
+        self.assertEqual(calls[0][4], "sound_effect")
+        self.assertEqual(calls[1][4], "music")
 
     def test_generates_dialogue_with_segment_performance(self):
         with patch.object(
