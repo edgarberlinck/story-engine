@@ -56,6 +56,11 @@ MUSIC_GENERATION_MODELS = {
     "musicgen_medium": "facebook/musicgen-medium",
 }
 
+# Sound Effects Models (environmental audio, separate from music)
+SOUND_EFFECTS_MODELS = {
+    "stable_audio_open": "stabilityai/stable-audio-open-1.0",
+}
+
 # Model paths (relative to project root)
 MODEL_PATHS = {
     "diffusion": "models/diffusion",
@@ -65,6 +70,7 @@ MODEL_PATHS = {
     "text_to_speech": "models/text_to_speech",
     "lip_sync": "models/lip_sync",
     "music_generation": "models/music_generation",
+    "sound_effects": "models/sound_effects",
 }
 
 # Default model configurations
@@ -76,6 +82,7 @@ DEFAULT_MODEL_CONFIGS = {
     "text_to_speech": {"dtype": "float16", "device": "cpu"},
     "lip_sync": {"dtype": "float16", "device": "cpu"},
     "music_generation": {"dtype": "float16", "device": "cpu"},
+    "sound_effects": {"dtype": "float16", "device": "cpu"},
 }
 
 # Model metadata
@@ -167,6 +174,14 @@ MODEL_METADATA = {
         "size": "~11.1GB",
         "description": "Meta MusicGen medium, controllable text-to-music (MIT)",
         "repo_id": "facebook/musicgen-medium",
+        "source": "huggingface",
+    },
+    "stable_audio_open": {
+        "name": "Stable Audio Open 1.0",
+        "type": "sound_effects",
+        "size": "~14.6GB",
+        "description": "Text-to-sound effects, 44.1 kHz stereo, up to 47 seconds (Stability AI license; requires accepting Hugging Face terms)",
+        "repo_id": "stabilityai/stable-audio-open-1.0",
         "source": "huggingface",
     },
 }

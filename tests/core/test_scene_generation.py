@@ -32,8 +32,8 @@ class TestSceneGeneration(unittest.TestCase):
         def fake_segment_path(project, scene_number, seg_idx, segment):
             return self._seg_paths.get(seg_idx, self.dir / f"missing_{seg_idx}.wav")
 
-        def fake_cue_path(project, prompt, seconds):
-            return self.dir / f"cue_{prompt.replace(' ', '_')}.wav"
+        def fake_cue_path(project, prompt, seconds, *, cue_type="sound_effect"):
+            return self.dir / f"cue_{cue_type}_{prompt.replace(' ', '_')}.wav"
 
         for target, repl in (
             ("segment_audio_path", fake_segment_path),
@@ -70,8 +70,8 @@ class TestSceneGeneration(unittest.TestCase):
             speech_calls.append(idx)
             return self.dir / f"seg_{idx}.wav"
 
-        def fake_cue(project, prompt, seconds, force=False):
-            cue_calls.append((prompt, seconds))
+        def fake_cue(project, prompt, seconds, force=False, *, cue_type="sound_effect"):
+            cue_calls.append((prompt, seconds, cue_type))
             return self.dir / "cue.wav"
 
         with patch("core.audio_preview.generate_segment_audio", fake_gen), patch(
@@ -83,6 +83,7 @@ class TestSceneGeneration(unittest.TestCase):
         self.assertEqual(len(cue_calls), 1)
         self.assertEqual(cue_calls[0][0], "sad piano")
         self.assertGreater(cue_calls[0][1], 0)  # bed sized to the timeline
+        self.assertEqual(cue_calls[0][2], "music")
 
     def test_generate_skips_existing_audio(self):
         rep = self._rep()

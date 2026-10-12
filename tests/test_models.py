@@ -24,6 +24,7 @@ class TestGetModelConfig(unittest.TestCase):
                 "text_to_speech": torch.float16,
                 "lip_sync": torch.float16,
                 "music_generation": torch.float16,
+                "sound_effects": torch.float16,
             }.items():
                 device, dtype = get_model_config(model_type)
                 self.assertEqual(device, "mps")
@@ -77,6 +78,7 @@ class TestGetModelConfig(unittest.TestCase):
             "text_to_speech",
             "lip_sync",
             "music_generation",
+            "sound_effects",
         ]:
             self.assertIn(model_type, DEFAULT_MODEL_CONFIGS)
 

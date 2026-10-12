@@ -20,7 +20,7 @@ productions with full reproducibility.
   `<music>` tags (or bracket shorthand). The parser is tolerant and mixes notation styles.
 - **Per-character voice assignment** — each character has a persistent voice profile
   (`voice_path`, `voice_prompt`) for consistent timbre across all fragments.
-- **Background beds** — generate `<sound>` (sound effects) and `<music>` beds via MusicGen;
+- **Background beds** — generate `<sound>` effects with Stable Audio Open and `<music>` beds with MusicGen;
   dialogue is ducked under the bed automatically.
 - **Per-fragment preview** — listen to any fragment in isolation (character or background);
   accept fragments to pre-generate and cache their WAV files.
@@ -103,7 +103,7 @@ render the audio. Then use the scene editor to preview fragments, accept them, a
 ├── requirements.txt
 ├── core/                 # Project/scene/character managers (UI-facing logic)
 ├── services/database/    # SQLite-backed services (projects, scenes, characters)
-├── generators/           # Audio generation engines (MusicGen, Qwen3-TTS)
+├── generators/           # Audio engines (Stable Audio Open, MusicGen, Qwen3-TTS)
 ├── utils/                # Shared helpers (model metrics, paths)
 ├── workers/              # Background task infrastructure
 ├── ui/                   # PySide6 desktop application
@@ -125,11 +125,31 @@ render the audio. Then use the scene editor to preview fragments, accept them, a
 | Category | Models |
 |---|---|
 | **Text-to-audio** | Qwen3-TTS (`qwen3_tts`) |
-| **Background audio** | MusicGen medium (`musicgen_medium`) |
+| **Sound effects** | Stable Audio Open 1.0 (`stable_audio_open`) |
+| **Music** | MusicGen medium (`musicgen_medium`) |
 | **Text generation** | Phi-3 Mini (`phi3_mini`), Gemma 2B (`gemma_2b`) |
 
 All audio generation runs locally (MLX on Apple Silicon) or via CPU fallback. No video
 models are included.
+
+Sound effects use [Stable Audio Open 1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0),
+which targets sound effects and short audio rather than MusicGen's music generation.
+Its [Diffusers pipeline](https://huggingface.co/docs/diffusers/api/pipelines/stable_audio)
+supports 44.1 kHz stereo clips up to 47 seconds; the generator downmixes to mono
+for the audiobook mixer. No additional Python dependencies are needed.
+
+Accept the checkpoint's terms on Hugging Face and log in before running `make models`
+(or select `stable_audio_open` in `make models-ui`). Weights are installed under
+`models/sound_effects/stable_audio_open`. Review the checkpoint's Stability AI license
+before commercial use. The download is roughly 14.6 GB; this is a heavier,
+higher-fidelity option, and GPU/unified-memory usage and latency must be checked
+on your hardware. CUDA uses half precision; CPU/MPS use full precision and may be slow.
+
+`generators/sound_effects_generator.py` owns sound-effects inference; MusicGen remains
+music-only. Preview, scene generation, timeline cache lookup, and export all select
+the model by segment type. Cue caches include the model and type, so old MusicGen
+sound-effect clips are not reused. An absent checkpoint skips only its own cue type;
+already cached cues can still be played without the checkpoint.
 
 ## Automation commands
 

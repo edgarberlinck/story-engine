@@ -106,7 +106,9 @@ class ExportAudiobookDialog(QDialog):
         row.addWidget(self.locale_combo)
         layout.addLayout(row)
 
-        self.cues_check = QCheckBox("Generate sound effects and music cues (MusicGen)")
+        self.cues_check = QCheckBox(
+            "Generate sound effects (Stable Audio Open) and music (MusicGen)"
+        )
         self.cues_check.setChecked(True)
         layout.addWidget(self.cues_check)
 

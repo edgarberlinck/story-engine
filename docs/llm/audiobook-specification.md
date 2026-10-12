@@ -83,17 +83,18 @@ Use `<character name="...">text</character>` for actual dialogue.
 ## `<sound>` / `<sfx>`
 
 A sound effect bed. Either a `preset` name or a `prompt` string must be provided.
-The prompt/preset is passed to the sound engine (MusicGen) to generate a background bed
-segment. `<sound>` can also contain nested `<character>` tags for dialogue within the bed.
+The prompt/preset is passed to the dedicated sound-effects generator (Stable Audio Open)
+to generate a background bed segment. `<sound>` can also contain nested `<character>`
+tags for dialogue within the bed. MusicGen is used only for `<music>` segments.
 
 ### Attributes
 
 | Attribute | Required? | Description |
 |---|---|---|
-| `preset` | No | A named music preset (e.g. `"adventure"`, `"orchestral"`). Mutually exclusive |
+| `preset` | No | A named sound description (e.g. `"rain on a roof"`, `"wind howling"`). Mutually exclusive |
 | | | with `prompt`; at least one must be provided. |
 | `prompt` | No | A free-form text description used as the generation prompt. If no `preset` is |
-| | | given, this string is used verbatim as the MusicGen prompt. |
+| | | given, this string is used verbatim as the Stable Audio Open prompt. |
 
 ### Example
 

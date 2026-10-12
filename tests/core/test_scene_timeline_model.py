@@ -29,8 +29,8 @@ class TestComputeTimeline(unittest.TestCase):
         def fake_segment_path(project, scene_number, seg_idx, segment):
             return self._seg_paths.get(seg_idx, self.dir / f"missing_{seg_idx}.wav")
 
-        def fake_cue_path(project, prompt, seconds):
-            return self.dir / f"cue_{prompt.replace(' ', '_')}.wav"
+        def fake_cue_path(project, prompt, seconds, *, cue_type="sound_effect"):
+            return self.dir / f"cue_{cue_type}_{prompt.replace(' ', '_')}.wav"
 
         self.patches = [
             patch.object(stm, "segment_audio_path", fake_segment_path),
@@ -81,6 +81,16 @@ class TestComputeTimeline(unittest.TestCase):
         kinds = {t.name: t.kind for t in model.tracks}
         self.assertEqual(kinds["Sound FX"], stm.TRACK_SFX)
         self.assertEqual(kinds["Music"], stm.TRACK_MUSIC)
+
+    def test_identical_music_and_sfx_use_separate_cache_paths(self):
+        rep = self._rep()
+        rep.add_segment("sound_effect", "", "rain", timing={"start": 0, "end": 5})
+        rep.add_segment("music", "", "rain", timing={"start": 0, "end": 5})
+        beds = [
+            c for c in stm.compute_timeline("p", 1, rep).all_clips()
+            if c.kind in (stm.TRACK_SFX, stm.TRACK_MUSIC)
+        ]
+        self.assertNotEqual(beds[0].path, beds[1].path)
 
     def test_bed_offset_is_speech_cursor_position(self):
         self._with_audio([0], seconds=0.4)
