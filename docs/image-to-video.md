@@ -100,6 +100,7 @@ are:
 | `TEXT_TO_SPEECH_MODELS` | `qwen3_tts` (`Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice`), `qwen3_tts_base` (`Qwen/Qwen3-TTS-12Hz-0.6B-Base`) | 4.2 GB / 2.3 GB | Apache-2.0 SOTA; CustomVoice = voice clone, Base = light fallback |
 | `LIP_SYNC_MODELS` | `latentsync_1_6` (`ByteDance/LatentSync-1.6`) | 9.0 GB | Best fidelity; 1.5 dropped (bigger, 9.2 GB), MuseTalk dropped (256×256, lower fidelity), Wav2Lip dropped (research-grade, GitHub-only) |
 | `MUSIC_GENERATION_MODELS` | `musicgen_medium` (`facebook/musicgen-medium`) | 11.1 GB | Smallest viable; large (19 GB) dropped for +8 GB marginal gain, stable-audio (14.6 GB) dropped for size |
+| `SOUND_EFFECTS_MODELS` | `stable_audio_open` (`stabilityai/stable-audio-open-1.0`) | ~14.6 GB full snapshot (estimate) | Dedicated field recordings and sound effects; 44.1 kHz stereo via Diffusers, kept separate from music |
 
 - Voice cloning is a capability of the TTS models (Qwen3-TTS CustomVoice
   *is* the clone model), so no separate voice registry is kept.

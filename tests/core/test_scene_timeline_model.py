@@ -29,7 +29,7 @@ class TestComputeTimeline(unittest.TestCase):
         def fake_segment_path(project, scene_number, seg_idx, segment):
             return self._seg_paths.get(seg_idx, self.dir / f"missing_{seg_idx}.wav")
 
-        def fake_cue_path(project, prompt, seconds):
+        def fake_cue_path(project, prompt, seconds, cue_type="sound_effect"):
             return self.dir / f"cue_{prompt.replace(' ', '_')}.wav"
 
         self.patches = [
@@ -92,6 +92,22 @@ class TestComputeTimeline(unittest.TestCase):
         bed = [c for c in model.all_clips() if c.kind == stm.TRACK_SFX][0]
         # Bed starts where the speech cursor was: after the first clip.
         self.assertAlmostEqual(bed.start, 0.4, places=2)
+
+    def test_beds_use_type_specific_generation_cache_paths(self):
+        from generators.sound_engine import cue_audio_path
+
+        rep = AudioSceneRepresentation(scene_id="s1", title="T", timeline={})
+        for kind in ("sound_effect", "music"):
+            rep.add_segment(kind, "", "wind", timing={"start": 0, "end": 5})
+        with patch.object(stm, "cue_audio_path", wraps=cue_audio_path) as paths, patch(
+            "generators.sound_engine.project_dir", return_value=self.dir
+        ):
+            model = stm.compute_timeline("p", 1, rep)
+            paths.assert_any_call("p", "wind", 5.0, cue_type="sound_effect")
+            paths.assert_any_call("p", "wind", 5.0, cue_type="music")
+        beds = model.all_clips()
+        self.assertEqual(len(beds), 2)
+        self.assertNotEqual(beds[0].path, beds[1].path)
 
     def test_missing_audio_clips_flagged_with_estimated_duration(self):
         model = stm.compute_timeline("p", 1, self._rep())

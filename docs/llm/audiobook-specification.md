@@ -83,7 +83,7 @@ Use `<character name="...">text</character>` for actual dialogue.
 ## `<sound>` / `<sfx>`
 
 A sound effect bed. Either a `preset` name or a `prompt` string must be provided.
-The prompt/preset is passed to the sound engine (MusicGen) to generate a background bed
+The prompt/preset is passed to the dedicated sound-effects engine (Stable Audio Open) to generate a background bed
 segment. `<sound>` can also contain nested `<character>` tags for dialogue within the bed.
 
 ### Attributes
@@ -93,7 +93,7 @@ segment. `<sound>` can also contain nested `<character>` tags for dialogue withi
 | `preset` | No | A named music preset (e.g. `"adventure"`, `"orchestral"`). Mutually exclusive |
 | | | with `prompt`; at least one must be provided. |
 | `prompt` | No | A free-form text description used as the generation prompt. If no `preset` is |
-| | | given, this string is used verbatim as the MusicGen prompt. |
+| | | given, this string is used verbatim as the sound-effects prompt. |
 
 ### Example
 
@@ -112,11 +112,38 @@ segment. `<sound>` can also contain nested `<character>` tags for dialogue withi
 
 ---
 
+### Local sound-effects model setup
+
+Sound effects use [Stable Audio Open 1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0),
+a text-to-audio model trained on field recordings and sound effects rather than
+MusicGen's music-only training data. It generates up to 47 seconds of stereo
+audio at 44.1 kHz through Diffusers, with `torchsde` for its cosine DPM scheduler.
+
+Accept the model's gated license on Hugging Face and run `hf auth login` before
+`make models` (or download only this checkpoint with `hf download
+stabilityai/stable-audio-open-1.0 --local-dir models/sound_effects/stable_audio_open`).
+Review the current Stability AI license for commercial-use eligibility; the
+weights are not Apache/MIT licensed. Inference loads only the local checkpoint,
+uses the available MPS/CUDA device or CPU, and uses float32 for numerical
+stability. CPU inference is slow and accelerator inference requires several GB
+of memory beyond the downloaded weights.
+The installer downloads the full repository, including alternative checkpoint
+formats, so disk usage is larger than the inference weights alone (the model
+registry's download-size estimate is approximate).
+
+Generation lives in `generators/sound_effects_engine.py`; cue routing and WAV
+caching remain in `generators/sound_engine.py`. Cache keys include model identity
+and cue type, so old MusicGen effects and music clips cannot be reused as new
+sound effects. Missing effects weights skip effects without disabling music.
+
+---
+
 ## `<music>`
 
 A music bed segment. Like `<sound>`, either `preset` or `prompt` must be provided. The
 generated music is mixed under the dialogue with the exporter's default ducking curve
 (`MUSIC_VOLUME=0.30`), but can be adjusted per-scene.
+Music continues to use MusicGen; it does not use the sound-effects model.
 
 ### Attributes
 

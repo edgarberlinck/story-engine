@@ -25,6 +25,7 @@ from models import (
     TEXT_TO_SPEECH_MODELS,
     LIP_SYNC_MODELS,
     MUSIC_GENERATION_MODELS,
+    SOUND_EFFECTS_MODELS,
     MODEL_METADATA,
 )
 
@@ -49,6 +50,7 @@ def setup_directories():
         "models/text_to_speech",
         "models/lip_sync",
         "models/music_generation",
+        "models/sound_effects",
         "outputs",
     ]
 
@@ -198,6 +200,7 @@ def install_all_models():
         (TEXT_TO_SPEECH_MODELS, "text_to_speech", "models/text_to_speech"),
         (LIP_SYNC_MODELS, "lip_sync", "models/lip_sync"),
         (MUSIC_GENERATION_MODELS, "music_generation", "models/music_generation"),
+        (SOUND_EFFECTS_MODELS, "sound_effects", "models/sound_effects"),
     ]
     for registry, model_type, dest_dir in audio_categories:
         for model_name in registry:

@@ -32,7 +32,7 @@ class TestSceneGeneration(unittest.TestCase):
         def fake_segment_path(project, scene_number, seg_idx, segment):
             return self._seg_paths.get(seg_idx, self.dir / f"missing_{seg_idx}.wav")
 
-        def fake_cue_path(project, prompt, seconds):
+        def fake_cue_path(project, prompt, seconds, cue_type="sound_effect"):
             return self.dir / f"cue_{prompt.replace(' ', '_')}.wav"
 
         for target, repl in (
@@ -70,8 +70,8 @@ class TestSceneGeneration(unittest.TestCase):
             speech_calls.append(idx)
             return self.dir / f"seg_{idx}.wav"
 
-        def fake_cue(project, prompt, seconds, force=False):
-            cue_calls.append((prompt, seconds))
+        def fake_cue(project, prompt, seconds, force=False, cue_type="sound_effect"):
+            cue_calls.append((prompt, seconds, cue_type))
             return self.dir / "cue.wav"
 
         with patch("core.audio_preview.generate_segment_audio", fake_gen), patch(
@@ -83,6 +83,7 @@ class TestSceneGeneration(unittest.TestCase):
         self.assertEqual(len(cue_calls), 1)
         self.assertEqual(cue_calls[0][0], "sad piano")
         self.assertGreater(cue_calls[0][1], 0)  # bed sized to the timeline
+        self.assertEqual(cue_calls[0][2], "music")
 
     def test_generate_skips_existing_audio(self):
         rep = self._rep()
@@ -97,6 +98,17 @@ class TestSceneGeneration(unittest.TestCase):
             count = sg.generate_missing_fragments("p", 1, rep)
         self.assertEqual(count, 1)
         self.assertEqual(calls, [1])
+
+    def test_sound_effect_clip_preserves_cue_type(self):
+        rep = self._rep(with_bed=True)
+        rep.segments[-1].segment_type = "sound_effect"
+        model = stm.compute_timeline("p", 1, rep)
+        clip = next(c for c in model.all_clips() if c.kind == stm.TRACK_SFX)
+        with patch("generators.sound_engine.generate_cue") as generate:
+            sg.generate_clip_audio("p", 1, rep, clip)
+        generate.assert_called_once_with(
+            "p", "sad piano", clip.duration, cue_type="sound_effect"
+        )
 
     def test_nothing_missing_is_a_noop(self):
         rep = self._rep()

@@ -252,6 +252,12 @@ def _unload_generation_models() -> None:
         sound_engine.unload()
     except Exception:  # noqa: BLE001
         logger.debug("Sound engine unload skipped", exc_info=True)
+    try:
+        from generators.sound_effects_engine import sound_effects_engine
+
+        sound_effects_engine.unload()
+    except Exception:  # noqa: BLE001
+        logger.debug("Sound effects engine unload skipped", exc_info=True)
 
 
 def _encode_master(src: Path, output_path: Path) -> None:
@@ -370,7 +376,9 @@ def _render_scene(
     for seg_idx, segment, offset in pending_cues:
         remaining = max(MUSIC_MIN_S, scene_len - offset)
         seconds = _cue_seconds(segment, remaining_hint=remaining)
-        cue_wav = generate_cue(project, segment.text, seconds)
+        cue_wav = generate_cue(
+            project, segment.text, seconds, cue_type=segment.segment_type
+        )
         if cue_wav is None:
             result.skipped.append(
                 f"Scene {scene_number} cue skipped: {segment.text[:40]}"
@@ -467,7 +475,7 @@ def export_chapters(
                 timeline.append(mixed)
 
         # All generation is done; the rest is pure ffmpeg. Release the TTS
-        # and MusicGen models (several GB of RAM/VRAM) before mastering.
+        # and audio generation models (several GB of RAM/VRAM) before mastering.
         _unload_generation_models()
 
         if not timeline:
