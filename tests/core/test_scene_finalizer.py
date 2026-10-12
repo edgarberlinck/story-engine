@@ -52,7 +52,7 @@ class TestSceneFinalizer(unittest.TestCase):
     def _fake_segment_audio(self, project, scene_number, seg_idx, segment, force=False):
         return _tiny_wav(Path(self.workdir.name) / f"seg_{seg_idx}.wav")
 
-    def _fake_cue(self, project, prompt, seconds, force=False):
+    def _fake_cue(self, project, prompt, seconds, force=False, *, cue_type="sound_effect"):
         return _tiny_wav(Path(self.workdir.name) / "cue.wav", seconds=1.0, freq=110)
 
     def test_finalize_produces_final_wav(self):
