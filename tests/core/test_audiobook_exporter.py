@@ -152,6 +152,18 @@ class TestAudiobookExporter(unittest.TestCase):
         self.assertEqual(requested["seconds"], ax.MUSIC_MIN_S)
         self.assertEqual(requested["cue_type"], "music")
 
+    def test_sound_effect_export_routes_to_dedicated_generator(self):
+        ch = self._make_chapter("FX", 1, with_cue=True)
+        out = Path(self.workdir.name) / "sfx.wav"
+        with patch.object(
+            ax, "generate_segment_audio", self._fake_segment_audio
+        ), patch.object(ax, "generate_cue", side_effect=self._fake_cue) as cue:
+            result = ax.export_chapters("p", [ch], str(out))
+        self.assertEqual(result.cues_rendered, 1)
+        cue.assert_called_once_with(
+            "p", "wind howling", ax.DEFAULT_SFX_SECONDS, cue_type="sound_effect"
+        )
+
     def test_cues_can_be_disabled(self):
         ch = self._make_chapter("C1", 1, with_cue=True)
         out = Path(self.workdir.name) / "no_cues.wav"

@@ -99,6 +99,15 @@ class TestSceneGeneration(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertEqual(calls, [1])
 
+    def test_bulk_generation_routes_sound_effects(self):
+        rep = self._rep()
+        rep.add_segment("sound_effect", "", "thunder")
+        with patch("core.audio_preview.generate_segment_audio"), patch(
+            "generators.sound_engine.generate_cue"
+        ) as cue:
+            sg.generate_missing_fragments("p", 1, rep)
+        cue.assert_called_once_with("p", "thunder", 5.0, cue_type="sound_effect")
+
     def test_nothing_missing_is_a_noop(self):
         rep = self._rep()
         self._with_audio([0, 1])

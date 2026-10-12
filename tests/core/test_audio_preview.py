@@ -120,6 +120,17 @@ class TestGenerateSegmentAudio(unittest.TestCase):
         self.assertEqual(calls[0][4], "sound_effect")
         self.assertEqual(calls[1][4], "music")
 
+    def test_sound_model_change_invalidates_review_identity(self):
+        from generators import sound_engine
+        from core.scene_status import segment_accepted
+
+        segment = _seg(segment_type="sound_effect", text="thunder")
+        segment.accepted = True
+        segment.accepted_hash = audio_preview.segment_cache_key("p", segment)
+        self.assertTrue(segment_accepted("p", segment))
+        with patch.object(sound_engine, "SFX_MODEL_ID", "another/model"):
+            self.assertFalse(segment_accepted("p", segment))
+
     def test_generates_dialogue_with_segment_performance(self):
         with patch.object(
             audio_preview, "resolve_character_voice", return_value=_PRESET

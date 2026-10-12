@@ -82,8 +82,16 @@ def _voice_identity_for(project: str, segment: AudioSceneSegment) -> str:
 
 
 def segment_cache_key(project: str, segment: AudioSceneSegment) -> str:
-    """Public cache key including the character's resolved voice identity."""
-    return _segment_cache_key(segment, _voice_identity_for(project, segment))
+    """Cache/review identity including the selected voice or cue model."""
+    key = _segment_cache_key(segment, _voice_identity_for(project, segment))
+    if segment.segment_type in ("sound_effect", "music"):
+        from generators.sound_engine import _cue_cache_key
+
+        cue_key = _cue_cache_key(
+            segment.text or "", PREVIEW_CUE_SECONDS, segment.segment_type
+        )
+        key = hashlib.sha1(f"{key}|{cue_key}".encode("utf-8")).hexdigest()[:16]
+    return key
 
 
 def segment_audio_path(

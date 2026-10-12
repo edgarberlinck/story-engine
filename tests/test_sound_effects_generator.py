@@ -1,8 +1,10 @@
 """Sound-effects inference and cue routing tests without downloaded weights."""
 
+import io
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -24,7 +26,8 @@ class TestSoundEffectsGenerator(unittest.TestCase):
         self.assertEqual(
             sfx.MODEL_DIR,
             Path(__file__).resolve().parent.parent
-            / MODEL_PATHS["sound_effects"] / sfx.MODEL_NAME,
+            / MODEL_PATHS["sound_effects"]
+            / sfx.MODEL_NAME,
         )
 
     def test_available_checks_diffusers_index_not_musicgen_config(self):
@@ -102,6 +105,34 @@ class TestSoundEffectsGenerator(unittest.TestCase):
         self.assertIsNone(generator._pipeline)
 
 
+class TestSoundEffectsInstallation(unittest.TestCase):
+    def test_model_installer_downloads_registered_sound_effects(self):
+        from scripts import install
+
+        with patch.object(install, "setup_directories"), patch.object(
+            install, "get_network_speed", return_value=1
+        ), patch.object(
+            install, "download_model", return_value=True
+        ) as download, redirect_stdout(
+            io.StringIO()
+        ):
+            install.install_all_models()
+        download.assert_any_call(
+            sfx.MODEL_NAME,
+            "sound_effects",
+            f"{MODEL_PATHS['sound_effects']}/{sfx.MODEL_NAME}",
+        )
+
+    def test_model_installer_creates_sound_effects_directory(self):
+        from scripts import install
+
+        with patch.object(install.os, "makedirs") as mkdir, redirect_stdout(
+            io.StringIO()
+        ):
+            install.setup_directories()
+        mkdir.assert_any_call(MODEL_PATHS["sound_effects"], exist_ok=True)
+
+
 class TestCueRouting(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -129,9 +160,7 @@ class TestCueRouting(unittest.TestCase):
         music = cues.generate_cue("p", "rain", 5, cue_type="music")
         self.assertNotEqual(effect, music)
         self.assertEqual(effect, cues.cue_audio_path("p", "rain", 5))
-        self.assertEqual(
-            music, cues.cue_audio_path("p", "rain", 5, cue_type="music")
-        )
+        self.assertEqual(music, cues.cue_audio_path("p", "rain", 5, cue_type="music"))
         self.sfx_engine.generate.assert_called_once_with("rain", 5)
         self.music_engine.generate.assert_called_once_with("rain", 5)
         self.assertEqual(sf.info(str(effect)).samplerate, 44100)
@@ -180,6 +209,18 @@ class TestCueRouting(unittest.TestCase):
         self.assertIsNone(cues.generate_cue("p", "   "))
         self.sfx_engine.generate.assert_not_called()
         self.music_engine.generate.assert_not_called()
+
+    def test_export_unloads_both_audio_models(self):
+        from core.audiobook_exporter import _unload_generation_models
+
+        with patch("core.voice_engine.voice_engine.unload"), patch(
+            "generators.sound_engine.sound_engine.unload"
+        ) as unload_music, patch(
+            "generators.sound_effects_generator.sound_effects_generator.unload"
+        ) as unload_sfx:
+            _unload_generation_models()
+        unload_music.assert_called_once()
+        unload_sfx.assert_called_once()
 
 
 if __name__ == "__main__":
