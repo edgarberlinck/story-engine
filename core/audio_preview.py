@@ -134,7 +134,13 @@ def generate_segment_audio(
     if segment.segment_type in ("sound_effect", "music"):
         from generators.sound_engine import generate_cue
 
-        return generate_cue(project, text, PREVIEW_CUE_SECONDS, force=force)
+        return generate_cue(
+            project,
+            text,
+            PREVIEW_CUE_SECONDS,
+            force=force,
+            cue_type=segment.segment_type,
+        )
 
     wav_path = segment_audio_path(project, scene_number, segment_index, segment)
     if wav_path.exists() and not force:

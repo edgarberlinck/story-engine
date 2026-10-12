@@ -45,7 +45,9 @@ def generate_clip_audio(
 
     segment = representation.segments[clip.segment_index]
     if segment.segment_type in ("sound_effect", "music"):
-        generate_cue(project, segment.text, clip.duration)
+        generate_cue(
+            project, segment.text, clip.duration, cue_type=segment.segment_type
+        )
     else:
         generate_segment_audio(project, scene_number, clip.segment_index, segment)
 

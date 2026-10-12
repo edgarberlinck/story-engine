@@ -38,6 +38,7 @@ soundfile==0.14.0  # WAV write for voice generation
 sympy==1.14.0
 tokenizers==0.22.2
 torch==2.13.0
+torchsde==0.2.6  # Stable Audio Open's Cosine DPM solver scheduler
 torchaudio==2.11.0
 torchvision==0.28.0
 tqdm==4.70.0

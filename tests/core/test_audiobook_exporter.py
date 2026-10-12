@@ -80,7 +80,7 @@ class TestAudiobookExporter(unittest.TestCase):
     def _fake_segment_audio(self, project, scene_number, seg_idx, segment, force=False):
         return _tiny_wav(Path(self.workdir.name) / f"seg_{scene_number}_{seg_idx}.wav")
 
-    def _fake_cue(self, project, prompt, seconds, force=False):
+    def _fake_cue(self, project, prompt, seconds, force=False, cue_type="sound_effect"):
         return _tiny_wav(
             Path(self.workdir.name) / f"cue_{seconds:.0f}.wav",
             seconds=min(seconds, 2.0),
@@ -139,8 +139,9 @@ class TestAudiobookExporter(unittest.TestCase):
         out = Path(self.workdir.name) / "music.wav"
         requested = {}
 
-        def spy_cue(project, prompt, seconds, force=False):
+        def spy_cue(project, prompt, seconds, force=False, cue_type="sound_effect"):
             requested["seconds"] = seconds
+            requested["cue_type"] = cue_type
             return self._fake_cue(project, prompt, seconds, force)
 
         with patch.object(
@@ -149,6 +150,7 @@ class TestAudiobookExporter(unittest.TestCase):
             ax.export_chapters("p", [ch], str(out))
         # Music bed sized against the (short) scene, clamped to the minimum.
         self.assertEqual(requested["seconds"], ax.MUSIC_MIN_S)
+        self.assertEqual(requested["cue_type"], "music")
 
     def test_cues_can_be_disabled(self):
         ch = self._make_chapter("C1", 1, with_cue=True)
@@ -238,7 +240,7 @@ class TestSoundEngineCache(unittest.TestCase):
         from generators import sound_engine as se
 
         self.assertIsNone(se.generate_cue("p", "   "))
-        with patch.object(se.SoundEngine, "available", return_value=False):
+        with patch.object(se.SoundEffectsGenerator, "available", return_value=False):
             self.assertIsNone(se.generate_cue("p", "thunder"))
 
 

@@ -29,7 +29,7 @@ class TestComputeTimeline(unittest.TestCase):
         def fake_segment_path(project, scene_number, seg_idx, segment):
             return self._seg_paths.get(seg_idx, self.dir / f"missing_{seg_idx}.wav")
 
-        def fake_cue_path(project, prompt, seconds):
+        def fake_cue_path(project, prompt, seconds, cue_type="sound_effect"):
             return self.dir / f"cue_{prompt.replace(' ', '_')}.wav"
 
         self.patches = [
@@ -67,6 +67,19 @@ class TestComputeTimeline(unittest.TestCase):
             clips[2].start, clips[1].start + 0.4 + SEGMENT_GAP_S, places=2
         )
         self.assertAlmostEqual(model.duration, clips[2].end, places=3)
+
+    def test_bed_cache_lookup_uses_segment_type(self):
+        from generators.sound_engine import cue_audio_path
+
+        rep = self._rep()
+        for kind in ("sound_effect", "music"):
+            rep.add_segment(kind, "", "wind", timing={"start": 0, "end": 5})
+        with patch.object(stm, "cue_audio_path", wraps=cue_audio_path) as lookup:
+            stm.compute_timeline("p", 1, rep)
+        self.assertEqual(
+            [call.kwargs["cue_type"] for call in lookup.call_args_list],
+            ["sound_effect", "music"],
+        )
 
     def test_tracks_per_voice_plus_bed_lanes(self):
         rep = self._rep()

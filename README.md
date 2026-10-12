@@ -20,7 +20,7 @@ productions with full reproducibility.
   `<music>` tags (or bracket shorthand). The parser is tolerant and mixes notation styles.
 - **Per-character voice assignment** — each character has a persistent voice profile
   (`voice_path`, `voice_prompt`) for consistent timbre across all fragments.
-- **Background beds** — generate `<sound>` (sound effects) and `<music>` beds via MusicGen;
+- **Background beds** — generate `<sound>` effects with Stable Audio Open and `<music>` beds with MusicGen;
   dialogue is ducked under the bed automatically.
 - **Per-fragment preview** — listen to any fragment in isolation (character or background);
   accept fragments to pre-generate and cache their WAV files.
@@ -56,6 +56,15 @@ Or use the interactive Rust TUI model manager:
 ```bash
 make models-ui
 ```
+
+Sound effects use [Stable Audio Open 1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0),
+a model intended for sound effects and environmental audio rather than music.
+Accept its model license on Hugging Face and run `hf auth login` before downloading.
+Review the model's license for your intended use; it is not the Diffusers code license.
+The installer stores it in `models/sound_effects/stable_audio_open`.
+Effects support durations up to 47 seconds; CPU/MPS use float32 and CUDA uses float16.
+The generator downmixes its 44.1 kHz stereo output to mono for the existing audio workflow.
+Old MusicGen effect caches are not reused; music caches are preserved.
 
 ### 2. Launch the app
 
@@ -103,7 +112,7 @@ render the audio. Then use the scene editor to preview fragments, accept them, a
 ├── requirements.txt
 ├── core/                 # Project/scene/character managers (UI-facing logic)
 ├── services/database/    # SQLite-backed services (projects, scenes, characters)
-├── generators/           # Audio generation engines (MusicGen, Qwen3-TTS)
+├── generators/           # Audio generation engines (Stable Audio Open, MusicGen, Qwen3-TTS)
 ├── utils/                # Shared helpers (model metrics, paths)
 ├── workers/              # Background task infrastructure
 ├── ui/                   # PySide6 desktop application
@@ -125,7 +134,8 @@ render the audio. Then use the scene editor to preview fragments, accept them, a
 | Category | Models |
 |---|---|
 | **Text-to-audio** | Qwen3-TTS (`qwen3_tts`) |
-| **Background audio** | MusicGen medium (`musicgen_medium`) |
+| **Sound effects** | Stable Audio Open 1.0 (`stable_audio_open`) |
+| **Background music** | MusicGen medium (`musicgen_medium`) |
 | **Text generation** | Phi-3 Mini (`phi3_mini`), Gemma 2B (`gemma_2b`) |
 
 All audio generation runs locally (MLX on Apple Silicon) or via CPU fallback. No video

@@ -175,7 +175,9 @@ def compute_timeline(
     for seg_idx, segment, auto_offset in pending_beds:
         remaining = max(MUSIC_MIN_S, scene_len - auto_offset)
         seconds = _cue_seconds(segment, remaining_hint=remaining)
-        path = cue_audio_path(project, segment.text, seconds)
+        path = cue_audio_path(
+            project, segment.text, seconds, cue_type=segment.segment_type
+        )
         exists = path.exists()
         duration = (_wav_duration(path) if exists else None) or seconds
         start = (
