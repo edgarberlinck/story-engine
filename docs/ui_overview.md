@@ -2,7 +2,7 @@
 
 ## Features
 - Projects: create, update, delete, list
-- Characters: generate multiple variants, select default look, view history
+- Characters: create from an editable prompt or image reference, review previews, select default look, view history
 - Scenes: create scenes with prompt enrichment from characters
 
 ## Architecture

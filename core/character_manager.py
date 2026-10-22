@@ -178,6 +178,60 @@ class CharacterManager:
 
         return versions
 
+    def save_preview(
+        self,
+        project: str,
+        name: str,
+        prompt: str,
+        model: str,
+        image_path: str,
+        seed: int = 42,
+    ) -> Dict:
+        """Save a previewed image as a character version and set it as default."""
+        source = Path(image_path)
+        if not source.is_file():
+            raise FileNotFoundError(f"Generated preview not found: {source}")
+
+        char_path = character_dir(name, project)
+        versions_dir = char_path / "versions"
+        versions_dir.mkdir(parents=True, exist_ok=True)
+        existing_versions = self.version_service.list_versions(project, name)
+        next_version = max(
+            (version["version"] for version in existing_versions), default=0
+        ) + 1
+        version_path = versions_dir / f"v_{next_version}.png"
+        shutil.copy2(source, version_path)
+
+        try:
+            version = self.version_service.add_version(
+                project=project,
+                character_name=name,
+                prompt=prompt,
+                seed=seed,
+                model=model,
+                image_path=str(version_path),
+            )
+        except Exception:
+            version_path.unlink(missing_ok=True)
+            raise
+
+        if next_version == 1:
+            self.set_default_version(project, name, version["version"])
+
+        manifest_path = char_path / "manifest.json"
+        manifest = {
+            "name": name,
+            "project": project,
+            "versions": sorted(
+                item["version"]
+                for item in self.version_service.list_versions(project, name)
+            ),
+        }
+        with open(manifest_path, "w") as manifest_file:
+            json.dump(manifest, manifest_file)
+
+        return version
+
     def list_versions(self, project: str, character_name: str) -> List[Dict]:
         return self.version_service.list_versions(project, character_name)
 

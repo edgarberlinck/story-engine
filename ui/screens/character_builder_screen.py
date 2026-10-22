@@ -1,69 +1,100 @@
-"""
-Character creation builder with attributes.
-"""
+"""Character creation with an editable prompt and optional image reference."""
 
+import shutil
+import tempfile
+from pathlib import Path
+from uuid import uuid4
+
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QFileDialog,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QMessageBox,
     QPushButton,
     QComboBox,
-    QSpinBox,
-    QLineEdit,
-    QFormLayout,
     QTextEdit,
-    QMessageBox,
-    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QThread, Signal
 
+from core.character_manager import character_manager, ensure_full_body
 from core.project_manager import project_manager
-from core.character_manager import character_manager
-from core.character_attributes import CHARACTER_TYPES, build_character_prompt
 from models import MODEL_METADATA
 
 
 def get_diffusion_models():
-    """Dynamically load diffusion models from MODEL_METADATA"""
-    diffusion_models = []
-    for model_id, metadata in MODEL_METADATA.items():
-        if metadata.get("type") == "diffusion":
-            # Prefer the display name if available, otherwise use the model ID
-            display_name = metadata.get("name", model_id)
-            diffusion_models.append((display_name, model_id))
-
-    # Sort by display name for consistent ordering
-    diffusion_models.sort(key=lambda x: x[0])
-    return diffusion_models
+    """Return available diffusion models as display-name/model-id pairs."""
+    diffusion_models = [
+        (metadata.get("name", model_id), model_id)
+        for model_id, metadata in MODEL_METADATA.items()
+        if metadata.get("type") == "diffusion"
+    ]
+    return sorted(diffusion_models, key=lambda model: model[0])
 
 
-class _GenerateThread(QThread):
-    finished_ok = Signal()
+class _PromptThread(QThread):
+    finished_ok = Signal(str)
     failed = Signal(str)
 
-    def __init__(self, project, name, prompt, num_versions, model_id, attributes=None):
+    def __init__(self, image_path):
         super().__init__()
-        self.project = project
-        self.name = name
-        self.prompt = prompt
-        self.num_versions = num_versions
-        self.model_id = model_id
-        self.attributes = attributes or {}
+        self.image_path = image_path
 
     def run(self):
         try:
-            character_manager.generate_versions(
-                self.project,
-                self.name,
-                self.prompt,
-                num_versions=self.num_versions,
-                model=self.model_id,
-                attributes=self.attributes,
-            )
-            self.finished_ok.emit()
-        except Exception as e:  # noqa: BLE001
-            self.failed.emit(str(e))
+            from generators.image_prompt_generator import generate_prompt_from_image
+
+            self.finished_ok.emit(generate_prompt_from_image(self.image_path))
+        except Exception as error:  # noqa: BLE001
+            self.failed.emit(str(error))
+
+
+class _PreviewThread(QThread):
+    finished_ok = Signal(str, str, int)
+    failed = Signal(str)
+
+    def __init__(self, prompt, model_id, reference_image, output_path):
+        super().__init__()
+        self.prompt = prompt
+        self.model_id = model_id
+        self.reference_image = reference_image
+        self.output_path = output_path
+        self.seed = uuid4().int % (2**31)
+
+    def run(self):
+        try:
+            if self.reference_image:
+                from generators.img2img_engine import generate_image_from_reference
+
+                generate_image_from_reference(
+                    self.reference_image,
+                    self.prompt,
+                    model_name=self.model_id,
+                    seed=self.seed,
+                    output_path=self.output_path,
+                )
+                prompt_used = self.prompt
+            else:
+                from generators.image_generator import generate_images
+
+                prompt_used = ensure_full_body(self.prompt)
+                files = generate_images(
+                    prompt=prompt_used,
+                    model_name=self.model_id,
+                    seed=self.seed,
+                    task_name=f"character_preview_{uuid4().hex}",
+                )
+                if not files:
+                    raise RuntimeError("Image generation did not return an image.")
+                shutil.copy2(files[0], self.output_path)
+
+            self.finished_ok.emit(self.output_path, prompt_used, self.seed)
+        except Exception as error:  # noqa: BLE001
+            self.failed.emit(str(error))
 
 
 class CharacterBuilderScreen(QWidget):
@@ -72,22 +103,28 @@ class CharacterBuilderScreen(QWidget):
         self.project_id = project_id
         self.on_back = on_back
         self.on_created = on_created
-        self._gen_thread = None
-
-        project = project_manager.get_project(project_id) or {"name": "Unknown"}
-        self.project_slug = project["name"].replace(" ", "_")
+        self.project = project_manager.get_project(project_id) or {"name": "Unknown"}
+        self.project_slug = self.project["name"].replace(" ", "_")
+        self.reference_image = None
+        self._preview_path = None
+        self._preview_prompt = None
+        self._busy = False
+        self._preview_directory = tempfile.TemporaryDirectory(
+            prefix="story_engine_character_"
+        )
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(20, 20, 20, 20)
 
-        # Breadcrumb / back
         crumb_row = QHBoxLayout()
-        back_btn = QPushButton("\u2190 Back")
-        back_btn.setProperty("flat", True)
-        back_btn.clicked.connect(self.on_back)
-        breadcrumb = QLabel(f"Home  \u203a  {project['name']}  \u203a  New Character")
+        self.back_button = QPushButton("\u2190 Back")
+        self.back_button.setProperty("flat", True)
+        self.back_button.clicked.connect(self.cancel)
+        breadcrumb = QLabel(
+            f"Home  \u203a  {self.project['name']}  \u203a  New Character"
+        )
         breadcrumb.setStyleSheet("font-size: 12px; color: #666;")
-        crumb_row.addWidget(back_btn)
+        crumb_row.addWidget(self.back_button)
         crumb_row.addWidget(breadcrumb)
         crumb_row.addStretch()
         outer.addLayout(crumb_row)
@@ -96,205 +133,212 @@ class CharacterBuilderScreen(QWidget):
         title.setStyleSheet("font-size: 22px; font-weight: bold;")
         outer.addWidget(title)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        form_host = QWidget()
-        form = QFormLayout(form_host)
+        form = QFormLayout()
         form.setSpacing(10)
-        scroll.setWidget(form_host)
-        outer.addWidget(scroll)
-
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Character name (required)")
         form.addRow("Name:", self.name_input)
 
-        def combo(items):
-            c = QComboBox()
-            c.addItems(items)
-            return c
+        self.model_combo = QComboBox()
+        for display_name, model_id in get_diffusion_models():
+            self.model_combo.addItem(display_name, model_id)
+        sdxl_index = self.model_combo.findData("sdxl")
+        if sdxl_index >= 0:
+            self.model_combo.setCurrentIndex(sdxl_index)
+        self.model_combo.currentIndexChanged.connect(self._invalidate_preview)
+        form.addRow("Generation model:", self.model_combo)
+        outer.addLayout(form)
 
-        self.gender_combo = combo(["Female", "Male", "Non-binary", "Other"])
-        form.addRow("Gender:", self.gender_combo)
+        image_row = QHBoxLayout()
+        source_column = QVBoxLayout()
+        source_title = QLabel("Reference image (optional)")
+        self.source_preview = self._image_preview_label("No reference image")
+        self.choose_image_button = QPushButton("Choose Image\u2026")
+        self.choose_image_button.clicked.connect(self.choose_reference_image)
+        self.describe_button = QPushButton("Generate Prompt from Image")
+        self.describe_button.setEnabled(False)
+        self.describe_button.clicked.connect(self.generate_prompt_from_image)
+        source_column.addWidget(source_title)
+        source_column.addWidget(self.source_preview)
+        source_column.addWidget(self.choose_image_button)
+        source_column.addWidget(self.describe_button)
+        image_row.addLayout(source_column)
 
-        self.age_combo = combo(["Child", "Teen", "20-30", "30-40", "40-50", "50+"])
-        form.addRow("Age Range:", self.age_combo)
-
-        self.body_combo = combo(
-            ["Slender", "Athletic", "Curvy", "Muscular", "Plus Size"]
+        generated_column = QVBoxLayout()
+        generated_column.addWidget(QLabel("Generated preview"))
+        self.generated_preview = self._image_preview_label(
+            "Generate a preview to review it here"
         )
-        form.addRow("Body Type:", self.body_combo)
+        generated_column.addWidget(self.generated_preview)
+        image_row.addLayout(generated_column)
+        image_row.addStretch()
+        outer.addLayout(image_row)
 
-        self.hair_type_combo = combo(["Straight", "Wavy", "Curly", "Coily", "Bald"])
-        form.addRow("Hair Type:", self.hair_type_combo)
-
-        self.hair_color_combo = combo(
-            ["Black", "Brown", "Blonde", "Red", "Gray", "White"]
+        self.prompt_input = QTextEdit()
+        self.prompt_input.setPlaceholderText(
+            "Describe the character, or upload an image and generate a prompt."
         )
-        form.addRow("Hair Color:", self.hair_color_combo)
+        self.prompt_input.setMinimumHeight(110)
+        self.prompt_input.textChanged.connect(self._invalidate_preview)
+        outer.addWidget(QLabel("Prompt:"))
+        outer.addWidget(self.prompt_input)
 
-        self.hair_length_combo = combo(["Short", "Medium", "Long"])
-        form.addRow("Hair Length:", self.hair_length_combo)
-
-        self.skin_combo = combo(
-            ["Very Light", "Light", "Medium", "Tan", "Dark", "Very Dark"]
-        )
-        form.addRow("Skin Tone:", self.skin_combo)
-
-        self.eye_combo = combo(["Blue", "Green", "Brown", "Hazel", "Gray"])
-        form.addRow("Eye Color:", self.eye_combo)
-
-        self.clothing_combo = combo(
-            ["Casual", "Formal", "Fantasy", "Sci-fi", "Historical", "Sporty"]
-        )
-        form.addRow("Clothing Style:", self.clothing_combo)
-
-        self.mood_combo = combo(
-            ["Neutral", "Happy", "Serious", "Mysterious", "Confident", "Melancholic"]
-        )
-        form.addRow("Mood/Expression:", self.mood_combo)
-
-        # Add Style attribute
-        self.style_combo = combo(
-            [
-                "Ultra Realistic",
-                "Cinematic",
-                "Photorealistic",
-                "Realistic",
-                "Anime",
-                "Manga",
-                "Comic Book",
-                "Cartoon",
-                "Animation",
-                "3D Animation",
-                "3D Render",
-                "Pixar-like",
-                "Disney-like",
-                "Stylized",
-                "Semi-Realistic",
-                "Fantasy Art",
-                "Dark Fantasy",
-                "Cyberpunk",
-                "Sci-Fi",
-                "Steampunk",
-                "Medieval Art",
-                "Concept Art",
-                "Digital Painting",
-                "Oil Painting",
-                "Watercolor",
-                "Pencil Drawing",
-                "Sketch",
-                "Ink Drawing",
-                "Pixel Art",
-                "Low Poly",
-                "Game Asset",
-                "Clay Render",
-                "Minimalist",
-                "Abstract",
-            ]
-        )
-        form.addRow("Visual Style:", self.style_combo)
-
-        # Add Model selector - dynamically loaded from models.py
-        diffusion_models = get_diffusion_models()
-        model_display_names = [model[0] for model in diffusion_models]
-        self.model_combo = combo(model_display_names)
-        form.addRow("Generation Model:", self.model_combo)
-
-        # Store mapping from display names to actual model IDs
-        self.model_id_mapping = {
-            display_name: model_id for display_name, model_id in diffusion_models
-        }
-
-        self.variant_spin = QSpinBox()
-        self.variant_spin.setRange(1, 10)
-        self.variant_spin.setValue(3)
-        form.addRow("Variants to generate:", self.variant_spin)
-
-        self.prompt_preview = QTextEdit()
-        self.prompt_preview.setPlaceholderText(
-            "Prompt preview \u2014 click \u201cPreview Prompt\u201d to generate, then edit freely."
-        )
-        self.prompt_preview.setMaximumHeight(120)
-        form.addRow("Prompt:", self.prompt_preview)
-
-        # Status + ghost previews
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #4CAF50; font-style: italic;")
+        self.status_label.setStyleSheet("color: #666; font-style: italic;")
         outer.addWidget(self.status_label)
 
-        self.ghost_row = QHBoxLayout()
-        self.ghost_row.setSpacing(10)
-        outer.addLayout(self.ghost_row)
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.setProperty("flat", True)
+        self.cancel_button.clicked.connect(self.cancel)
+        buttons.addWidget(self.cancel_button)
+        self.preview_button = QPushButton("Generate Preview")
+        self.preview_button.clicked.connect(self.generate_preview)
+        buttons.addWidget(self.preview_button)
+        self.save_button = QPushButton("Save Character")
+        self.save_button.setEnabled(False)
+        self.save_button.clicked.connect(self.save_character)
+        buttons.addWidget(self.save_button)
+        outer.addLayout(buttons)
 
-        # Buttons
-        btn_layout = QHBoxLayout()
-        btn_cancel = QPushButton("Cancel")
-        btn_cancel.setProperty("flat", True)
-        btn_cancel.clicked.connect(self.on_back)
-        btn_preview = QPushButton("Preview Prompt")
-        btn_preview.clicked.connect(self.preview_prompt)
-        self.btn_generate = QPushButton("Generate Character")
-        self.btn_generate.clicked.connect(self.generate_character)
-        btn_layout.addStretch()
-        btn_layout.addWidget(btn_cancel)
-        btn_layout.addWidget(btn_preview)
-        btn_layout.addWidget(self.btn_generate)
-        outer.addLayout(btn_layout)
-
-    # -- prompt building ------------------------------------------------------
-
-    def get_attributes(self):
-        return {
-            "gender": self.gender_combo.currentText(),
-            "age_range": self.age_combo.currentText(),
-            "body_type": self.body_combo.currentText(),
-            "hair_type": self.hair_type_combo.currentText(),
-            "hair_color": self.hair_color_combo.currentText(),
-            "hair_length": self.hair_length_combo.currentText(),
-            "skin_tone": self.skin_combo.currentText(),
-            "eye_color": self.eye_combo.currentText(),
-            "clothing": self.clothing_combo.currentText(),
-            "mood": self.mood_combo.currentText(),
-            "style": self.style_combo.currentText(),
-        }
-
-    def build_prompt(self):
-        a = {k: v.lower() for k, v in self.get_attributes().items()}
-
-        # Build a character using the character attributes system
-        # but maintain compatibility with the existing simple format
-        if a["gender"] == "male":
-            char_type = "man"
-        elif a["gender"] == "female":
-            char_type = "woman"
-        else:
-            char_type = "animal"  # Fallback for non-binary or other
-
-        # For now we'll use the simpler approach, but the system supports style
-        base_prompt = (
-            f"Full body photo of a {a['body_type']} {a['gender']} character, "
-            f"age {a['age_range']}, with {a['hair_length']} {a['hair_type']} {a['hair_color']} hair, "
-            f"{a['skin_tone']} skin tone and {a['eye_color']} eyes, wearing {a['clothing']} clothing, "
-            f"{a['mood']} expression, photorealistic, detailed face, high detail, good lighting"
+    @staticmethod
+    def _image_preview_label(placeholder):
+        label = QLabel(placeholder)
+        label.setFixedSize(220, 220)
+        label.setAlignment(Qt.AlignCenter)
+        label.setWordWrap(True)
+        label.setStyleSheet(
+            "background-color: #eee; border: 1px solid #ddd; border-radius: 6px;"
         )
+        return label
 
-        # Append style if selected (but since this is a simpler UI, just indicate it's included)
-        if a["style"] and a["style"] != "Default":
-            base_prompt = f"{a['style'].lower()} {base_prompt}"
+    @staticmethod
+    def _set_image(label, image_path, placeholder):
+        pixmap = QPixmap(image_path)
+        if pixmap.isNull():
+            label.setPixmap(QPixmap())
+            label.setText(placeholder)
+            return False
+        label.setText("")
+        label.setPixmap(
+            pixmap.scaled(
+                label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        )
+        return True
 
-        return base_prompt
+    def _invalidate_preview(self):
+        if not self._preview_path:
+            return
+        Path(self._preview_path).unlink(missing_ok=True)
+        self._preview_path = None
+        self._preview_prompt = None
+        self._preview_seed = None
+        self.save_button.setEnabled(False)
+        self.generated_preview.setPixmap(QPixmap())
+        self.generated_preview.setText("Prompt changed; generate a new preview")
 
-    def preview_prompt(self):
-        self.prompt_preview.setPlainText(self.build_prompt())
+    def choose_reference_image(self):
+        image_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose character reference image",
+            "",
+            "Images (*.png *.jpg *.jpeg *.webp *.bmp)",
+        )
+        if not image_path:
+            return
+        self._invalidate_preview()
+        self.reference_image = None
+        self.describe_button.setEnabled(False)
+        if not self._set_image(self.source_preview, image_path, "Could not load image"):
+            QMessageBox.warning(
+                self, "Invalid image", "The selected image could not be opened."
+            )
+            return
+        self.reference_image = image_path
+        self.describe_button.setEnabled(True)
 
-    # -- generation -----------------------------------------------------------
+    def _set_busy(self, busy, message=""):
+        self._busy = busy
+        self.status_label.setText(message)
+        for button in (
+            self.back_button,
+            self.cancel_button,
+            self.choose_image_button,
+            self.describe_button,
+            self.preview_button,
+            self.save_button,
+        ):
+            button.setEnabled(not busy)
+        self.name_input.setEnabled(not busy)
+        self.model_combo.setEnabled(not busy)
+        self.prompt_input.setEnabled(not busy)
+        if not busy:
+            self.describe_button.setEnabled(bool(self.reference_image))
+            self.save_button.setEnabled(bool(self._preview_path))
 
-    def generate_character(self):
+    def generate_prompt_from_image(self):
+        if not self.reference_image:
+            return
+        self._set_busy(True, "Analyzing reference image\u2026")
+        self._prompt_thread = _PromptThread(self.reference_image)
+        self._prompt_thread.finished_ok.connect(self._on_prompt_generated)
+        self._prompt_thread.failed.connect(self._on_task_failed)
+        self._prompt_thread.start()
+
+    def _on_prompt_generated(self, prompt):
+        self._set_busy(False)
+        self.prompt_input.setPlainText(prompt)
+
+    def generate_preview(self):
+        prompt = self.prompt_input.toPlainText().strip()
+        if not prompt:
+            QMessageBox.warning(self, "Missing prompt", "Enter a character prompt.")
+            return
+        model_id = self.model_combo.currentData()
+        if self.reference_image and model_id not in {"sdxl", "flux_dev"}:
+            QMessageBox.warning(
+                self,
+                "Unsupported model",
+                "Reference-image generation supports SDXL and FLUX.1 Dev. "
+                "Choose one of those models to preserve the pose.",
+            )
+            return
+
+        self._invalidate_preview()
+        output_path = str(Path(self._preview_directory.name) / "candidate.png")
+        self._set_busy(True, "Generating preview\u2026")
+        self._preview_thread = _PreviewThread(
+            prompt, model_id, self.reference_image, output_path
+        )
+        self._preview_thread.finished_ok.connect(self._on_preview_generated)
+        self._preview_thread.failed.connect(self._on_task_failed)
+        self._preview_thread.start()
+
+    def _on_preview_generated(self, image_path, prompt_used, seed):
+        self._set_busy(False)
+        if not self._set_image(
+            self.generated_preview, image_path, "Generated image could not be loaded"
+        ):
+            self._on_task_failed("Generated image could not be loaded.")
+            return
+        self._preview_path = image_path
+        self._preview_prompt = prompt_used
+        self._preview_seed = seed
+        self.save_button.setEnabled(True)
+        self.status_label.setText("Review the preview, edit the prompt, or save it.")
+
+    def _on_task_failed(self, error):
+        self._set_busy(False)
+        self.status_label.setText("")
+        QMessageBox.critical(self, "Character image failed", error)
+
+    def save_character(self):
         name = self.name_input.text().strip()
         if not name:
             QMessageBox.warning(self, "Missing name", "Please enter a character name.")
             return
-
         if character_manager.get_character(self.project_slug, name):
             QMessageBox.warning(
                 self,
@@ -302,65 +346,30 @@ class CharacterBuilderScreen(QWidget):
                 f"Character \u201c{name}\u201d already exists in this project.",
             )
             return
+        if not self._preview_path or not self._preview_prompt:
+            QMessageBox.warning(
+                self, "Missing preview", "Generate and review a preview before saving."
+            )
+            return
 
-        prompt = self.prompt_preview.toPlainText().strip() or self.build_prompt()
+        try:
+            character_manager.save_preview(
+                self.project_slug,
+                name,
+                self._preview_prompt,
+                self.model_combo.currentData(),
+                self._preview_path,
+                seed=self._preview_seed,
+            )
+        except Exception as error:  # noqa: BLE001
+            QMessageBox.critical(self, "Save failed", str(error))
+            return
 
-        # Get selected model ID
-        selected_model_display = self.model_combo.currentText()
-        model_id = self.model_id_mapping.get(
-            selected_model_display, "flux_dev"
-        )  # fallback to flux_dev if not found
-
-        self.btn_generate.setEnabled(False)
-        self.status_label.setText("Generating\u2026 this may take a while.")
-        self._show_ghosts(self.variant_spin.value())
-
-        # For a more complete integration we could build full attribute dict
-        full_attributes = self.get_attributes()
-        if "style" in full_attributes:
-            style_id = full_attributes["style"].lower().replace(" ", "_")
-            if style_id in [
-                "ultra_realistic",
-                "cinematic",
-                "photorealistic",
-                "realistic",
-            ]:
-                # This would be passed to our more complete prompt building function...
-                pass
-
-        self._gen_thread = _GenerateThread(
-            self.project_slug,
-            name,
-            prompt,
-            self.variant_spin.value(),
-            model_id,
-            attributes=full_attributes,
-        )
-        self._gen_thread.finished_ok.connect(self._on_generated)
-        self._gen_thread.failed.connect(self._on_generation_failed)
-        self._gen_thread.start()
-
-    def _show_ghosts(self, count):
-        from ui.components.ghost_card import GhostCard
-
-        self._clear_ghosts()
-        for _ in range(count):
-            self.ghost_row.addWidget(GhostCard(110, 130))
-        self.ghost_row.addStretch()
-
-    def _clear_ghosts(self):
-        while self.ghost_row.count():
-            item = self.ghost_row.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-    def _on_generated(self):
-        self.status_label.setText("")
-        self._clear_ghosts()
+        self._preview_directory.cleanup()
         self.on_created()
 
-    def _on_generation_failed(self, error):
-        self.btn_generate.setEnabled(True)
-        self.status_label.setText("")
-        self._clear_ghosts()
-        QMessageBox.critical(self, "Generation failed", error)
+    def cancel(self):
+        if self._busy:
+            return
+        self._preview_directory.cleanup()
+        self.on_back()

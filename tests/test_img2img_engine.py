@@ -1,7 +1,10 @@
 import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+
+from PIL import Image
 
 from generators import img2img_engine as ie
 
@@ -32,6 +35,37 @@ class _FakePipe:
 
 
 class Img2ImgEngineTest(unittest.TestCase):
+    def test_generate_image_from_reference_preserves_pose(self):
+        pipe = _FakePipe()
+        with tempfile.TemporaryDirectory() as tmp:
+            reference = Path(tmp) / "reference.png"
+            Image.new("RGB", (16, 16), color="white").save(reference)
+            with patch(
+                "diffusers.StableDiffusionXLImg2ImgPipeline.from_pretrained",
+                return_value=pipe,
+            ), patch.object(
+                ie, "resolve_model_path", return_value="local/sdxl"
+            ), patch.object(
+                ie, "get_model_config", return_value=("cpu", "float16")
+            ), patch.object(
+                ie, "cleanup_pipeline"
+            ):
+                out = ie.generate_image_from_reference(
+                    str(reference),
+                    "a character",
+                    output_path="/tmp/character.png",
+                )
+
+        self.assertEqual(out, "/tmp/character.png")
+        self.assertIn("same pose", pipe.calls[0]["prompt"])
+        self.assertEqual(pipe.calls[0]["strength"], 0.3)
+
+    def test_generate_image_from_reference_rejects_unsupported_model(self):
+        with self.assertRaisesRegex(ValueError, "not supported"):
+            ie.generate_image_from_reference(
+                "/tmp/reference.png", "a character", model_name="flux_klein"
+            )
+
     def test_refine_composite_success_clamps_strength(self):
         pipe = _FakePipe()
         opened = _FakeImage()
