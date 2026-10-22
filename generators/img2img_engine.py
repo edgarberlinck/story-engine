@@ -16,6 +16,7 @@ Design constraints (see multi-character scene design doc):
 """
 
 import os
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -31,6 +32,86 @@ DEFAULT_REFINEMENT_PROMPT = (
 )
 
 MAX_SAFE_STRENGTH = 0.4
+
+
+def generate_image_from_reference(
+    reference_image: str,
+    prompt: str,
+    model_name: str = "sdxl",
+    strength: float = 0.3,
+    seed: int = 42,
+    output_path: Optional[str] = None,
+    steps: int = 30,
+    guidance_scale: float = 7.5,
+) -> str:
+    """Generate a new character image while preserving the reference pose."""
+    if model_name not in {"sdxl", "flux_dev"}:
+        raise ValueError(
+            f"Reference-image generation is not supported for model: {model_name}. "
+            "Choose SDXL or FLUX.1 Dev."
+        )
+    if not Path(reference_image).is_file():
+        raise FileNotFoundError(f"Reference image not found: {reference_image}")
+
+    if strength > MAX_SAFE_STRENGTH:
+        strength = MAX_SAFE_STRENGTH
+
+    temporary_output = None
+    if output_path is None:
+        fd, output_path = tempfile.mkstemp(
+            prefix="story_engine_character_", suffix=".png"
+        )
+        os.close(fd)
+        temporary_output = output_path
+
+    pipe = None
+    try:
+        import torch
+        from PIL import Image
+
+        model_path = resolve_model_path(
+            "diffusion", model_name, DIFFUSION_MODELS[model_name]
+        )
+        device, torch_dtype = get_model_config("diffusion")
+        if model_name == "flux_dev":
+            from diffusers import FluxImg2ImgPipeline
+
+            pipe = FluxImg2ImgPipeline.from_pretrained(
+                model_path, torch_dtype=torch_dtype
+            )
+        else:
+            from diffusers import StableDiffusionXLImg2ImgPipeline
+
+            pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+                model_path, torch_dtype=torch_dtype, safety_checker=None
+            )
+        pipe = pipe.to(device)
+
+        with Image.open(reference_image) as source:
+            init_image = source.convert("RGB")
+            kwargs = {
+                "prompt": (
+                    f"{prompt.rstrip().rstrip('.,')}. Preserve the same pose, "
+                    "body position, camera angle, and framing as the reference image."
+                ),
+                "image": init_image,
+                "strength": strength,
+                "num_inference_steps": steps,
+                "guidance_scale": guidance_scale,
+                "generator": torch.Generator(device=device).manual_seed(seed),
+            }
+            if model_name == "flux_dev":
+                kwargs["max_sequence_length"] = 512
+
+            result = pipe(**kwargs)
+            result.images[0].save(output_path)
+        return output_path
+    except Exception:
+        if temporary_output and os.path.exists(temporary_output):
+            os.unlink(temporary_output)
+        raise
+    finally:
+        cleanup_pipeline(pipe)
 
 
 def refine_composite(
