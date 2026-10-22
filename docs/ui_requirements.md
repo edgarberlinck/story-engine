@@ -35,38 +35,20 @@ Local desktop application using PySide6/Qt. No browser. Responsive with backgrou
 - Edit allows rename, adjust attributes
 
 ### 5. Character Creation Builder
-- Step-by-step form with attributes:
-  - Basic: Name, Gender/Sex, Age range
-  - Appearance: Body type, Height, Build
-  - Hair: Hair type, Hair color, Length, Style
-  - Face: Skin tone, Eye color, Facial features
-  - Clothing: Style, Color, Era
-  - Mood/Expression: Happy, Serious, etc.
-- LLM prompt generation: Use TEXT_GENERATION_MODELS (Phi-3/Gemma) to convert attributes into detailed prompt
-- Preview: Generate 1 preview image before committing
-- Options: Number of variants to generate (1-10)
-- After creation, goes to Character View
+- Fields: Name, generation model, and one editable character prompt
+- Optional image reference: upload an existing image and generate a prompt from its visual description
+- Image-based generation keeps the reference pose and shows the source and generated preview side by side
+- Edit the prompt and generate another preview; save only after reviewing the current preview
+- Without a reference image, generate and review a text-to-image preview before saving
+- After saving, goes to Character View
 
 ## Data Model Extensions
 
 ### Character Attributes
-New table `character_attributes`:
-- id, project, character_name, attribute_json (JSON blob), created_at, updated_at
-Attributes stored as JSON for flexibility:
-{
-  "gender": "female",
-  "age_range": "20-30",
-  "body_type": "athletic",
-  "hair_type": "straight",
-  "hair_color": "brown",
-  "skin_tone": "medium",
-  "eye_color": "blue",
-  ...
-}
+Existing character attribute data remains available for compatibility, but the creation builder now uses the prompt as the character description.
 
 ### Prompt Generation
-Use LLM model to convert attributes JSON -> detailed prompt:
-"Create a photorealistic portrait of a [attributes] character..."
+The optional image-to-prompt action uses an image-captioning model to produce an editable description that includes pose and framing guidance.
 
 ## Navigation
 Stack-based navigation with back button. Breadcrumb reflects history.

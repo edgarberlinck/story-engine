@@ -323,6 +323,36 @@ class TestCharacterManagerCoverage(unittest.TestCase):
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    def test_save_preview_persists_character_and_default_version(self):
+        cm = CharacterManager()
+        tmp_dir = Path(tempfile.mkdtemp())
+        preview = tmp_dir / "preview.png"
+        preview.write_text("generated-image")
+        character_home = tmp_dir / "character"
+        try:
+            with patch(
+                "core.character_manager.character_dir", return_value=character_home
+            ):
+                version = cm.save_preview(
+                    self.project,
+                    "Hero",
+                    "a character preserving the uploaded pose",
+                    "sdxl",
+                    str(preview),
+                )
+
+            self.assertEqual(version["version"], 1)
+            self.assertEqual(
+                version["prompt"], "a character preserving the uploaded pose"
+            )
+            self.assertTrue((character_home / "versions" / "v_1.png").exists())
+            self.assertTrue((character_home / "reference.png").exists())
+            self.assertEqual(
+                cm.version_service.get_default(self.project, "Hero")["version"], 1
+            )
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
