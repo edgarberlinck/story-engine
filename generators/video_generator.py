@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 """
-Image-to-video generation across all supported i2v models.
+Image-to-video generation across the benchmarked i2v models.
 
-Supported models (see models.py IMAGE_TO_VIDEO_MODELS):
-   - ltx_video_095_i2v (default): Lightricks/LTX-Video-0.9.5
-     (LTXImageToVideoPipeline, compact ~3.6 GB transformer — runs on MPS).
+Candidates (see models.py IMAGE_TO_VIDEO_MODELS):
+   - cosmos3_nano_i2v (default): nvidia/Cosmos3-Nano
+   - minimax_h3_q4_i2v: MiniMaxAI/MiniMax-H3, 4-bit quantized at load
 
-Benchmark decision (2026-08): LTX-Video 0.9.5 is the surviving i2v model.
-Wan 2.2 I2V A14B was DROPPED: a dual 14B-expert MoE stored F32 on disk
-(106 GB of transformers) that OOMs (~23 GB free) during model load on a
-64 GB Apple-Silicon Mac, independent of resolution/frames. HunyuanVideo-I2V
-is also dropped.
-
-Each model is invoked with its own correct pipeline class and parameters.
+Models are loaded one at a time and released after each clip so the
+benchmark never holds two models in memory.
 """
 
 import json
@@ -38,17 +33,37 @@ from utils.model_metrics import get_memory_usage
 
 AVAILABLE_VIDEO_MODELS = dict(IMAGE_TO_VIDEO_MODELS)
 
-# No i2v models available; video generation archived due to hardware
-# constraints. Set to None to indicate no model is available until a machine
-# with sufficient GPU memory (>= 32 GB VRAM for LTX-Video or >= 80 GB unified
-# memory for larger models) is available.
-DEFAULT_VIDEO_MODEL = None
+DEFAULT_VIDEO_MODEL = "cosmos3_nano_i2v"
+
+_NEGATIVE_PROMPT = (
+    "static, still frame, blurred details, subtitles, worst quality, low "
+    "quality, deformed, disfigured, extra limbs, fused fingers, messy background"
+)
 
 # Per-model generation parameters. Each model has different native
-# resolutions, frame counts, fps and guidance requirements.
-# No models are currently available (archived see models.py).
-# Parameters will be populated when a video model is re-introduced.
-MODEL_GENERATION_PARAMS = {}
+# resolutions, frame counts, fps and guidance requirements. Values are
+# deliberately conservative (small clips) because the benchmark machine is
+# memory constrained; tune after the first successful run.
+MODEL_GENERATION_PARAMS = {
+    "cosmos3_nano_i2v": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 49,
+        "fps": 24,
+        "guidance_scale": 6.0,
+        "num_inference_steps": 30,
+        "negative_prompt": _NEGATIVE_PROMPT,
+    },
+    "minimax_h3_q4_i2v": {
+        "width": 832,
+        "height": 480,
+        "num_frames": 49,
+        "fps": 24,
+        "guidance_scale": 5.0,
+        "num_inference_steps": 30,
+        "negative_prompt": _NEGATIVE_PROMPT,
+    },
+}
 
 
 def resolve_video_model_path(model_name: str) -> str:
@@ -67,21 +82,36 @@ def resolve_video_model_path(model_name: str) -> str:
 
 
 def _load_pipeline(model_name: str, model_path: str, device: str, torch_dtype):
-    """Load the correct diffusers pipeline for the given i2v model.
-    New models add an entry here plus one in MODEL_GENERATION_PARAMS."""
-    if model_name == "ltx_video_095_i2v":
-        from diffusers import LTXImageToVideoPipeline
+    """Load the diffusers pipeline for the given i2v model.
 
-        pipe = LTXImageToVideoPipeline.from_pretrained(
-            model_path, torch_dtype=torch_dtype
-        )
-    else:
+    Pipeline classes are resolved from each repo's model_index.json
+    (DiffusionPipeline).
+    Only one model is ever loaded at a time; the caller unloads it.
+    New models add an entry to MODEL_GENERATION_PARAMS.
+    """
+    if model_name not in MODEL_GENERATION_PARAMS:
         raise ValueError(f"Unsupported image-to-video model: {model_name}")
 
-    # The LTX-Video text encoder is large (~17 GB); offloading it to CPU one
-    # component at a time keeps the footprint small enough for an accelerator
-    # with limited free memory (e.g. a 64 GB Apple-Silicon Mac on MPS).
-    # Without an accelerator (cpu), load it resident on CPU.
+    from diffusers import DiffusionPipeline
+
+    kwargs = {"torch_dtype": torch_dtype}
+    pipeline_cls = DiffusionPipeline
+    if model_name == "minimax_h3_q4_i2v":
+        # Q4: quantize weights to 4-bit NF4 while loading (needs bitsandbytes).
+        from diffusers import PipelineQuantizationConfig
+
+        kwargs["quantization_config"] = PipelineQuantizationConfig(
+            quant_backend="bitsandbytes_4bit",
+            quant_kwargs={
+                "load_in_4bit": True,
+                "bnb_4bit_quant_type": "nf4",
+                "bnb_4bit_compute_dtype": torch_dtype,
+            },
+        )
+
+    pipe = pipeline_cls.from_pretrained(model_path, **kwargs)
+
+    # Keep the footprint small: offload components to CPU when idle.
     if device in ("cuda", "mps"):
         pipe.enable_model_cpu_offload()
     else:
