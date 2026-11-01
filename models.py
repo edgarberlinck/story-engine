@@ -27,13 +27,17 @@ TEXT_GENERATION_MODELS = {
 
 # Image-to-Video Models
 # Policy: the benchmark suite decides which i2v model survives; the losing
-# model is removed from this registry once the comparison is final.
-# Decision (2026-08): ALL i2v models have been archived due to hardware
-# constraints requiring more GPU memory than available on this machine.
-# Future work: re-introduce when a machine with >= 80 GB unified memory is
-# available for LTX-Video or when models are quantized/MLX-ified for local
-# execution.
-IMAGE_TO_VIDEO_MODELS = {}
+# models are removed from this registry once the comparison is final.
+# Restored for benchmarking (hardware is tight, so the benchmark runs ONE
+# model at a time and unloads it before the next).
+# Some of these repos may be gated: accept the license on the model page
+# (logged in to Hugging Face) before downloading.
+IMAGE_TO_VIDEO_MODELS = {
+    # License: https://huggingface.co/nvidia/Cosmos3-Nano
+    "cosmos3_nano_i2v": "nvidia/Cosmos3-Nano",
+    # License: https://huggingface.co/MiniMaxAI/MiniMax-H3
+    "minimax_h3_q4_i2v": "MiniMaxAI/MiniMax-H3",
+}
 
 # Text-to-Speech Models (spoken dialogue for scenes)
 # Voice cloning/design is a capability of the TTS models below (Qwen3-TTS
@@ -135,6 +139,22 @@ MODEL_METADATA = {
         "size": "~24GB",
         "description": "LTX-Video 0.9.5 image-to-video model (LTXImageToVideoPipeline): fast, compact (~3.6 GB transformer) - runs on Apple-Silicon MPS, where Wan 2.2 I2V A14B OOMs during load",
         "repo_id": "Lightricks/LTX-Video-0.9.5",
+    },
+    "cosmos3_nano_i2v": {
+        "name": "NVIDIA Cosmos3 Nano",
+        "type": "image_to_video",
+        "size": "unknown",
+        "description": "NVIDIA Cosmos3-Nano image-to-video benchmark candidate (loaded via DiffusionPipeline auto-detection)",
+        "repo_id": "nvidia/Cosmos3-Nano",
+        "license_url": "https://huggingface.co/nvidia/Cosmos3-Nano",
+    },
+    "minimax_h3_q4_i2v": {
+        "name": "MiniMax-H3 (4-bit)",
+        "type": "image_to_video",
+        "size": "unknown",
+        "description": "MiniMax-H3 image-to-video benchmark candidate, quantized to 4-bit (bitsandbytes NF4) at load time",
+        "repo_id": "MiniMaxAI/MiniMax-H3",
+        "license_url": "https://huggingface.co/MiniMaxAI/MiniMax-H3",
     },
     "qwen3_tts": {
         "name": "Qwen3-TTS CustomVoice 1.7B",

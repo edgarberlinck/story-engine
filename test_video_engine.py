@@ -80,11 +80,8 @@ class TestCharacterService(unittest.TestCase):
 
 
 class TestVideoGenerator(unittest.TestCase):
-    def test_no_default_model_while_archived(self):
-        # All i2v models are archived due to hardware constraints (models.py);
-        # the default must be None until a model is re-introduced.
-        self.assertIsNone(DEFAULT_VIDEO_MODEL)
-        self.assertEqual(AVAILABLE_VIDEO_MODELS, {})
+    def test_default_model_is_registered(self):
+        self.assertIn(DEFAULT_VIDEO_MODEL, AVAILABLE_VIDEO_MODELS)
 
     def test_all_models_have_params(self):
         self.assertEqual(set(AVAILABLE_VIDEO_MODELS), set(MODEL_GENERATION_PARAMS))

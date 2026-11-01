@@ -1,37 +1,19 @@
 #!/usr/bin/env python3
 """
-Definitive image-to-video benchmark: the café conversation.
+Image-to-video benchmark: a random character walking.
 
-Scene:
-  A cinematic two-character conversation. Nikita and Roger sit at a small
-  table in a quiet, stylish café during the morning. Nikita (long curly red
-  hair, friendly) is on the LEFT; Roger (bald, dark-skinned, muscular,
-  calm) is on the RIGHT. Both visible from the waist up, facing each other,
-  faces clear and unobstructed, medium cinematic shot, warm morning light.
+Scene: a single character walks along a quiet street. The same validated
+scene image and seed are animated with each benchmarked i2v model
+(see models.py IMAGE_TO_VIDEO_MODELS).
 
-Dialogue (drives the future TTS + lip-sync + music stage):
-  Nikita: "Good morning, Roger."
-  Roger:  "Good morning to you too, Nikita."
-  Background: quiet, relaxed café ambience.
+To avoid overloading the machine, models run strictly ONE AT A TIME:
+each pipeline is loaded, used for one clip, released (cleanup_pipeline) and
+garbage-collected before the next starts. A failure in one model does not
+abort the others. Pass model names as arguments to run a subset, e.g.
+    python generators/benchmark_video_generator.py cosmos3_nano_i2v
 
-Benchmark rules:
-   - The characters live in the 'Test_ui' project, so the benchmark runs
-     against that project (see BENCHMARK_PROJECT).
-   - Face verification is SOFT: both characters are checked for presence in
-     the scene, but a non-match or an inconclusive check does not abort it
-     (the point of this benchmark is to see whether a video can be
-     generated, not to gate it on perfect face detection).
-   - The same validated scene is animated with EVERY i2v model.
-    - Every video is >= 4 s, seeded identically, named
-     benchmark_<model>.mp4, with a metrics JSON next to it. The surviving
-     model (ltx_video_095_i2v) is run at its LTX-native 704x512 / 161f / 25fps
-     = 6.44s; the original ">= 720p" bar was dropped because the 64 GB run that
-     could hit 720p (Wan 2.2 A14B) OOMs — see docs/image-to-video.md §5.
-
-Outputs follow the project structure (project 'Test_ui'):
-  outputs/Test_ui/characters/<name>/reference.png
-  outputs/Test_ui/scenes/scene_<n>/scene.png
-  outputs/Test_ui/scenes/scene_<n>/out/benchmark_<model>.mp4 (+ metrics)
+Outputs (project BENCHMARK_PROJECT):
+  outputs/<project>/scenes/scene_<n>/out/benchmark_<model>.mp4 (+ metrics)
 """
 
 import sys
@@ -41,99 +23,59 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from generators.image_generator import cleanup_pipeline
 from generators.image_engine import generate_character, get_character
 from generators.video_engine import create_validated_scene
 from generators.video_generator import (
     AVAILABLE_VIDEO_MODELS,
-    DEFAULT_VIDEO_MODEL,
     generate_video,
 )
 from utils.project_paths import scene_out_dir
 
-# Nikita and Roger live in the 'Test_ui' project (their reference images and
-# scenes), NOT the default 'test_project'. Run the benchmark against the
-# project that actually owns the characters.
 BENCHMARK_PROJECT = "Test_ui"
 
-# Characters used by the benchmark. Portraits drive character generation;
-# the scene prompt only references them by name.
-CHARACTERS = {
-    "Nikita": (
-        "Portrait of Nikita, a young woman with long curly red hair and fair "
-        "skin, natural friendly expression, warm eyes. Photorealistic, "
-        "detailed face"
-    ),
-    "Roger": (
-        "Portrait of Roger, a bald dark-skinned man with a muscular build "
-        "and a calm friendly expression. Photorealistic, detailed face"
-    ),
-}
+CHARACTER_NAME = "Walker"
+CHARACTER_PROMPT = (
+    "Full-body portrait of Walker, a young person with short dark hair, "
+    "wearing a green jacket, jeans and sneakers. Photorealistic, detailed face"
+)
 
-# The definitive benchmark scene for the vertical 9:16 LTX Video benchmark.
-# Focuses on subtle motion and character consistency for ~3 seconds.
 SCENE_PROMPT = (
-    "Nikita and Roger are sitting together at a small table in a quiet, "
-    "realistic café during the morning. Nikita looks at Roger and makes a "
-    "subtle natural movement, gently turning her head toward him and smiling. "
-    "Roger remains mostly still and looks at Nikita. Both characters remain "
-    "visually consistent throughout the shot. Natural breathing and subtle "
-    "facial movement. Stable camera, realistic lighting, realistic anatomy, "
-    "cinematic composition. Minimal movement, calm and natural acting."
+    "Walker, standing on a quiet tree-lined street in soft morning light, "
+    "full body visible, realistic anatomy, cinematic composition."
 )
 
-# Video prompt: describes the subtle natural motion for the i2v animation
-# (scene content stays in the conditioning image). Vertical 9:16 configuration.
 VIDEO_PROMPT = (
-    "Nikita and Roger having a natural morning conversation, subtle head "
-    "movement, gentle smiling, natural breathing, cinematic motion"
+    "Walker walks forward along the street with a natural relaxed gait, "
+    "arms swinging gently, steady tracking camera, realistic motion"
 )
 
-# Vertical 9:16 configuration for LTX Video benchmark
-BENCHMARK_VIDEO_PARAMS = {
-    "width": 576,
-    "height": 1024,
-}
-# music are the next pipeline phase; captured here as the benchmark spec).
-DIALOGUE = [
-    {"character": "Nikita", "line": "Good morning, Roger."},
-    {"character": "Roger", "line": "Good morning to you too, Nikita."},
-]
-BACKGROUND_SOUND = "quiet and relaxed background ambience"
-
-# Video-model generation parameters (resolution, frame count, fps) are owned
-# by video_generator.MODEL_GENERATION_PARAMS, NOT by this benchmark: when we
-# generate videos we must not pass model-specific parameters from here — that
-# is video_generator's responsibility. The benchmark therefore supplies only
-# what it owns: the conditioning image, the motion prompt, the model name, the
-# output location and a fixed seed.
-#
-# ltx_video_095_i2v is configured by video_generator at its LTX-native
-# vertical 9:16 576x1024 / 81 frames @ 25 fps = ~3.24 s (new benchmark
-# duration). The previous 1024x576 landscape configuration is no longer the
-# default for this benchmark. Model-specific generation parameters
-# (resolution, frame count, fps, guidance) are owned by
-# video_generator.MODEL_GENERATION_PARAMS; this benchmark passes only the
-# conditioning image, motion prompt, model name, output location and a fixed
-# seed, and lets video_generator apply each model's native parameters.
-
-# ltx_video_095_i2v native: 576x1024 (9:16), 81 frames @ 25 fps = ~3.24 s.
-# The benchmark scenario uses subtle motion to test character identity and
-# temporal stability over ~3 seconds, not complex animation.
+# Resolution, frame count and fps are owned by
+# video_generator.MODEL_GENERATION_PARAMS; the benchmark passes only the
+# conditioning image, prompt, model name, output location and a fixed seed.
+# The scene image is generated at the models' shared 832x480 size.
+SCENE_SIZE = {"width": 832, "height": 480}
 
 
-def ensure_character(name: str, project: str = BENCHMARK_PROJECT):
-    """Create a benchmark character if it does not exist yet."""
+def ensure_character(name: str = CHARACTER_NAME, project: str = BENCHMARK_PROJECT):
+    """Create the benchmark character if it does not exist yet."""
     if get_character(name, project) is None:
         print(f"Generating benchmark character '{name}'...")
-        generate_character(name, CHARACTERS[name], project=project)
+        generate_character(name, CHARACTER_PROMPT, project=project)
     else:
         print(f"Character '{name}' already exists; reusing reference.")
 
 
 def generate_benchmark_videos(
-    scene: dict, video_prompt: str, project: str = BENCHMARK_PROJECT
+    scene: dict,
+    video_prompt: str,
+    project: str = BENCHMARK_PROJECT,
+    models=None,
 ) -> dict:
-    """Animate a validated scene with every i2v model, then enhance each clip.
+    """Animate a validated scene with each i2v model, strictly one at a time.
+
+    generate_video unloads its pipeline before returning; the explicit
+    gc/cache cleanup below guarantees memory is released between models.
 
     Model-specific generation parameters (resolution, frame count, fps,
     guidance) are owned by video_generator.MODEL_GENERATION_PARAMS; this
@@ -147,7 +89,7 @@ def generate_benchmark_videos(
     """
     out_dir = scene_out_dir(scene["scene_number"], project)
     results = {}
-    for model_name in AVAILABLE_VIDEO_MODELS:
+    for model_name in models or AVAILABLE_VIDEO_MODELS:
         try:
             print(f"\n--- Generating video with {model_name} ---")
             results[model_name] = generate_video(
@@ -177,37 +119,28 @@ def generate_benchmark_videos(
         except Exception as e:
             print(f"Failed to generate video with {model_name}: {e}")
             results[model_name] = None
+        finally:
+            cleanup_pipeline(None)
     return results
 
 
-def run_cafe_conversation_benchmark(project: str = BENCHMARK_PROJECT) -> dict:
-    """The definitive benchmark: Nikita and Roger talking in a café."""
-    print("\n########## Benchmark: Café conversation (Nikita & Roger) ##########")
-    for name in ("Nikita", "Roger"):
-        ensure_character(name, project)
+def run_walking_benchmark(project: str = BENCHMARK_PROJECT, models=None) -> dict:
+    """Benchmark: a random character walking."""
+    print("\n########## Benchmark: Character walking ##########")
+    ensure_character(CHARACTER_NAME, project)
 
     print(f"\n=== Generating scene: {SCENE_PROMPT[:80]}... ===")
-    # Face verification is checked but NON-FATAL (require_verification=False):
-    # an inconclusive/non-matching check must not abort the benchmark — the
-    # point is to see whether a video can be generated.
-    # Generate the scene at the LTX Video benchmark resolution (576x1024, 9:16)
-    # so the conditioning frame matches the output exactly.
+    # Face verification is non-fatal: the point is to see whether a video
+    # can be generated.
     scene = create_validated_scene(
         SCENE_PROMPT,
-        character_names=["Nikita", "Roger"],
+        character_names=[CHARACTER_NAME],
         seed=42,
         project=project,
         require_verification=False,
-        width=BENCHMARK_VIDEO_PARAMS["width"],
-        height=BENCHMARK_VIDEO_PARAMS["height"],
+        **SCENE_SIZE,
     )
-
-    print("\n=== Dialogue for the audio stage ===")
-    for d in DIALOGUE:
-        print(f"     {d['character']}: \"{d['line']}\"")
-    print(f"  Background: {BACKGROUND_SOUND}")
-
-    return generate_benchmark_videos(scene, VIDEO_PROMPT, project)
+    return generate_benchmark_videos(scene, VIDEO_PROMPT, project, models)
 
 
 def print_summary(all_results: dict):
@@ -227,25 +160,27 @@ def print_summary(all_results: dict):
                 print(f"  {model_name}: FAILED")
 
 
-def main():
-    """Run the image-to-video benchmark across all i2v models."""
-    print("=== Image-to-Video Generation Benchmark Suite ===")
+def main(argv=None):
+    """Run the walking benchmark on the requested (default: all) models."""
+    requested = list(sys.argv[1:] if argv is None else argv) or None
+    if requested:
+        unknown = [m for m in requested if m not in AVAILABLE_VIDEO_MODELS]
+        if unknown:
+            sys.exit(
+                f"Unknown model(s): {', '.join(unknown)}. "
+                f"Available: {', '.join(AVAILABLE_VIDEO_MODELS)}"
+            )
+    print("=== Image-to-Video Generation Benchmark ===")
     print(
-        f"Models: {', '.join(AVAILABLE_VIDEO_MODELS)} (default: {DEFAULT_VIDEO_MODEL})"
+        f"Models: {', '.join(requested or AVAILABLE_VIDEO_MODELS)} "
+        f"(run sequentially, one at a time)"
     )
 
     all_results = {}
     try:
-        all_results["Café conversation (Nikita & Roger)"] = (
-            run_cafe_conversation_benchmark()
-        )
-
+        all_results["Character walking"] = run_walking_benchmark(models=requested)
         print_summary(all_results)
-        print("\nBenchmark suite completed!")
-        print(
-            "Compare scene_*/out/benchmark_<model>.mp4 and the matching "
-            "*_benchmark_metrics.json files to pick the winning i2v model."
-        )
+        print("\nBenchmark completed!")
     except Exception as e:
         print(f"Error during benchmark: {e}")
         if all_results:
